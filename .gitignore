@@ -1,0 +1,10 @@
+node_modules/
+.wrangler/
+.sites-runtime/
+.venv/
+.dev.vars
+local/storage/
+local/models/
+local/runtime/
+__pycache__/
+*.pyc

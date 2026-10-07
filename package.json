@@ -1,0 +1,12 @@
+{
+  "name": "mission-health",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "wrangler dev --config wrangler.jsonc --local --port 8765 --persist-to .wrangler/state",
+    "db:generate": "drizzle-kit generate"
+  },
+  "dependencies": {"drizzle-orm": "0.45.2"},
+  "devDependencies": {"drizzle-kit": "0.31.10", "wrangler": "4.92.0"}
+}

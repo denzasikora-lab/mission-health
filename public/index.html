@@ -7,7 +7,7 @@
   <meta name="description" content="A mission health monitoring prototype with simulated crew readings, trend review, and research context.">
   <title>Mission Health | Crew monitoring prototype</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23061119'/%3E%3Cpath d='M8 34h12l6-14 10 26 7-12h13' fill='none' stroke='%2372e5ff' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="styles.css?v=20261007-glass2">
+  <link rel="stylesheet" href="styles.css?v=20261007-green2">
   <script>try{const theme=localStorage.getItem('mission-health-theme');document.documentElement.dataset.theme=theme==='light'||theme==='dark'?theme:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch{}</script>
 </head>
 <body>
@@ -35,18 +35,34 @@
     <main class="layout">
       <aside class="panel glass panel-pad crew-panel" data-i18n-aria="crewMembers"><div class="panel-heading"><h2 data-i18n="crew"></h2><span class="count" data-i18n="memberCount"></span></div><div class="crew-list" id="crew-list"></div><div class="aside-note"><strong data-i18n="missionContext"></strong><span data-i18n="demoMission"></span><br><span data-i18n="latestSample"></span><br><span data-i18n="fictional"></span></div></aside>
       <section class="main-column" data-i18n-aria="dashboard">
-        <div class="panel glass profile"><div><h2 class="profile-name" id="profile-name"></h2><div class="profile-meta" id="profile-meta"></div></div><div class="profile-state" id="profile-state"></div></div>
-        <div class="metrics" id="metrics" data-i18n-aria="measurements"></div>
-        <section class="panel glass chart-panel" aria-labelledby="trend-heading"><div class="chart-head"><div><h2 class="chart-title" id="trend-heading" data-i18n="trend"></h2><span class="chart-subtitle" id="chart-subtitle"></span></div><div class="segmented" role="group" data-i18n-aria="chartPeriod"><button class="segment" type="button" data-period="24h" aria-pressed="true" data-i18n="periodDay"></button><button class="segment" type="button" data-period="7d" aria-pressed="false" data-i18n="periodWeek"></button></div></div><div class="chart-wrap"><svg id="trend-chart" viewBox="0 0 640 200" preserveAspectRatio="none" role="img"></svg></div><div class="chart-axis" id="chart-axis" dir="ltr"></div><div class="chart-foot"><span id="baseline-caption"></span><span class="chart-legend"><i class="legend-line" aria-hidden="true"></i><span data-i18n="sampleReadings"></span></span></div></section>
+        <div class="panel glass profile"><div class="profile-identity"><img id="profile-photo" class="profile-photo" alt=""><div><h2 class="profile-name" id="profile-name"></h2><div class="profile-meta" id="profile-meta"></div><a class="bio-link" id="profile-bio" target="_blank" rel="noopener noreferrer" data-i18n="biography"></a><span class="simulation-caption" data-i18n="profileSimulation"></span></div></div><div class="profile-state" id="profile-state"></div></div>
+        <div class="view-tabs" role="tablist" data-i18n-aria="viewLabel"><button type="button" role="tab" id="health-tab" data-view="health" aria-selected="true" aria-controls="health-view" data-i18n="healthTab"></button><button type="button" role="tab" id="journal-tab" data-view="journal" aria-selected="false" aria-controls="journal-view" data-i18n="journalTab"></button></div><div id="health-view" class="health-view" role="tabpanel" aria-labelledby="health-tab"><div class="metrics" id="metrics" data-i18n-aria="measurements"></div>
+        <section class="panel glass chart-panel" aria-labelledby="trend-heading"><div class="chart-head"><div><h2 class="chart-title" id="trend-heading" data-i18n="trend"></h2><span class="chart-subtitle" id="chart-subtitle"></span></div><div class="segmented" role="group" data-i18n-aria="chartPeriod"><button class="segment" type="button" data-period="1m" aria-pressed="false" data-i18n="periodMinute"></button><button class="segment" type="button" data-period="1h" aria-pressed="false" data-i18n="periodHour"></button><button class="segment" type="button" data-period="24h" aria-pressed="true" data-i18n="periodDay"></button><button class="segment" type="button" data-period="7d" aria-pressed="false" data-i18n="periodWeek"></button><button class="segment" type="button" data-period="1mo" aria-pressed="false" data-i18n="periodMonth"></button><button class="segment" type="button" data-period="1y" aria-pressed="false" data-i18n="periodYear"></button></div></div><div class="chart-wrap"><svg id="trend-chart" viewBox="0 0 640 200" preserveAspectRatio="none" role="img"></svg></div><div class="chart-axis" id="chart-axis" dir="ltr"></div><div class="chart-foot"><span id="baseline-caption"></span><span class="chart-legend"><i class="legend-line" aria-hidden="true"></i><span data-i18n="sampleReadings"></span></span></div></section>
         <div class="bottom-grid"><section class="panel glass small-panel" aria-labelledby="context-heading"><h2 id="context-heading" data-i18n="readingContext"></h2><ul class="context-list" id="context-list"></ul></section><section class="panel glass small-panel" aria-labelledby="activity-heading"><h2 id="activity-heading" data-i18n="recentActivity"></h2><ul class="event-list" id="event-list"></ul></section></div>
+</div>
+        <section id="journal-view" class="panel glass journal-panel" role="tabpanel" aria-labelledby="journal-tab" hidden>
+          <header class="journal-header"><div><p class="tiny-label" data-i18n="demoNote"></p><h2 id="journal-name"></h2><p data-i18n="journalIntro"></p></div><span class="journal-storage" id="journal-storage"></span></header>
+          <div class="journal-status" id="journal-capabilities"></div>
+          <form id="journal-search-form" class="journal-search"><label for="journal-search-input" data-i18n="searchDiary"></label><div class="lookup-row"><input type="search" id="journal-search-input" maxlength="1000" autocomplete="off"><button type="submit" data-i18n="searchDiaryButton"></button></div></form>
+          <div id="journal-search-results" class="journal-search-results" aria-live="polite" hidden></div>
+          <button type="button" id="journal-older" class="older-button" data-i18n="journalOlder" hidden></button>
+          <div id="journal-messages" class="journal-messages" role="log" aria-live="polite"></div>
+          <div id="journal-notice" class="journal-notice" role="status" hidden></div>
+          <form id="journal-form" class="journal-composer">
+            <div class="composer-modes" role="group"><button type="button" data-journal-mode="diary" aria-pressed="true" data-i18n="noteMode"></button><button type="button" data-journal-mode="ask" aria-pressed="false" data-i18n="askMode"></button></div>
+            <div class="journal-prompts"><button type="button" data-prompt="sleep" data-i18n="promptSleep"></button><button type="button" data-prompt="exercise" data-i18n="promptExercise"></button><button type="button" data-prompt="recall" data-i18n="promptRecall"></button></div>
+            <label for="journal-input" class="sr-only" data-i18n="composerLabel"></label><textarea id="journal-input" maxlength="6000" rows="3"></textarea>
+            <div class="composer-footer"><span id="journal-length">0 / 6000</span><button type="submit" id="journal-send" data-i18n="send"></button></div>
+          </form>
+        </section>
       </section>
       <aside class="insight-column" data-i18n-aria="assessmentResearch">
         <section class="panel glass assessment" aria-labelledby="assessment-heading"><span class="tiny-label" data-i18n="currentAssessment"></span><h2 class="status-title" id="assessment-heading"></h2><p class="status-desc" id="assessment-desc"></p><div class="divider"></div><span class="tiny-label" data-i18n="signals"></span><ul class="signal-list" id="signal-list"></ul><div class="divider"></div><div class="next-step"><strong data-i18n="nextCheck"></strong><span id="next-step"></span></div><p class="assessment-disclaimer" data-i18n="disclaimer"></p></section>
         <section class="panel glass evidence" aria-labelledby="evidence-heading"><h2 id="evidence-heading" data-i18n="researchContext"></h2><p class="evidence-intro" data-i18n="researchIntro"></p><div id="source-list"></div><form class="lookup" id="lookup-form"><label for="lookup-input" data-i18n="findMaterial"></label><div class="lookup-row"><input id="lookup-input" type="search" autocomplete="off"><button type="submit" data-i18n="find"></button></div><div class="lookup-result" id="lookup-result" aria-live="polite"></div></form></section>
       </aside>
     </main>
-    <footer class="site-footer"><span data-i18n="footer"></span><span><span data-i18n="sourcesLabel"></span> <a href="https://www.nasa.gov/hrp/risks/" target="_blank" rel="noopener noreferrer" data-i18n="sourceProgram"></a></span></footer>
+    <p class="photo-credit" data-i18n="photoCredit"></p><footer class="site-footer"><span data-i18n="footer"></span><span><span data-i18n="sourcesLabel"></span> <a href="https://www.nasa.gov/hrp/risks/" target="_blank" rel="noopener noreferrer" data-i18n="sourceProgram"></a></span></footer>
   </div>
-  <script src="translations.js?v=20261007-glass2"></script><script src="app.js?v=20261007-glass2"></script>
+  <script src="crew.js?v=20261007-green2"></script><script src="translations.js?v=20261007-green2"></script><script src="app.js?v=20261007-green2"></script><script src="journal.js?v=20261007-green2"></script>
 </body>
 </html>

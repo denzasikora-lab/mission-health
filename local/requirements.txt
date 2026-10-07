@@ -1,0 +1,11 @@
+sentence-transformers==6.1.0
+transformers==5.19.0
+torch==2.14.1
+torchvision==0.29.1
+pillow==12.3.0
+soundfile==0.14.0
+torchcodec==0.17.0
+qdrant-client==1.19.1
+fastapi==0.142.2
+uvicorn==0.54.0
+mlx-lm==0.32.0
