@@ -24,7 +24,8 @@ if not key_file.exists():
     key_file.write_text(secrets.token_urlsafe(32))
 key_file.chmod(0o600)
 settings = Path('.dev.vars')
-settings.write_text('MEMORY_API_KEY=' + key_file.read_text().strip() + '\n')
+existing = [line for line in settings.read_text().splitlines() if not line.startswith('MEMORY_API_KEY=')] if settings.exists() else []
+settings.write_text('\n'.join(existing) + '\nMEMORY_API_KEY=' + key_file.read_text().strip() + '\n')
 settings.chmod(0o600)
 PY
 npm run build

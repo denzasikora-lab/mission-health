@@ -1,7 +1,7 @@
-const journalState={profile:null,mode:'diary',messages:[],hasMore:false,capabilities:{memory:false,assistant:false},loading:false,loadError:false,searchMatches:null,notice:null};
+const journalState={profile:null,mode:'ask',messages:[],hasMore:false,capabilities:{memory:false,history:false,assistant:false},loading:false,loadError:false,notice:null};
 const journalDrafts=new Map();
 let journalLoadVersion=0;
-function draftFor(id=crew[state.crew].id){if(!journalDrafts.has(id))journalDrafts.set(id,{content:'',mode:'diary',pendingId:null,busy:false});return journalDrafts.get(id)}
+function draftFor(id=crew[state.crew].id){if(!journalDrafts.has(id))journalDrafts.set(id,{content:'',mode:'ask',pendingId:null,busy:false});return journalDrafts.get(id)}
 function journalDate(value){return new Intl.DateTimeFormat(text().locale,{dateStyle:'medium',timeStyle:'short'}).format(new Date(value))}
 function element(tag,className,content){const node=document.createElement(tag);if(className)node.className=className;if(content!==undefined)node.textContent=content;return node}
 async function journalApi(path,options){
@@ -18,25 +18,20 @@ function renderJournalMessages(){
     const article=element('article','journal-message '+(message.role==='assistant'?'assistant':'user'));article.id='entry-'+message.id;
     const meta=element('div','message-meta');meta.append(element('strong','',message.role==='assistant'?t.assistant:t.you));const time=element('time','',journalDate(message.createdAt));time.dateTime=message.createdAt;meta.append(time);
     const content=element('div','message-content',message.content);content.dir='auto';article.append(meta,content);
-    if(message.role!=='assistant')article.append(element('div','message-memory',message.vectorStatus==='indexed'?t.indexed:t.pendingIndex));
+    if(message.role!=='assistant')article.append(element('div','message-memory',message.vectorStatus==='indexed'?t.indexed:journalState.capabilities.memory?t.pendingIndex:t.journalSaved));
     if(message.references?.length){const refs=element('details','message-references');refs.append(element('summary','',t.memoryMatches));for(const reference of message.references){const node=element('p','',journalDate(reference.createdAt)+' · '+reference.content);node.dir='auto';refs.append(node)}article.append(refs)}
     list.append(article);
   }
-}
-function renderJournalSearch(){
-  const results=$('journal-search-results'),t=text();results.replaceChildren();results.hidden=journalState.searchMatches===null;if(results.hidden)return;
-  results.append(element('strong','',journalState.searchMatches.length?t.memoryMatches:t.searchEmpty));
-  for(const match of journalState.searchMatches){const item=element('article','memory-result'),time=element('time','',journalDate(match.createdAt));time.dateTime=match.createdAt;item.append(time,element('span','',match.content));item.dir='auto';results.append(item)}
 }
 function renderJournal(){
   const t=text(),draft=draftFor();document.querySelectorAll('[data-view]').forEach(button=>button.setAttribute('aria-selected',String(button.dataset.view===state.view)));
   $('health-view').hidden=state.view!=='health';$('journal-view').hidden=state.view!=='journal';document.querySelector('.insight-column').hidden=state.view==='journal';
   $('journal-name').textContent=t.people[state.crew].name;$('journal-storage').textContent=journalState.messages.length?t.journalSaved:t.journalTitle;
-  $('journal-capabilities').replaceChildren(element('span','',journalState.capabilities.memory?t.memoryReady:t.memoryOffline),element('span','',journalState.capabilities.assistant?t.aiReady:t.aiOffline));
-  $('journal-input').placeholder=t.composerPlaceholder;$('journal-search-input').placeholder=t.searchDiaryPlaceholder;
+  $('journal-capabilities').replaceChildren(element('span','',journalState.capabilities.memory?t.memoryReady:journalState.capabilities.history?t.historyReady:t.memoryOffline),element('span','',journalState.capabilities.assistant?t.aiReady:t.aiOffline));
+  $('journal-input').placeholder=t.composerPlaceholder;
   $('journal-input').value=draft.content;$('journal-length').textContent=draft.content.length+' / 6000';$('journal-send').disabled=draft.busy||!draft.content.trim()||journalState.loading||journalState.loadError;
-  $('journal-send').textContent=draft.busy?t.sending:draft.mode==='ask'?t.sendAsk:t.send;document.querySelectorAll('[data-journal-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.journalMode===draft.mode)));
-  $('journal-older').hidden=!journalState.hasMore;$('journal-older').disabled=journalState.loading;renderJournalMessages();renderJournalSearch();renderJournalNotice();
+  $('journal-send').textContent=draft.busy?(draft.mode==='ask'?t.responding:t.sending):draft.mode==='ask'?t.sendAsk:t.send;document.querySelectorAll('[data-journal-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.journalMode===draft.mode)));
+  $('journal-older').hidden=!journalState.hasMore;$('journal-older').disabled=journalState.loading;renderJournalMessages();renderJournalNotice();
 }
 async function loadJournal(older=false){
   const profile=crew[state.crew].id,version=++journalLoadVersion;journalState.loading=true;journalState.loadError=false;journalState.notice=null;renderJournal();
@@ -47,7 +42,7 @@ async function loadJournal(older=false){
   }catch(error){if(version!==journalLoadVersion)return;journalState.loadError=true;journalState.notice='loadError'}
   finally{if(version===journalLoadVersion){journalState.loading=false;renderJournal();if(!older)$('journal-messages').scrollTop=$('journal-messages').scrollHeight}}
 }
-window.journal={onProfileChange(){const profile=crew[state.crew].id;if(journalState.profile!==profile){journalState.profile=profile;journalState.messages=[];journalState.hasMore=false;journalState.searchMatches=null;journalState.notice=null;journalState.loadError=false;++journalLoadVersion;if(state.view==='journal'){void loadJournal();return}}renderJournal()}};
+window.journal={onProfileChange(){const profile=crew[state.crew].id;if(journalState.profile!==profile){journalState.profile=profile;journalState.messages=[];journalState.hasMore=false;journalState.notice=null;journalState.loadError=false;++journalLoadVersion;if(state.view==='journal'){void loadJournal();return}}renderJournal()}};
 document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>{state.view=button.dataset.view;renderJournal();if(state.view==='journal')void loadJournal()}));
 document.querySelector('.view-tabs').addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const selected=event.key==='Home'?'health':event.key==='End'?'journal':state.view==='health'?'journal':'health';document.querySelector('[data-view="'+selected+'"]').click();document.querySelector('[data-view="'+selected+'"]').focus()});
 document.querySelectorAll('[data-journal-mode]').forEach(button=>button.addEventListener('click',()=>{draftFor().mode=button.dataset.journalMode;renderJournal();$('journal-input').focus()}));
@@ -65,12 +60,5 @@ $('journal-form').addEventListener('submit',async event=>{
     if(profile===crew[state.crew].id){for(const message of [result.message,result.reply].filter(Boolean))if(!journalState.messages.some(item=>item.id===message.id))journalState.messages.push(message);showJournalNotice(result.replyError?'aiUnavailable':'saved')}
   }catch(error){if(profile===crew[state.crew].id)showJournalNotice(error.message==='assistant_unavailable'?'aiUnavailable':'saveError')}
   finally{draft.busy=false;if(profile===crew[state.crew].id){renderJournal();$('journal-messages').scrollTop=$('journal-messages').scrollHeight}}
-});
-$('journal-search-form').addEventListener('submit',async event=>{
-  event.preventDefault();const profile=crew[state.crew].id,query=$('journal-search-input').value.trim();if(!query)return;if(!journalState.capabilities.memory){showJournalNotice('memoryUnavailable');return}
-  const button=$('journal-search-form button');button.disabled=true;button.textContent=text().searching;showJournalNotice(null);
-  try{const result=await journalApi('/api/astronauts/'+profile+'/search?q='+encodeURIComponent(query));if(profile===crew[state.crew].id){journalState.searchMatches=result.matches;renderJournalSearch()}}
-  catch{if(profile===crew[state.crew].id)showJournalNotice('memoryUnavailable')}
-  finally{button.disabled=false;button.textContent=text().searchDiaryButton}
 });
 window.journal.onProfileChange();

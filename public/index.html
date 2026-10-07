@@ -7,7 +7,7 @@
   <meta name="description" content="A mission health monitoring prototype with simulated crew readings, trend review, and research context.">
   <title>Mission Health | Crew monitoring prototype</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23061119'/%3E%3Cpath d='M8 34h12l6-14 10 26 7-12h13' fill='none' stroke='%2372e5ff' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="styles.css?v=20261007-green2">
+  <link rel="stylesheet" href="styles.css?v=20261007-connected3">
   <script>try{const theme=localStorage.getItem('mission-health-theme');document.documentElement.dataset.theme=theme==='light'||theme==='dark'?theme:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch{}</script>
 </head>
 <body>
@@ -43,8 +43,6 @@
         <section id="journal-view" class="panel glass journal-panel" role="tabpanel" aria-labelledby="journal-tab" hidden>
           <header class="journal-header"><div><p class="tiny-label" data-i18n="demoNote"></p><h2 id="journal-name"></h2><p data-i18n="journalIntro"></p></div><span class="journal-storage" id="journal-storage"></span></header>
           <div class="journal-status" id="journal-capabilities"></div>
-          <form id="journal-search-form" class="journal-search"><label for="journal-search-input" data-i18n="searchDiary"></label><div class="lookup-row"><input type="search" id="journal-search-input" maxlength="1000" autocomplete="off"><button type="submit" data-i18n="searchDiaryButton"></button></div></form>
-          <div id="journal-search-results" class="journal-search-results" aria-live="polite" hidden></div>
           <button type="button" id="journal-older" class="older-button" data-i18n="journalOlder" hidden></button>
           <div id="journal-messages" class="journal-messages" role="log" aria-live="polite"></div>
           <div id="journal-notice" class="journal-notice" role="status" hidden></div>
@@ -63,6 +61,6 @@
     </main>
     <p class="photo-credit" data-i18n="photoCredit"></p><footer class="site-footer"><span data-i18n="footer"></span><span><span data-i18n="sourcesLabel"></span> <a href="https://www.nasa.gov/hrp/risks/" target="_blank" rel="noopener noreferrer" data-i18n="sourceProgram"></a></span></footer>
   </div>
-  <script src="crew.js?v=20261007-green2"></script><script src="translations.js?v=20261007-green2"></script><script src="app.js?v=20261007-green2"></script><script src="journal.js?v=20261007-green2"></script>
+  <script src="crew.js?v=20261007-connected3"></script><script src="translations.js?v=20261007-connected3"></script><script src="app.js?v=20261007-connected3"></script><script src="journal.js?v=20261007-connected3"></script>
 </body>
 </html>
