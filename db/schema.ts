@@ -1,4 +1,4 @@
-import { sqliteTable, text, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
 export const journalMessages=sqliteTable('journal_messages',{
   id:text('id').primaryKey(),
   ownerId:text('owner_id').notNull(),
@@ -9,5 +9,27 @@ export const journalMessages=sqliteTable('journal_messages',{
   createdAt:text('created_at').notNull(),
   vectorStatus:text('vector_status').notNull().default('pending'),
   replyTo:text('reply_to'),
-  references:text('references_json').notNull().default('[]')
+  references:text('references_json').notNull().default('[]'),
+  attachments:text('attachments_json').notNull().default('[]'),
+  assistantSource:text('assistant_source').notNull().default('server')
 },table=>[index('journal_owner_astronaut_time').on(table.ownerId,table.astronautId,table.createdAt)]);
+export const journalPhotos=sqliteTable('journal_photos',{
+  id:text('id').primaryKey(),
+  ownerId:text('owner_id').notNull(),
+  astronautId:text('astronaut_id').notNull(),
+  kind:text('media_kind').notNull().default('photo'),
+  duration:integer('duration_ms'),
+  frames:text('frames_json').notNull().default('[]'),
+  region:text('region').notNull(),
+  regionKey:text('region_key').notNull(),
+  createdAt:text('created_at').notNull(),
+  objectKey:text('object_key').notNull(),
+  mime:text('mime').notNull(),
+  width:integer('width').notNull(),
+  height:integer('height').notNull(),
+  bytes:integer('bytes').notNull(),
+  digest:text('digest').notNull(),
+  vectorStatus:text('vector_status').notNull().default('pending'),
+  model:text('model'),
+  vector:text('vector_json')
+},table=>[index('photos_owner_profile_region_time').on(table.ownerId,table.astronautId,table.regionKey,table.createdAt)]);
