@@ -9,7 +9,7 @@ async function journalApi(path,options){
   if(!response.ok)throw new Error(body.error||'storage_unavailable');return body;
 }
 function showJournalNotice(key){journalState.notice=key;renderJournalNotice()}
-function renderJournalNotice(){const t=text(),notice=$('journal-notice');notice.hidden=!journalState.notice;notice.replaceChildren();if(!journalState.notice)return;notice.append(element('span','',t[journalState.notice]||t.saveError));if(journalState.notice==='aiUnavailable'&&journalState.assistantError?.upstreamStatus)notice.append(element('span','',t.aiServiceError.replace('{status}',journalState.assistantError.upstreamStatus)));if(journalState.loadError){const button=element('button','older-button',t.retry);button.type='button';button.addEventListener('click',()=>loadJournal());notice.append(button)}}
+function renderJournalNotice(){const t=text(),notice=$('journal-notice');notice.hidden=!journalState.notice;notice.replaceChildren();if(!journalState.notice)return;notice.append(element('span','',t[journalState.notice]||t.saveError));if(journalState.notice==='aiUnavailable'&&journalState.assistantError?.upstreamStatus)notice.append(element('span','', ' '+t.aiServiceError.replace('{status}',journalState.assistantError.upstreamStatus)));if(journalState.loadError){const button=element('button','older-button',t.retry);button.type='button';button.addEventListener('click',()=>loadJournal());notice.append(button)}}
 function renderJournalMessages(){
   const t=text(),list=$('journal-messages');list.replaceChildren();
   if(journalState.loading&&!journalState.messages.length){list.append(element('p','journal-empty',t.loading));return}
