@@ -13,13 +13,13 @@ async function memoryRequest(env,path,body){
   return response.json();
 }
 async function capabilities(env){
-  const result={memory:false,history:Boolean(env.DB),photos:Boolean(env.DB&&env.PHOTOS),assistant:languageModelConfigured(env)};
+  const result={memory:false,history:Boolean(env.DB),photos:Boolean(env.DB&&env.PHOTOS),assistant:languageModelConfigured(env),assistantState:languageModelConfigured(env)?'configured':'offline'};
   if(!memoryConfigured(env))return result;
-  try{const health=await memoryRequest(env,'/health');return {...result,memory:health.semantic===true,assistant:result.assistant||health.generation===true}}catch{return result}
+  try{const health=await memoryRequest(env,'/health');return {...result,memory:health.semantic===true,assistant:result.assistant||health.generation===true,assistantState:result.assistantState==='offline'&&health.generation===true?'ready':result.assistantState}}catch{return result}
 }
-function serialize(row){return {id:row.id,role:row.role,content:row.role==='assistant'?row.content.replaceAll('ё','е').replaceAll('Ё','Е').replace(/[—–]/g,'-'):row.content,language:row.language,createdAt:row.created_at,vectorStatus:row.vector_status,references:JSON.parse(row.references_json||'[]'),attachmentIds:JSON.parse(row.attachments_json||'[]'),source:row.assistant_source||'server',replyStatus:row.role==='user'?(row.answered?'answered':'pending'):'not_applicable',attachments:[]} }
+function serialize(row){return {id:row.id,role:row.role,content:row.role==='assistant'?row.content.replaceAll('ё','е').replaceAll('Ё','Е').replace(/[—–]/g,'-'):row.content,language:row.language,createdAt:row.created_at,vectorStatus:row.vector_status,references:JSON.parse(row.references_json||'[]'),attachmentIds:JSON.parse(row.attachments_json||'[]'),source:row.assistant_source||'server',replyTo:row.reply_to||null,replyStatus:row.role==='user'?(row.answered?'answered':'pending'):'not_applicable',attachments:[]} }
 async function history(env,user,astronaut,before){
-  const db=database(env),query=before?'SELECT m.*,EXISTS(SELECT 1 FROM journal_messages r WHERE r.reply_to=m.id AND r.owner_id=m.owner_id AND r.astronaut_id=m.astronaut_id) AS answered FROM journal_messages m WHERE owner_id=? AND astronaut_id=? AND created_at<? ORDER BY created_at DESC,id DESC LIMIT 61':'SELECT m.*,EXISTS(SELECT 1 FROM journal_messages r WHERE r.reply_to=m.id AND r.owner_id=m.owner_id AND r.astronaut_id=m.astronaut_id) AS answered FROM journal_messages m WHERE owner_id=? AND astronaut_id=? ORDER BY created_at DESC,id DESC LIMIT 61';
+  const db=database(env),query=before?`SELECT m.*,EXISTS(SELECT 1 FROM journal_messages r WHERE r.reply_to=m.id AND r.owner_id=m.owner_id AND r.astronaut_id=m.astronaut_id AND COALESCE(r.assistant_source,'server') NOT IN ('history','comparison') AND COALESCE(r.assistant_source,'server') NOT LIKE 'browser:%') AS answered FROM journal_messages m WHERE owner_id=? AND astronaut_id=? AND created_at<? ORDER BY created_at DESC,id DESC LIMIT 61`:`SELECT m.*,EXISTS(SELECT 1 FROM journal_messages r WHERE r.reply_to=m.id AND r.owner_id=m.owner_id AND r.astronaut_id=m.astronaut_id AND COALESCE(r.assistant_source,'server') NOT IN ('history','comparison') AND COALESCE(r.assistant_source,'server') NOT LIKE 'browser:%') AS answered FROM journal_messages m WHERE owner_id=? AND astronaut_id=? ORDER BY created_at DESC,id DESC LIMIT 61`;
   const {results}=await db.prepare(query).bind(...[user,astronaut,...(before?[before]:[])]).all();
   return {messages:await Promise.all(results.slice(0,60).reverse().map(row=>hydratedMessage(env,user,astronaut,row))),hasMore:results.length>60};
 }
@@ -65,11 +65,22 @@ function diaryPrompt(query){
 }
 async function languageModelAnswer(env,query){
   const instruction=diaryPrompt(query);
-  const messages=[{role:'system',content:instruction},...query.history.filter(item=>!item.source?.startsWith('browser:')).slice(-10).map(item=>({role:item.role==='assistant'?'assistant':'user',content:item.role==='assistant'?item.content.slice(0,2000):'Дата: '+item.createdAt+'\n'+item.content.slice(0,2400)}))];
-  if(query.history.at(-1)?.content!==query.query||query.history.at(-1)?.role!=='user')messages.push({role:'user',content:query.query});
+  const trustedHistory=query.history.filter(item=>!['history','comparison'].includes(item.source)&&!item.source?.startsWith('browser:'));
+  const messages=[{role:'system',content:instruction},...trustedHistory.slice(-10).map(item=>({role:item.role==='assistant'?'assistant':'user',content:item.role==='assistant'?item.content.slice(0,2000):'Дата: '+item.createdAt+'\n'+item.content.slice(0,2400)}))];
+  if(trustedHistory.at(-1)?.content!==query.query||trustedHistory.at(-1)?.role!=='user')messages.push({role:'user',content:query.query});
   if(query.photos?.length){const last=messages.at(-1);last.content=[{type:'text',text:typeof last.content==='string'?last.content:query.query},...query.photos.flatMap(photo=>[{type:'text',text:'Фото '+photo.position+'; дата '+photo.createdAt+'; участок '+photo.region},{type:'image_url',image_url:{url:photo.dataUrl,detail:'high'}}])]}
-  let response;for(let attempt=0;attempt<2;attempt++){response=await fetch(env.LLM_BASE_URL.replace(/\/$/,'')+'/chat/completions',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+env.LLM_API_KEY},body:JSON.stringify({model:env.LLM_MODEL,messages,max_completion_tokens:1536,reasoning_effort:'low',store:false}),signal:AbortSignal.timeout(40000)});if(response.ok||![502,503,504].includes(response.status)||attempt===1)break;await response.body?.cancel()}
-  if(!response.ok){console.warn('Ошибка языкового сервиса:',response.status);fail('assistant_unavailable',503)}
+  let response;
+  for(let attempt=0;attempt<2;attempt++){
+    try{response=await fetch(env.LLM_BASE_URL.replace(/\/$/,'')+'/chat/completions',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+env.LLM_API_KEY},body:JSON.stringify({model:env.LLM_MODEL,messages,max_completion_tokens:1536,reasoning_effort:'low',store:false}),signal:AbortSignal.timeout(40000)})}
+    catch(error){if(attempt===0)continue;console.error('Соединение с языковым сервисом недоступно:',error.name);fail('assistant_unavailable',503)}
+    if(response.ok||![502,503,504].includes(response.status)||attempt===1)break;
+    await response.body?.cancel();
+  }
+  if(!response.ok){
+    const status=response.status,body=await response.text(),requestId=(body.match(/request-id:\s*([a-f0-9-]{36})/i)||[])[1]||null;
+    console.error('Ошибка языкового сервиса:',JSON.stringify({status,requestId,model:env.LLM_MODEL,host:new URL(env.LLM_BASE_URL).hostname}));
+    throw Object.assign(new Error('assistant_unavailable'),{code:'assistant_unavailable',status:503,upstreamStatus:status});
+  }
   const data=await response.json(),content=data.choices?.[0]?.message?.content;
   const answer=typeof content==='string'?content:Array.isArray(content)?content.map(part=>part.text||'').join(''):'';
   if(!answer.trim())fail('assistant_unavailable',503);
@@ -85,13 +96,13 @@ async function addMessage(request,env,user,astronaut){
   if(existing){
     if(existing.owner_id!==user||existing.astronaut_id!==astronaut||existing.role!==(input.mode==='ask'?'user':'note')||(existing.content!==input.content.trim()||existing.attachments_json!==JSON.stringify(attachmentIds)))fail('id_conflict',409);
     const reply=await db.prepare('SELECT * FROM journal_messages WHERE reply_to=? AND owner_id=? AND astronaut_id=?').bind(input.id,user,astronaut).first();
-    if(reply||input.mode==='diary')return json({message:await hydratedMessage(env,user,astronaut,{...existing,answered:Boolean(reply)}),reply:reply?await hydratedMessage(env,user,astronaut,reply):null});
+    if((reply&&!['history','comparison'].includes(reply.assistant_source)&&!reply.assistant_source?.startsWith('browser:'))||input.mode==='diary')return json({message:await hydratedMessage(env,user,astronaut,{...existing,answered:Boolean(reply)}),reply:reply?await hydratedMessage(env,user,astronaut,reply):null});
   }
   if(!existing)for(const id of attachmentIds)if(!await photoRow(env,user,astronaut,id))fail('not_found',404);
   const features=await capabilities(env);if(input.mode==='ask'&&!features.assistant)fail('assistant_unavailable',503);
   const row=existing||{id:input.id,owner_id:user,astronaut_id:astronaut,role:input.mode==='diary'?'note':'user',content:input.content.trim(),language:input.language,created_at:new Date().toISOString(),vector_status:'pending',references_json:'[]',attachments_json:JSON.stringify(attachmentIds)};
   if(!existing)await db.prepare('INSERT INTO journal_messages (id,owner_id,astronaut_id,role,content,language,created_at,vector_status,references_json,attachments_json) VALUES (?,?,?,?,?,?,?,?,?,?)').bind(row.id,user,astronaut,row.role,row.content,row.language,row.created_at,'pending','[]',row.attachments_json).run();
-  let reply=null,replyError=null;
+  let reply=null,replyError=null,assistantError=null;
   if(input.mode==='ask'){
     try{
       await syncPending(env,user,astronaut);
@@ -102,11 +113,12 @@ async function addMessage(request,env,user,astronaut){
       const answer=languageModelConfigured(env)?await languageModelAnswer(env,context):await memoryRequest(env,'/answer',context);
       if(typeof answer.text!=='string'||!answer.text.trim())fail('assistant_unavailable',503);
       const entry={id:crypto.randomUUID(),role:'assistant',content:answer.text.slice(0,16000).replaceAll('ё','е').replaceAll('Ё','Е').replace(/[—–]/g,'-'),language:row.language,created_at:new Date().toISOString(),vector_status:'not_applicable',references_json:JSON.stringify([...references.filter(x=>x.id!==row.id).map(x=>({id:x.id,createdAt:x.createdAt,content:x.content.slice(0,160)})),...context.photos.map(({dataUrl,...photo})=>({...photo,type:'photo',content:photo.region}))])};
+      await db.prepare("UPDATE journal_messages SET content=?,language=?,created_at=?,references_json=?,assistant_source='server' WHERE reply_to=? AND owner_id=? AND astronaut_id=? AND (assistant_source IN ('history','comparison') OR assistant_source LIKE 'browser:%')").bind(entry.content,entry.language,entry.created_at,entry.references_json,row.id,user,astronaut).run();
       await db.prepare('INSERT INTO journal_messages (id,owner_id,astronaut_id,role,content,language,created_at,vector_status,reply_to,references_json) SELECT ?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM journal_messages WHERE reply_to=? AND owner_id=? AND astronaut_id=?)').bind(entry.id,user,astronaut,entry.role,entry.content,entry.language,entry.created_at,entry.vector_status,row.id,entry.references_json,row.id,user,astronaut).run();reply=await hydratedMessage(env,user,astronaut,await db.prepare('SELECT * FROM journal_messages WHERE reply_to=? AND owner_id=? AND astronaut_id=?').bind(row.id,user,astronaut).first());
-    }catch(error){console.warn('Ответ помощника недоступен:',error.code||error.name);replyError='assistant_unavailable'}
+    }catch(error){console.error('Ответ помощника недоступен:',error.code||error.name);replyError='assistant_unavailable';assistantError={upstreamStatus:error.upstreamStatus||null}}
   }
   if(await indexEntry(env,row))row.vector_status='indexed';
-  return json({message:await hydratedMessage(env,user,astronaut,{...row,answered:Boolean(reply)}),reply,replyError},201);
+  return json({message:await hydratedMessage(env,user,astronaut,{...row,answered:Boolean(reply)}),reply,replyError,assistantError,assistantState:input.mode==='ask'?(replyError?'unavailable':'ready'):features.assistantState},201);
 }
 export default {
   async fetch(request,env,ctx){
@@ -127,7 +139,7 @@ export default {
       const astronaut=match[1];
       if(match[2]==='messages'&&request.method==='GET'){
         const before=url.searchParams.get('before');if(before&&! /^\d{4}-\d{2}-\d{2}T/.test(before))fail('invalid_input',400);
-        const result=await history(env,user,astronaut,before);ctx.waitUntil(syncPending(env,user,astronaut));return json({...result,capabilities:await capabilities(env)});
+        const result=await history(env,user,astronaut,before);ctx.waitUntil(syncPending(env,user,astronaut));const features=await capabilities(env),lastQuestion=result.messages.filter(item=>item.role==='user').at(-1);if(features.assistant&&lastQuestion)features.assistantState=lastQuestion.replyStatus==='pending'?'unavailable':'ready';return json({...result,capabilities:features});
       }
       if(match[2]==='messages'&&request.method==='POST')return await addMessage(request,env,user,astronaut);
       if(match[2]==='search'&&request.method==='GET'){
