@@ -271,7 +271,7 @@ const translations={
     "attachPhoto": "Attach photo",
     "cameraDenied": "Camera access is unavailable. Allow it in your browser or upload a photo.",
     "invalidPhoto": "This image could not be opened. Try a JPEG, PNG or WebP photo.",
-    "photoSaving": "Saving photo...",
+    "photoSaving": "Saving capture...",
     "photoLoading": "Loading comparison model",
     "photoEncoding": "Creating image vector...",
     "photoIndexed": "Vector saved",
@@ -312,7 +312,8 @@ const translations={
     "invalidVideo": "This video could not be opened. Try an MP4 or WebM clip under 20 MB.",
     "videoUnavailable": "Recording is unavailable in this browser. Upload a short video instead.",
     "videoPrompt": "Compare this clip with my previous videos of the same area. Describe visible changes in the sampled frames, without diagnosis or claims about unobserved movements.",
-    "videoLabel": "Video"
+    "videoLabel": "Video",
+    "visualHistory": "Visual history"
   },
   "zh": {
     "locale": "zh-CN",
@@ -586,7 +587,7 @@ const translations={
     "attachPhoto": "添加照片",
     "cameraDenied": "无法使用相机。请允许浏览器访问或上传照片。",
     "invalidPhoto": "无法打开图片。请尝试 JPEG、PNG 或 WebP 照片。",
-    "photoSaving": "正在保存照片...",
+    "photoSaving": "正在保存记录...",
     "photoLoading": "正在加载比较模型",
     "photoEncoding": "正在生成图像向量...",
     "photoIndexed": "向量已保存",
@@ -627,7 +628,8 @@ const translations={
     "invalidVideo": "无法打开视频。请尝试小于 20 MB 的 MP4 或 WebM。",
     "videoUnavailable": "此浏览器无法录制，请上传短视频。",
     "videoPrompt": "将此视频与同一部位的历史视频比较。描述采样帧中的可见变化，不诊断，也不推断未观察到的动作。",
-    "videoLabel": "视频"
+    "videoLabel": "视频",
+    "visualHistory": "视觉记录"
   },
   "ar": {
     "locale": "ar-AE",
@@ -901,7 +903,7 @@ const translations={
     "attachPhoto": "إرفاق الصورة",
     "cameraDenied": "الكاميرا غير متاحة. اسمح بالوصول إليها في المتصفح أو ارفع صورة.",
     "invalidPhoto": "تعذر فتح الصورة. جرب صورة JPEG أو PNG أو WebP.",
-    "photoSaving": "جار حفظ الصورة...",
+    "photoSaving": "جار حفظ التسجيل...",
     "photoLoading": "جار تحميل نموذج المقارنة",
     "photoEncoding": "جار إنشاء متجه الصورة...",
     "photoIndexed": "تم حفظ المتجه",
@@ -942,7 +944,8 @@ const translations={
     "invalidVideo": "تعذر فتح الفيديو. جرب MP4 أو WebM دون 20 ميغابايت.",
     "videoUnavailable": "التسجيل غير متاح في هذا المتصفح. ارفع فيديو قصيرا.",
     "videoPrompt": "قارن هذا المقطع بمقاطعي السابقة للمنطقة نفسها. صف التغيرات الظاهرة في الإطارات المختارة دون تشخيص أو ادعاء حركات غير مرئية.",
-    "videoLabel": "فيديو"
+    "videoLabel": "فيديو",
+    "visualHistory": "السجل المرئي"
   },
   "es": {
     "locale": "es-ES",
@@ -1216,7 +1219,7 @@ const translations={
     "attachPhoto": "Adjuntar foto",
     "cameraDenied": "La cámara no está disponible. Permite el acceso en el navegador o sube una foto.",
     "invalidPhoto": "No se pudo abrir la imagen. Prueba una foto JPEG, PNG o WebP.",
-    "photoSaving": "Guardando foto...",
+    "photoSaving": "Guardando registro...",
     "photoLoading": "Cargando modelo de comparación",
     "photoEncoding": "Creando vector de imagen...",
     "photoIndexed": "Vector guardado",
@@ -1257,6 +1260,7 @@ const translations={
     "invalidVideo": "No se pudo abrir el vídeo. Prueba MP4 o WebM de menos de 20 MB.",
     "videoUnavailable": "Este navegador no permite grabar. Sube un vídeo corto.",
     "videoPrompt": "Compara este clip con mis vídeos anteriores de la misma zona. Describe los cambios visibles en los fotogramas sin diagnosticar ni afirmar movimientos no observados.",
-    "videoLabel": "Vídeo"
+    "videoLabel": "Vídeo",
+    "visualHistory": "Historial visual"
   }
 };

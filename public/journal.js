@@ -16,7 +16,7 @@ function renderJournalMessages(){
   if(!journalState.messages.length){const empty=element('div','journal-empty');empty.append(element('h3','',t.journalEmpty),element('p','',t.journalEmptyText));list.append(empty);return}
   for(const message of journalState.messages){
     const article=element('article','journal-message '+(message.role==='assistant'?'assistant':'user'));article.id='entry-'+message.id;
-    const meta=element('div','message-meta');meta.append(element('strong','',message.role==='assistant'?(message.source?.startsWith('browser:')?t.reserveAssistant:t.assistant):t.you));const time=element('time','',journalDate(message.createdAt));time.dateTime=message.createdAt;meta.append(time);
+    const meta=element('div','message-meta');meta.append(element('strong','',message.role==='assistant'?(message.source==='comparison'?t.visualHistory:message.source?.startsWith('browser:')?t.reserveAssistant:t.assistant):t.you));const time=element('time','',journalDate(message.createdAt));time.dateTime=message.createdAt;meta.append(time);
     for(const photo of message.attachments||[])if(window.photos)article.append(window.photos.messagePhoto(photo));
     const content=element('div','message-content',message.content);content.dir='auto';article.append(meta,content);
     if(message.role!=='assistant')article.append(element('div','message-memory',message.vectorStatus==='indexed'?t.indexed:journalState.capabilities.memory?t.pendingIndex:t.journalSaved));
