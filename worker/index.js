@@ -65,7 +65,7 @@ function diaryPrompt(query){
 }
 async function languageModelAnswer(env,query){
   const instruction=diaryPrompt(query);
-  const messages=[{role:'system',content:instruction},...query.history.slice(-10).map(item=>({role:item.role==='assistant'?'assistant':'user',content:item.role==='assistant'?item.content.slice(0,2000):'Дата: '+item.createdAt+'\n'+item.content.slice(0,2400)}))];
+  const messages=[{role:'system',content:instruction},...query.history.filter(item=>!item.source?.startsWith('browser:')).slice(-10).map(item=>({role:item.role==='assistant'?'assistant':'user',content:item.role==='assistant'?item.content.slice(0,2000):'Дата: '+item.createdAt+'\n'+item.content.slice(0,2400)}))];
   if(query.history.at(-1)?.content!==query.query||query.history.at(-1)?.role!=='user')messages.push({role:'user',content:query.query});
   if(query.photos?.length){const last=messages.at(-1);last.content=[{type:'text',text:typeof last.content==='string'?last.content:query.query},...query.photos.flatMap(photo=>[{type:'text',text:'Фото '+photo.position+'; дата '+photo.createdAt+'; участок '+photo.region},{type:'image_url',image_url:{url:photo.dataUrl,detail:'high'}}])]}
   let response;for(let attempt=0;attempt<2;attempt++){response=await fetch(env.LLM_BASE_URL.replace(/\/$/,'')+'/chat/completions',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+env.LLM_API_KEY},body:JSON.stringify({model:env.LLM_MODEL,messages,max_completion_tokens:1536,reasoning_effort:'low',store:false}),signal:AbortSignal.timeout(40000)});if(response.ok||![502,503,504].includes(response.status)||attempt===1)break;await response.body?.cancel()}

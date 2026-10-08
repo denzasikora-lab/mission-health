@@ -313,7 +313,9 @@ const translations={
     "videoUnavailable": "Recording is unavailable in this browser. Upload a short video instead.",
     "videoPrompt": "Compare this clip with my previous videos of the same area. Describe visible changes in the sampled frames, without diagnosis or claims about unobserved movements.",
     "videoLabel": "Video",
-    "visualHistory": "Visual history"
+    "visualHistory": "Visual history",
+    "journalHistory": "Journal history",
+    "experimentalWarning": "Earlier experimental response. Check its claims against the original entries. This model is no longer used."
   },
   "zh": {
     "locale": "zh-CN",
@@ -629,7 +631,9 @@ const translations={
     "videoUnavailable": "此浏览器无法录制，请上传短视频。",
     "videoPrompt": "将此视频与同一部位的历史视频比较。描述采样帧中的可见变化，不诊断，也不推断未观察到的动作。",
     "videoLabel": "视频",
-    "visualHistory": "视觉记录"
+    "visualHistory": "视觉记录",
+    "journalHistory": "日记记录",
+    "experimentalWarning": "早期实验回复。请核对原始记录；此模型已停用。"
   },
   "ar": {
     "locale": "ar-AE",
@@ -945,7 +949,9 @@ const translations={
     "videoUnavailable": "التسجيل غير متاح في هذا المتصفح. ارفع فيديو قصيرا.",
     "videoPrompt": "قارن هذا المقطع بمقاطعي السابقة للمنطقة نفسها. صف التغيرات الظاهرة في الإطارات المختارة دون تشخيص أو ادعاء حركات غير مرئية.",
     "videoLabel": "فيديو",
-    "visualHistory": "السجل المرئي"
+    "visualHistory": "السجل المرئي",
+    "journalHistory": "سجل اليوميات",
+    "experimentalWarning": "رد تجريبي سابق. راجع ادعاءاته مقابل السجلات الأصلية. لم يعد هذا النموذج مستخدما."
   },
   "es": {
     "locale": "es-ES",
@@ -1261,6 +1267,8 @@ const translations={
     "videoUnavailable": "Este navegador no permite grabar. Sube un vídeo corto.",
     "videoPrompt": "Compara este clip con mis vídeos anteriores de la misma zona. Describe los cambios visibles en los fotogramas sin diagnosticar ni afirmar movimientos no observados.",
     "videoLabel": "Vídeo",
-    "visualHistory": "Historial visual"
+    "visualHistory": "Historial visual",
+    "journalHistory": "Historial del diario",
+    "experimentalWarning": "Respuesta experimental anterior. Verifica sus afirmaciones con las entradas originales. Este modelo ya no se utiliza."
   }
 };
