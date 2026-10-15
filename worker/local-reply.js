@@ -19,10 +19,11 @@ async function localReplyRoute(request,env,user,astronaut,id,action){
 async function captureHistoryReply(env,user,astronaut,context){
   const current=context.photos[0];if(!current)return null;
   const comparison=await comparePhoto(env,user,astronaut,current.id),previous=comparison.previous;
-  const lang=/[а-яА-Я]/u.test(context.query)?'ru':/[\p{Script=Han}]/u.test(context.query)?'zh':/[\p{Script=Arabic}]/u.test(context.query)?'ar':context.language==='es'?'es':'en';
-  const date=value=>new Intl.DateTimeFormat({en:'en-GB',ru:'ru-RU',zh:'zh-CN',ar:'ar',es:'es-ES'}[lang],{dateStyle:'medium',timeStyle:'short',timeZone:'UTC'}).format(new Date(value))+' UTC';
+  const lang=context.language==='ur'?'ur':/[а-яА-Я]/u.test(context.query)?'ru':/[\p{Script=Han}]/u.test(context.query)?'zh':/[\p{Script=Arabic}]/u.test(context.query)?'ar':context.language==='es'?'es':'en';
+  const date=value=>new Intl.DateTimeFormat({en:'en-GB',ru:'ru-RU',ur:'ur-PK',zh:'zh-CN',ar:'ar',es:'es-ES'}[lang],{dateStyle:'medium',timeStyle:'short',timeZone:'UTC'}).format(new Date(value))+' UTC';
   const stamp=date(current.createdAt),prior=previous?date(previous.createdAt):'',score=previous?.similarity?.toFixed(3),count=comparison.comparedCount;
   const replies={
+    ur:['ریکارڈنگ محفوظ ہے: '+stamp+'.',previous?'اسی حصے کی پچھلی ریکارڈنگ: '+prior+'.':'اس حصے کی یہ پہلی ریکارڈنگ ہے؛ اگلی ریکارڈنگ سے موازنہ ہو سکے گا۔',score?'EmbeddingGemma 2 نے '+count+' پچھلے ویکٹر کا موازنہ کیا۔ مماثلت: '+score+'.':current.vectorStatus==='indexed'?'768 جہتوں کا ویکٹر محفوظ ہے۔':'ریکارڈنگ محفوظ ہے؛ ویکٹر کی تیاری باقی ہے۔','مماثلت صرف پرانے مواد کو تلاش کرتی ہے، صحت کی تبدیلی نہیں ناپتی۔ کلاؤڈ کا بصری معاون عارضی طور پر دستیاب نہیں؛ جلد یا چہرے کی تبدیلی کا معتبر فیصلہ نہیں کیا جا سکتا۔'],
     en:['Capture saved: '+stamp+'.',previous?'Previous capture of the same area: '+prior+'.':'This is the first capture of this area; a later capture will allow comparison.',score?'EmbeddingGemma 2 compared '+count+' previous vectors. Similarity: '+score+'.':current.vectorStatus==='indexed'?'The 768-dimensional vector is saved.':'The capture is saved; its vector is still pending.','Similarity retrieves earlier captures and cannot measure health changes. The cloud visual assistant is temporarily unavailable; the reserve cannot reliably judge skin or face changes.'],
     ru:['Запись сохранена: '+stamp+'.',previous?'Предыдущая запись того же участка: '+prior+'.':'Это первая запись данного участка; после следующей съемки появится сравнение.',score?'EmbeddingGemma 2 сравнила предыдущие векторы: '+count+'. Сходство: '+score+'.':current.vectorStatus==='indexed'?'Вектор из 768 чисел сохранен.':'Материал сохранен; вектор еще ожидает обработки.','Сходство помогает найти историю и не измеряет изменения здоровья. Облачный визуальный помощник временно недоступен; резерв не может надежно оценить изменения кожи или лица.'],
     zh:['记录已保存：'+stamp+'。',previous?'同一部位的历史记录：'+prior+'。':'这是该部位的首条记录；再次拍摄后可以比较。',score?'EmbeddingGemma 2 比较了 '+count+' 个历史向量。相似度：'+score+'。':current.vectorStatus==='indexed'?'768 维向量已保存。':'记录已保存，向量仍待处理。','相似度用于检索历史记录，不能衡量健康变化。云端视觉助手暂时不可用；备用助手无法可靠评估皮肤或面部变化。'],
@@ -32,8 +33,9 @@ async function captureHistoryReply(env,user,astronaut,context){
 }
 
 function journalHistoryReply(context,row){
-  const lang=/[а-яА-Я]/u.test(row.content)?'ru':/[\p{Script=Han}]/u.test(row.content)?'zh':/[\p{Script=Arabic}]/u.test(row.content)?'ar':row.language==='es'?'es':'en';
+  const lang=row.language==='ur'?'ur':/[а-яА-Я]/u.test(row.content)?'ru':/[\p{Script=Han}]/u.test(row.content)?'zh':/[\p{Script=Arabic}]/u.test(row.content)?'ar':row.language==='es'?'es':'en';
   const copy={
+    ur:['اندراج محفوظ ہے۔ زبان کی سروس عارضی طور پر دستیاب نہیں۔','متعلقہ محفوظ اندراج:','حالیہ محفوظ اندراج:','اس پروفائل میں پہلے کوئی اندراج نہیں۔'],
     en:['Your entry is saved. The language service is temporarily unavailable.','Matching saved entries:','Recent saved entries:','There are no earlier entries in this profile.'],
     ru:['Запись сохранена. Языковой сервис временно недоступен.','Найденные сохраненные записи:','Последние сохраненные записи:','В этом профиле еще нет предыдущих записей.'],
     zh:['记录已保存。语言服务暂时不可用。','匹配的已保存记录：','最近保存的记录：','此档案尚无历史记录。'],

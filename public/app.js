@@ -1,12 +1,12 @@
 const metricInfo={hr:{unit:"bpm"},spo2:{unit:"%"},temp:{unit:"°C"},fatigue:{unit:"/ 10"}};
-const languageInfo={en:{flag:"🇬🇧",name:"English"},zh:{flag:"🇨🇳",name:"中文"},ar:{flag:"🇦🇪",name:"العربية"},es:{flag:"🇪🇸",name:"Español"}};
+const languageInfo={ru:{flag:"🇷🇺",name:"Русский"},en:{flag:"🇬🇧",name:"English"},ur:{flag:"🇵🇰",name:"اردو"}};
 const sourceUrls=["https://www.nasa.gov/hrp/risks/","https://www.nasa.gov/hrp/risks/","https://www.nasa.gov/hrp/"];
 const sourceKeywords=[
   ["health","risk","oxygen","hypoxia","fatigue","temperature","monitoring","baseline","健康","风险","血氧","氧气","疲劳","体温","الصحة","صحة","خطر","مخاطر","أكسجين","الأكسجين","تعب","حرارة","salud","riesgo","oxígeno","fatiga","temperatura"],
   ["heart","cardiovascular","pulse","circulation","心率","心血管","心脏","循环","القلب","قلب","نبض","الدورة","corazón","cardiovascular","pulso","circulación"],
   ["research","astronaut","medicine","performance","sleep","研究","航天员","医学","表现","睡眠","بحث","أبحاث","رائد","طب","نوم","investigación","astronauta","medicina","rendimiento","sueño"]
 ];
-const state={crew:0,metric:"hr",period:"24h",view:"health",language:"en",theme:document.documentElement.dataset.theme,query:""};
+const state={crew:0,metric:"hr",period:"24h",view:"health",workspace:"research",language:"ru",theme:document.documentElement.dataset.theme,query:""};
 try{const language=localStorage.getItem("mission-health-language");if(languageInfo[language])state.language=language}catch{}
 const $=id=>document.getElementById(id);
 const text=()=>translations[state.language];
@@ -14,7 +14,7 @@ const format=(value,key)=>new Intl.NumberFormat(text().locale,{maximumFractionDi
 const unit=key=>key==="hr"?text().units.hr:metricInfo[key].unit;
 function savePreference(key,value){try{localStorage.setItem(key,value)}catch{}}
 function renderStatic(){
-  const t=text();document.documentElement.lang=state.language;document.documentElement.dir=state.language==="ar"?"rtl":"ltr";document.documentElement.dataset.theme=state.theme;
+  const t=text();document.documentElement.lang=state.language;document.documentElement.dir=["ar","ur"].includes(state.language)?"rtl":"ltr";document.documentElement.dataset.theme=state.theme;
   document.querySelectorAll("[data-i18n]").forEach(node=>node.textContent=t[node.dataset.i18n]);
   document.querySelectorAll("[data-i18n-aria]").forEach(node=>node.setAttribute("aria-label",t[node.dataset.i18nAria]));
   document.querySelectorAll("[data-theme-choice]").forEach(button=>{const label=button.dataset.themeChoice==="light"?t.lightTheme:t.darkTheme;button.setAttribute("aria-pressed",String(button.dataset.themeChoice===state.theme));button.setAttribute("aria-label",label);button.title=label});
@@ -59,7 +59,7 @@ function renderLookup(){
   const tokens=query.split(/[\s\p{P}]+/u).filter(token=>token.length>=2),ranked=sourceKeywords.map((keywords,index)=>{const haystack=normalizeQuery(`${keywords.join(" ")} ${t.sourceTitles[index]} ${t.sourceDescriptions[index]}`),score=tokens.reduce((count,token)=>count+Number(haystack.includes(token)),0)+keywords.reduce((count,keyword)=>count+Number(query.includes(normalizeQuery(keyword))),0);return {index,score}}).sort((a,b)=>b.score-a.score),match=ranked[0],title=document.createElement("strong"),description=document.createElement("p");result.replaceChildren();
   if(match.score){title.textContent=t.sourceTitles[match.index];description.textContent=t.sourceDescriptions[match.index];const link=document.createElement("a");link.href=sourceUrls[match.index];link.target="_blank";link.rel="noopener noreferrer";link.textContent=t.openSource;result.append(title,description,link)}else{title.textContent=t.noMatch;description.textContent=t.searchHint;result.append(title,description)}result.classList.add("visible");
 }
-function render(){renderStatic();const person=crew[state.crew];renderCrew();renderMetrics(person);renderChart(person);renderAssessment(person);renderSources();renderLookup();window.journal?.onProfileChange()}
+function render(){renderStatic();const person=crew[state.crew];renderCrew();renderMetrics(person);renderChart(person);renderAssessment(person);renderSources();renderLookup();window.journal?.onProfileChange();window.research?.render()}
 function closeLanguageMenu(returnFocus=false){$("language-menu").hidden=true;$("language-button").setAttribute("aria-expanded","false");if(returnFocus)$("language-button").focus()}
 function openLanguageMenu(focusItem=false){$("language-menu").hidden=false;$("language-button").setAttribute("aria-expanded","true");if(focusItem)document.querySelector(`[data-language="${state.language}"]`).focus()}
 $("crew-list").addEventListener("click",event=>{const button=event.target.closest("[data-crew]");if(button){state.crew=Number(button.dataset.crew);render()}});
@@ -75,5 +75,5 @@ $("lookup-form").addEventListener("submit",event=>{event.preventDefault();state.
 render();
 if(document.modelContext?.registerTool){
   const toolController=new AbortController();
-  try{void Promise.resolve(document.modelContext.registerTool({name:"select_crew_health_view",title:"Показать показатели члена экипажа",description:"Открывает показатели выбранного члена экипажа и нужный график в текущем прототипе.",inputSchema:{type:"object",properties:{crewName:{type:"string",enum:crew.map(person=>person.name)},metric:{type:"string",enum:Object.keys(metricInfo)},period:{type:"string",enum:["1m","1h","24h","7d","1mo","1y"]}},required:["crewName"],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute(input){const index=crew.findIndex(person=>person.name===input?.crewName);if(index<0||input?.metric!==undefined&&!metricInfo[input.metric]||input?.period!==undefined&&!["1m","1h","24h","7d","1mo","1y"].includes(input.period))throw new Error("Недопустимый выбор экипажа или графика.");state.view='health';state.crew=index;if(input.metric)state.metric=input.metric;if(input.period)state.period=input.period;render();return {crewName:crew[index].name,metric:state.metric,period:state.period,status:crew[index].statusText,reading:crew[index].metrics[state.metric],language:state.language,theme:state.theme}}},{signal:toolController.signal})).catch(()=>{});}catch{}
+  try{void Promise.resolve(document.modelContext.registerTool({name:"select_crew_health_view",title:"Показать показатели члена экипажа",description:"Открывает показатели выбранного члена экипажа и нужный график в текущем прототипе.",inputSchema:{type:"object",properties:{crewName:{type:"string",enum:crew.map(person=>person.name)},metric:{type:"string",enum:Object.keys(metricInfo)},period:{type:"string",enum:["1m","1h","24h","7d","1mo","1y"]}},required:["crewName"],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute(input){const index=crew.findIndex(person=>person.name===input?.crewName);if(index<0||input?.metric!==undefined&&!metricInfo[input.metric]||input?.period!==undefined&&!["1m","1h","24h","7d","1mo","1y"].includes(input.period))throw new Error("Недопустимый выбор экипажа или графика.");state.workspace='crew';state.view='health';state.crew=index;if(input.metric)state.metric=input.metric;if(input.period)state.period=input.period;render();return {crewName:crew[index].name,metric:state.metric,period:state.period,status:crew[index].statusText,reading:crew[index].metrics[state.metric],language:state.language,theme:state.theme}}},{signal:toolController.signal})).catch(()=>{});}catch{}
 }

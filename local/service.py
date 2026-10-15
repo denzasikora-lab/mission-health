@@ -88,7 +88,7 @@ class Scope(BaseModel):
 class Entry(Scope):
     id: uuid.UUID
     text: str = Field(min_length=1, max_length=6000)
-    language: Literal["en", "zh", "ar", "es"]
+    language: Literal["en", "ru", "ur", "zh", "ar", "es"]
     createdAt: str = Field(max_length=40)
 
 
@@ -97,7 +97,7 @@ class Search(Scope):
 
 
 class Answer(Search):
-    language: Literal["en", "zh", "ar", "es"]
+    language: Literal["en", "ru", "ur", "zh", "ar", "es"]
     references: list[dict] = Field(default_factory=list, max_length=6)
     history: list[dict] = Field(default_factory=list, max_length=12)
 
@@ -173,7 +173,7 @@ def search(query: Search):
 def answer(query: Answer):
     if "llm" not in runtime:
         raise HTTPException(503, "assistant_unavailable")
-    language = {"en": "English", "zh": "Chinese", "ar": "Arabic", "es": "Spanish"}[query.language]
+    language = {"en": "English", "ru": "Russian", "ur": "Urdu", "zh": "Chinese", "ar": "Arabic", "es": "Spanish"}[query.language]
     references = [{"id": item.get("id"), "date": item.get("createdAt"), "text": str(item.get("content", ""))[:2000]}
                   for item in query.references]
     instruction = (
