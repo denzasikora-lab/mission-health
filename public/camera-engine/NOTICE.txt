@@ -1,0 +1,8 @@
+Отделение человека от фона: Google MediaPipe Tasks Vision 1.2.0 и Selfie Segmenter Landscape.
+Библиотека: https://www.npmjs.com/package/@mediapipe/tasks-vision/v/1.2.0
+Лицензия библиотеки: Apache-2.0.
+Copyright Google LLC / MediaPipe Authors.
+Документация модели: https://developers.google.com/edge/mediapipe/solutions/vision/image_segmenter
+Модель: https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite
+Загрузчик и WASM берутся из официального npm-пакета через jsDelivr с фиксированной версией 1.2.0. Кадры обрабатываются только на устройстве.
+Фон лаборатории создан встроенным генератором изображений по выбранному пользователем кадру видеодневника Avatar (2009), с удалением людей и надписей.

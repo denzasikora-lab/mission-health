@@ -7,7 +7,7 @@
   const demoButton = document.getElementById('voice-demo');
   const notice = document.getElementById('voice-notice');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-  let source = 'idle', style = 'particles', sequence = 0, frame = 0;
+  let source = 'idle', style = 'glass', sequence = 0, frame = 0;
   let stream, audioContext, audioSource, analyser, samples, frequencies;
   let startedAt = 0, previousFrame = 0, level = 0, decibels = -90;
   let width = 0, height = 0, lastReadout = 0;
@@ -31,6 +31,7 @@
     demoButton.textContent = source === 'demo' ? 'Остановить демо' : 'Посмотреть демо';
     demoButton.setAttribute('aria-pressed', String(source === 'demo'));
     stage.dataset.source = source;
+    stage.dataset.style = style;
     document.getElementById('voice-source').textContent = active ? 'МИКРОФОН / ЖИВОЙ СИГНАЛ' : source === 'demo' ? 'ДЕМО / ИСКУССТВЕННЫЙ СИГНАЛ' : waiting ? 'ПОДКЛЮЧЕНИЕ МИКРОФОНА' : 'ОЖИДАНИЕ';
     document.getElementById('voice-stage-hint').textContent = active ? 'Волна реагирует на твой голос' : source === 'demo' ? 'Пример движения без микрофона' : waiting ? 'Разреши микрофон в браузере' : 'Включи микрофон или посмотри демо';
     document.getElementById('voice-input-name').textContent = active ? 'Микрофон' : source === 'demo' ? 'Демонстрация' : 'Не выбран';
@@ -171,6 +172,62 @@
     context.globalAlpha = 1;
   }
 
+  function drawGlass(time) {
+    const motion = reducedMotion.matches ? 0 : time * .00055;
+    const baseline = height * .83;
+    // Изогнутые линии создают глубину стекла, а нити растут из общего основания.
+    context.lineWidth = 1;
+    for (let row = 0; row < 7; row++) {
+      const y = height * (.12 + row * .126);
+      context.strokeStyle = `rgba(181,222,255,${row === 0 ? .2 : .075})`;
+      context.beginPath(); context.moveTo(-20, y - height * .035);
+      context.bezierCurveTo(width * .27, y + height * .075, width * .73, y + height * .075, width + 20, y - height * .035);
+      context.stroke();
+    }
+    const glow = context.createRadialGradient(width * .5, baseline - height * .1, 0, width * .5, baseline - height * .1, width * .38);
+    glow.addColorStop(0, `rgba(105,205,255,${.06 + level * .18})`);
+    glow.addColorStop(.5, `rgba(63,155,239,${.03 + level * .06})`);
+    glow.addColorStop(1, 'rgba(28,92,162,0)');
+    context.fillStyle = glow; context.fillRect(0, 0, width, height);
+
+    const strands = width < 500 ? 58 : 92;
+    const active = source === 'mic' || source === 'demo';
+    for (let strand = 0; strand < strands; strand++) {
+      const u = strand / (strands - 1), x = u * 2 - 1;
+      const depth = (strand * .61803398875) % 1;
+      const envelope = Math.exp(-x * x * 5.5);
+      const frequencyIndex = frequencies ? Math.min(frequencies.length - 1, Math.round(3 * Math.pow(80, u))) : 0;
+      const spectral = frequencies ? frequencies[frequencyIndex] / 255 : .35 + .3 * Math.sin(u * 17 + motion * 2);
+      const summit = .55 + .45 * Math.pow(Math.sin(strand * 1.71 + motion * .7), 2);
+      const reach = Math.min(height * .68, height * envelope * (.015 + (active ? Math.sqrt(level) : 0) * (.75 + spectral * .28)) * summit);
+      const rootX = width * .5 + x * width * .34;
+      const rootY = baseline + (depth - .5) * height * .065;
+      const alpha = (.24 + depth * .35) * (.6 + level * .4) * envelope;
+      context.strokeStyle = `rgba(170,229,255,${alpha})`;
+      context.lineWidth = depth > .8 ? 1.1 : .65;
+      context.beginPath();
+      for (let point = 0; point < 36; point++) {
+        const v = point / 35;
+        const drift = Math.sin(v * 10 + strand * 2 + motion * 2) * (1 + v * 3) * (.2 + level);
+        const px = rootX + drift + x * v * width * .014;
+        const py = rootY - v * reach;
+        if (point) context.lineTo(px, py); else context.moveTo(px, py);
+      }
+      context.stroke();
+      context.fillStyle = `rgba(212,244,255,${Math.min(.85, alpha * 2)})`;
+      for (let point = 0; point < 16; point++) {
+        const v = (point / 16 + (reducedMotion.matches ? 0 : motion * (.15 + depth * .12))) % 1;
+        const drift = Math.sin(v * 10 + strand * 2 + motion * 2) * (1 + v * 3) * (.2 + level);
+        context.fillRect(rootX + drift + x * v * width * .014, rootY - v * reach, .7 + depth * .7, 1 + depth);
+      }
+    }
+    const baseGlow = context.createLinearGradient(width * .12, 0, width * .88, 0);
+    baseGlow.addColorStop(0, 'rgba(130,211,255,0)'); baseGlow.addColorStop(.5, `rgba(163,229,255,${.15 + level * .32})`); baseGlow.addColorStop(1, 'rgba(130,211,255,0)');
+    context.strokeStyle = baseGlow; context.lineWidth = 1;
+    context.beginPath(); context.moveTo(width * .12, baseline + 8);
+    context.bezierCurveTo(width * .35, baseline + 18, width * .65, baseline + 18, width * .88, baseline + 8); context.stroke();
+  }
+
   function animate(time) {
     if (!dialog.open || document.hidden) { frame = 0; return; }
     frame = requestAnimationFrame(animate);
@@ -179,7 +236,9 @@
     sampleSignal(time);
     if (context && width && height) {
       context.clearRect(0, 0, width, height);
-      if (style === 'particles') drawParticles(time); else drawWave(time);
+      if (style === 'glass') drawGlass(time);
+      else if (style === 'particles') drawParticles(time);
+      else drawWave(time);
     }
     if (time - lastReadout > 100) { updateReadings(time); lastReadout = time; }
   }

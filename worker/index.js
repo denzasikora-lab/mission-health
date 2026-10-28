@@ -4,6 +4,15 @@ const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:
 const fail=(code,status)=>{throw Object.assign(new Error(code),{code,status})};
 function database(env){if(!env.DB)fail('storage_unavailable',503);return env.DB}
 function owner(request,env){const value=request.headers.get('oai-authenticated-user-id');if(value)return value;if(env.LOCAL_PREVIEW==='1')return 'local-preview';fail('sign_in_required',401)}
+async function videoLogIdentity(request,user){
+  let name=request.headers.get('oai-authenticated-user-full-name')||'';
+  if(request.headers.get('oai-authenticated-user-full-name-encoding')==='percent-encoded-utf-8')try{name=decodeURIComponent(name)}catch{name=''}
+  if(!name.trim())name=(request.headers.get('oai-authenticated-user-email')||'').split('@')[0];
+  // Идентификатор подписи связан с аккаунтом, исходный идентификатор не передается клиенту.
+  const digest=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(user)));
+  const digits=String(new DataView(digest.buffer).getUint32(0)%1000000000).padStart(9,'0');
+  return {name:name.trim().slice(0,100),researcherId:digits.match(/.{3}/g).join(' ')};
+}
 function memoryConfigured(env){return Boolean(env.MEMORY_URL&&(env.MEMORY_API_KEY||env.LOCAL_PREVIEW==='1'))}
 function languageModelConfigured(env){return Boolean(env.LLM_API_KEY&&env.LLM_BASE_URL&&env.LLM_MODEL)}
 async function memoryRequest(env,path,body){
@@ -133,6 +142,7 @@ export default {
       const user=owner(request,env);
       if(request.method!=='GET'&&((request.headers.get('origin')&&request.headers.get('origin')!==url.origin)||request.headers.get('sec-fetch-site')==='cross-site'))fail('forbidden',403);
       if(url.pathname==='/api/status'&&request.method==='GET')return json(await capabilities(env));
+      if(url.pathname==='/api/me'&&request.method==='GET')return json(await videoLogIdentity(request,user));
       const responseMatch=url.pathname.match(/^\/api\/astronauts\/([^/]+)\/messages\/([a-f0-9-]{36})\/(context|reply)$/i);if(responseMatch&&astronautIds.has(responseMatch[1]))return await localReplyRoute(request,env,user,responseMatch[1],responseMatch[2],responseMatch[3]);
       const photoMatch=url.pathname.match(/^\/api\/astronauts\/([^/]+)\/photos(?:\/([a-f0-9-]{36}))?$/i);if(photoMatch&&astronautIds.has(photoMatch[1]))return await photoRoute(request,env,user,photoMatch[1],photoMatch[2],url);
       const match=url.pathname.match(/^\/api\/astronauts\/([^/]+)\/(messages|search)$/);if(!match||!astronautIds.has(match[1]))fail('not_found',404);
