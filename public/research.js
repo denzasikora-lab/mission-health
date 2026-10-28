@@ -71,6 +71,7 @@ function renderResearch(){
   const t=researchText(),active=state.workspace==='research';$('crew-workspace').hidden=active;$('research-workspace').hidden=!active;document.querySelector('.photo-credit').hidden=active;
   document.querySelectorAll('[data-workspace]').forEach(button=>{button.setAttribute('aria-pressed',String(button.dataset.workspace===state.workspace));button.textContent=button.dataset.workspace==='research'?t.tab:t.demo});
   document.querySelector('[data-i18n="headline"]').textContent=active?text().headline:text().crewHeadline;document.querySelector('[data-i18n="intro"]').textContent=active?text().intro:text().crewIntro;document.title='Mission Health | '+(active?text().headline:text().crewHeadline);document.querySelector('.demo-pill').textContent=active?t.real:text().simulated;document.querySelector('.mission-id').textContent=active?'Inspiration4 / BIDMC':text().missionDay;
+  window.missionDesign?.render();
   if(!active){researchStop();return}
   $('research-sidebar-title').textContent=t.datasets;$('research-sidebar-note').textContent=t.sidebar;
   $('research-datasets').innerHTML=[['nasa','01','NASA OSD-575',t.nasaSub],['bidmc','02','BIDMC',t.bidmcSub],['library','03',t.library,t.librarySub]].map(([id,symbol,title,subtitle])=>`<button type="button" class="dataset-button" data-dataset="${id}" aria-pressed="${researchState.dataset===id}"><span class="dataset-symbol" aria-hidden="true">${symbol}</span><span><strong>${title}</strong><small>${subtitle}</small></span></button>`).join('');

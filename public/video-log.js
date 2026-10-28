@@ -11,6 +11,9 @@
   const microphone = document.getElementById('video-log-sound');
   const notice = document.getElementById('video-log-notice');
   const researcher = document.getElementById('video-log-researcher');
+  const firstName = document.getElementById('video-log-first-name');
+  const lastName = document.getElementById('video-log-last-name');
+  const identityForm = document.getElementById('video-log-identity');
   const locationName = document.getElementById('video-log-location');
   const background = new Image();
   background.src = '/assets/video-log-lab.png';
@@ -34,8 +37,17 @@
         researcher.value = normalized(localStorage.getItem(storageKey('name')) || identity.name || '');
         locationName.value = normalized(localStorage.getItem(storageKey('location')) || 'SCI MOD');
       } catch { researcher.value = normalized(identity.name || ''); }
+      const parts = researcher.value.trim().split(/\s+/);
+      firstName.value = parts.length > 1 ? parts.slice(0, -1).join(' ') : parts[0] || '';
+      lastName.value = parts.length > 1 ? parts.at(-1) : '';
+      updateSignature();
       renderControls();
     } catch { message('Не удалось прочитать профиль. Обнови страницу после входа в аккаунт.', true); }
+  }
+
+  function updateSignature() {
+    researcher.value = normalized([firstName.value.trim(), lastName.value.trim()].filter(Boolean).join(' '));
+    document.getElementById('video-log-title').textContent = researcher.value ? 'Видеодневник / ' + researcher.value : 'Твой видеодневник';
   }
 
   function message(value, error = false) { notice.textContent = value; notice.dataset.error = String(error); }
@@ -48,7 +60,7 @@
     recordButton.querySelector('span').textContent = phase === 'recording' ? 'Остановить запись' : phase === 'finishing' ? 'Подготовка записи' : 'Начать запись';
     recordButton.setAttribute('aria-pressed', String(phase === 'recording'));
     backgroundChoice.disabled = phase === 'recording' || phase === 'finishing';
-    researcher.disabled = locationName.disabled = phase === 'recording' || phase === 'finishing';
+    firstName.disabled = lastName.disabled = locationName.disabled = identityForm.querySelector('button').disabled = phase === 'recording' || phase === 'finishing';
     microphone.disabled = Boolean(stream) || phase === 'requesting' || phase === 'finishing';
     download.hidden = !clipUrl || phase !== 'review';
     review.hidden = phase !== 'review';
@@ -241,7 +253,8 @@
   function startRecording() {
     if (phase === 'recording') { phase = 'finishing'; recorder.stop(); renderControls(); return; }
     if (phase !== 'live' || backgroundChoice.value === 'lab' && !portrait) return;
-    if (!identity || !researcher.value.trim()) { message('Укажи свое имя в поле RESEARCHER, чтобы подписать запись.', true); researcher.focus(); return; }
+    updateSignature();
+    if (!identity || !researcher.value.trim()) { message('Укажи имя и фамилию, чтобы подписать запись.', true); firstName.focus(); return; }
     if (!canvas.captureStream || !window.MediaRecorder) { message('Запись видео не поддерживается этим браузером. Попробуй Safari или Chrome.', true); return; }
     const audio = stream.getAudioTracks().length > 0;
     const types = audio ? ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/webm;codecs=vp8,opus', 'video/mp4', 'video/webm'] : ['video/mp4;codecs=avc1.42E01E', 'video/webm;codecs=vp8', 'video/mp4', 'video/webm'];
@@ -307,6 +320,20 @@
   for (const [node, key] of [[researcher, 'name'], [locationName, 'location']]) node.addEventListener('change', () => {
     node.value = normalized(node.value);
     if (identity) try { localStorage.setItem(storageKey(key), node.value.trim()); } catch {}
+  });
+  firstName.addEventListener('input', updateSignature); lastName.addEventListener('input', updateSignature);
+  identityForm.addEventListener('submit', event => {
+    event.preventDefault(); updateSignature();
+    if (!identity) { message('Дождись загрузки профиля и повтори сохранение.', true); return; }
+    try { localStorage.setItem(storageKey('name'), researcher.value); localStorage.setItem(storageKey('location'), normalized(locationName.value)); window.dispatchEvent(new Event('mission-profile-change')); message('Подпись сохранена на этом устройстве: ' + filmName(researcher.value)); }
+    catch { message('Подпись обновлена для этой записи. Браузер не разрешил сохранить ее на устройстве.', true); }
+  });
+  window.addEventListener('mission-profile-change', () => {
+    if (!identity || phase === 'recording') return;
+    try {
+      const saved = localStorage.getItem(storageKey('name'));
+      if (saved) { const parts = saved.trim().split(/\s+/); firstName.value = parts.length > 1 ? parts.slice(0, -1).join(' ') : parts[0]; lastName.value = parts.length > 1 ? parts.at(-1) : ''; updateSignature(); }
+    } catch {}
   });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {

@@ -1,0 +1,90 @@
+(() => {
+  const shell = document.querySelector('.shell');
+  const frame = document.createElement('div'); frame.className = 'mission-frame';
+  const content = document.createElement('div'); content.className = 'mission-content';
+  const rail = document.querySelector('.crew-panel'); rail.classList.add('mission-rail'); rail.removeAttribute('data-i18n-aria'); rail.setAttribute('aria-label','Навигация и профили');
+  const profile = document.querySelector('.profile'); rail.prepend(profile);
+  const navigation = document.createElement('nav'); navigation.className = 'mission-nav'; navigation.lang = 'ru'; navigation.setAttribute('aria-label', 'Разделы Mission Health');
+  const icons = {overview:'M3 10 12 3l9 7v11h-6v-7H9v7H3Z',observations:'M16 16 22 22M19 10a9 9 0 1 1-18 0 9 9 0 0 1 18 0',diary:'M3 4h6a4 4 0 0 1 3 2 4 4 0 0 1 3-2h6v16h-6a4 4 0 0 0-3 2 4 4 0 0 0-3-2H3Z M12 6v16',sources:'M3 5c0-5 18-5 18 0v14c0 5-18 5-18 0Zm0 0c0 5 18 5 18 0M3 12c0 5 18 5 18 0'};
+  navigation.innerHTML = [['overview','Обзор'],['observations','Наблюдения'],['diary','Дневник'],['sources','Источники']].map(([key,label])=>`<button type="button" data-mission-nav="${key}" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[key]}"/></svg><span>${label}</span></button>`).join('');
+  profile.after(navigation);
+  const switcher = document.createElement('details'); switcher.className = 'mission-profiles';
+  switcher.innerHTML = '<summary>Сменить профиль</summary>';
+  switcher.append(document.querySelector('.panel-heading'), document.getElementById('crew-list'));
+  navigation.after(switcher);
+  document.querySelector('.aside-note').textContent = 'Профили NASA. Показатели здоровья и дневники - демонстрация.';
+  const anatomy = document.createElement('section'); anatomy.className='mission-anatomy'; anatomy.setAttribute('aria-label','Схема показателей профиля'); anatomy.innerHTML='<img src="assets/health-body.svg" alt="Иллюстрация тела человека, без медицинской диагностики"><div>'+[['hr','Пульс'],['spo2','SpO₂'],['temp','Темп.'],['fatigue','Тонус']].map(([key,label])=>`<button type="button" data-body-metric="${key}"><span>${label}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${metricIcons[key]}"/></svg></button>`).join('')+'</div>'; rail.append(anatomy);
+  const oldResearch = document.getElementById('research-workspace'), oldCrew = document.getElementById('crew-workspace');
+  const heading = document.createElement('header'); heading.className = 'mission-heading'; heading.lang = 'ru';
+  heading.innerHTML = '<div><p class="mission-kicker">ЛИЧНЫЙ ФОН / НАБЛЮДЕНИЯ / ДНЕВНИК</p><h1 id="mission-heading-title">Состояние и наблюдения</h1><p id="mission-heading-description">Ключевые показатели на сегодня</p></div><span class="mission-data-label">Демо-данные</span>';
+  content.append(heading, oldResearch, oldCrew); frame.append(rail, content); document.querySelector('.workspace-switch').after(frame);
+  const journal = document.getElementById('journal-view');
+  const right = document.querySelector('.insight-column');
+  const context = document.createElement('details'); context.className = 'mission-context';
+  context.innerHTML = '<summary>Контекст профиля и источники NASA</summary><div class="mission-context-grid"></div>';
+  context.querySelector('div').append(...right.children);
+  document.querySelector('.main-column').append(context);
+  right.append(journal);
+  const assistantTitle = document.createElement('h2'); assistantTitle.className = 'mission-assistant-title'; assistantTitle.textContent = 'Личный помощник';
+  document.querySelector('.journal-header>div').prepend(assistantTitle);
+  const assistantScope = document.createElement('p'); assistantScope.className = 'mission-chat-scope'; assistantScope.textContent = 'Дневник прототипа для выбранного профиля.';
+  document.getElementById('journal-name').after(assistantScope);
+  const attachments = document.createElement('details'); attachments.className = 'mission-attachments'; attachments.innerHTML = '<summary>Фото и видео для сравнения</summary>';
+  const tools = document.querySelector('.photo-tools'); tools.before(attachments); attachments.append(tools);
+  const audio = document.createElement('section'); audio.className = 'mission-audio panel glass'; audio.lang = 'ru';
+  audio.innerHTML = '<h2>Голосовой дневник</h2><p>Мысли, ощущения и наблюдения за день</p><div class="mission-audio-body"><svg viewBox="0 0 290 60" aria-hidden="true">'+Array.from({length:65},(_,i)=>{const h=5+Math.abs(Math.sin(i*1.9)*Math.sin(i*.19))*42;return `<path d="M${i*4.4+3} ${30-h/2}v${h}"/>`}).join('')+'</svg><div><button type="button" data-open-voice>Включить микрофон</button><button type="button" data-open-video-log>Записать видео</button></div></div>';
+  document.querySelector('.bottom-grid').before(audio);
+  document.querySelector('.bottom-grid').classList.add('mission-observations');
+  const medical = '<svg viewBox="0 0 70 70" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M35 14v50M28 26c-16 0-20-7-25-10 16 3 22-8 28-7m11 17c16 0 20-7 25-10-16 3-22-8-28-7M29 18c-11 4-15 3-20 2m20 3c-8 3-11 3-15 2m27-7c11 4 15 3 20 2m-20 3c8 3 11 3 15 2M30 31c-11 7 21 10 13 18-4 4-16 5-13 11m10-29c11 7-21 10-13 18 4 4 16 5 13 11"/><circle cx="35" cy="7" r="3" fill="currentColor"/></g></svg>';
+  document.querySelector('.brand-mark').innerHTML = medical;
+  document.querySelector('.brand>span:last-child').textContent = 'MISSION HEALTH';
+  const subtitle = document.createElement('span'); subtitle.className = 'mission-brand-caption'; subtitle.textContent = 'Независимое исследование'; document.querySelector('.brand').append(subtitle);
+  const themeGroup = document.querySelector('.theme-control'); themeGroup.hidden=true;
+  const themeToggle=document.createElement('button'); themeToggle.type='button';themeToggle.id='mission-theme-toggle';themeToggle.className='mission-tool';
+  const sun=themeGroup.querySelector('[data-theme-choice="light"]').innerHTML,moon=themeGroup.querySelector('[data-theme-choice="dark"]').innerHTML;
+  const toolbar=document.querySelector('.toolbar');toolbar.append(themeToggle);
+  const date=document.createElement('time');date.className='mission-date';date.textContent=new Intl.DateTimeFormat('ru',{day:'numeric',month:'long',year:'numeric'}).format(new Date());date.dateTime=new Date().toISOString().slice(0,10);toolbar.prepend(date);
+  const iconButton = document.createElement('button'); iconButton.type = 'button'; iconButton.className = 'mission-source-launch'; iconButton.setAttribute('aria-label','Открыть источники NASA'); iconButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></svg>';
+  toolbar.insertBefore(iconButton,toolbar.querySelector('.log-launch'));
+  const model=document.createElement('section');model.className='mission-model panel glass';model.innerHTML='<h2><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="4"/><path d="M3 5v14c0 5 18 5 18 0V5M3 12c0 5 18 5 18 0"/></svg>Модель и данные</h2><p>EmbeddingGemma 2 <span>Фото / видео</span></p><p>AudioFM: ожидает весов</p><small>Сходство записей не определяет болезнь.</small>';right.append(model);
+  const atom='<svg viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1"><ellipse cx="16" cy="16" rx="15" ry="6"/><ellipse cx="16" cy="16" rx="15" ry="6" transform="rotate(60 16 16)"/><ellipse cx="16" cy="16" rx="15" ry="6" transform="rotate(120 16 16)"/></g><circle cx="16" cy="16" r="2" fill="currentColor"/></svg>';
+  assistantTitle.insertAdjacentHTML('afterbegin',atom);
+  const chatTools=document.createElement('div');chatTools.className='mission-chat-tools';chatTools.innerHTML='<button type="button" data-chat-camera aria-label="Добавить фото в чат"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h4l2-3h6l2 3h4v14H3Z"/><circle cx="12" cy="13" r="4"/></svg></button><button type="button" data-chat-voice aria-label="Открыть микрофон"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="2" width="8" height="13" rx="4"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4m-4 0h8"/></svg></button>';document.querySelector('.composer-footer').append(chatTools);
+  chatTools.querySelector('[data-chat-camera]').addEventListener('click',()=>document.getElementById('open-camera').click());chatTools.querySelector('[data-chat-voice]').addEventListener('click',()=>document.querySelector('.toolbar [data-open-voice]').click());
+  anatomy.addEventListener('click',event=>{const button=event.target.closest('[data-body-metric]');if(button){state.metric=button.dataset.bodyMetric;window.render();}});
+  const palette = matchMedia('(prefers-color-scheme: dark)');
+  let themeMode; try { themeMode = localStorage.getItem('mission-health-theme-mode') || localStorage.getItem('mission-health-theme') || 'system'; } catch { themeMode='system'; }
+  function render() {
+    document.body.dataset.missionWorkspace = state.workspace;
+    if(state.workspace==='crew')document.querySelector('.main-column').prepend(heading);else content.insertBefore(heading,oldResearch);
+    themeToggle.innerHTML=state.theme==='dark'?sun:moon;themeToggle.setAttribute('aria-label',state.theme==='dark'?'Включить светлую тему':'Включить темную тему');themeToggle.title=themeToggle.getAttribute('aria-label');
+    anatomy.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.bodyMetric===state.metric)));
+    const stats=document.querySelector('.mission-chart-stats');if(stats){const values=seriesFor(crew[state.crew],state.metric,state.period);stats.innerHTML=[['Среднее',values.reduce((sum,value)=>sum+value,0)/values.length],['Мин.',Math.min(...values)],['Макс.',Math.max(...values)]].map(([label,value])=>`<div><span>${label}</span><strong>${format(value,state.metric)}<small> ${unit(state.metric)}</small></strong></div>`).join('');}
+    const trendTitle=document.getElementById('trend-heading');trendTitle.removeAttribute('data-i18n');trendTitle.textContent='Сравнение с личным фоном';
+    heading.querySelector('h1').textContent = state.workspace === 'research' ? researchState.dataset === 'library' ? 'Источники и исследования' : 'Реальные наблюдения' : 'Состояние и наблюдения';
+    document.getElementById('mission-heading-description').textContent = state.workspace === 'research' ? 'NASA OSD-575 / BIDMC / открытые исследования' : 'Ключевые показатели выбранного профиля';
+    document.querySelector('.mission-data-label').textContent = state.workspace === 'research' ? 'Исходные данные' : 'Демо-данные';
+    const active = state.workspace === 'research' ? researchState.dataset === 'library' ? 'sources' : 'observations' : state.view === 'journal' ? 'diary' : 'overview';
+    navigation.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.missionNav===active)));
+    themeGroup.querySelectorAll('[data-theme-choice]').forEach(button=>{button.setAttribute('aria-pressed',String(button.dataset.themeChoice===themeMode));if(button.dataset.themeChoice==='system'){button.setAttribute('aria-label','Системная тема');button.title='Системная тема';}});
+  }
+  function navigate(section) {
+    researchStop(); state.workspace = section === 'observations' || section === 'sources' ? 'research' : 'crew';
+    if (section === 'sources') researchState.dataset = 'library';
+    else if (section === 'observations' && researchState.dataset === 'library') researchState.dataset = 'nasa';
+    state.view = section === 'diary' ? 'journal' : 'health';
+    window.research.render(); renderJournal(); render();
+    if (section === 'diary') { void loadJournal(); journal.scrollIntoView({behavior:'smooth',block:'start'}); document.getElementById('journal-input').focus({preventScroll:true}); }
+  }
+  navigation.addEventListener('click',event=>{const button=event.target.closest('[data-mission-nav]');if(button)navigate(button.dataset.missionNav)});
+  iconButton.addEventListener('click',()=>navigate('sources'));
+  themeToggle.addEventListener('click',()=>{themeMode=state.theme==='dark'?'light':'dark';state.theme=themeMode;savePreference('mission-health-theme-mode',themeMode);savePreference('mission-health-theme',themeMode);window.render();});
+  palette.addEventListener('change',()=>{if(themeMode==='system'){state.theme=palette.matches?'dark':'light';window.render();}});
+  audio.querySelector('[data-open-voice]').addEventListener('click',()=>document.querySelector('.toolbar [data-open-voice]').click());
+  audio.querySelector('[data-open-video-log]').addEventListener('click',()=>document.querySelector('.toolbar [data-open-video-log]').click());
+  const chartBody=document.createElement('div');chartBody.className='mission-chart-body';const plot=document.createElement('div');plot.className='mission-chart-plot';const chart=document.querySelector('.chart-wrap');chart.before(chartBody);chartBody.append(plot);plot.append(chart,document.getElementById('chart-axis'));const stats=document.createElement('div');stats.className='mission-chart-stats';chartBody.append(stats);
+  document.querySelectorAll('[data-period]').forEach(button=>button.addEventListener('click',render));
+  window.missionDesign = {render,navigate,content,rail};
+  state.workspace = 'crew'; state.view = 'health'; state.theme = themeMode==='system'?(palette.matches?'dark':'light'):themeMode;
+  window.render(); void loadJournal();
+})();

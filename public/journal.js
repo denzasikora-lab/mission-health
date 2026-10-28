@@ -28,7 +28,7 @@ function renderJournalMessages(){
 }
 function renderJournal(){
   const t=text(),draft=draftFor();document.querySelectorAll('[data-view]').forEach(button=>button.setAttribute('aria-selected',String(button.dataset.view===state.view)));
-  $('health-view').hidden=state.view!=='health';$('journal-view').hidden=state.view!=='journal';document.querySelector('.insight-column').hidden=state.view==='journal';
+  $('health-view').hidden=window.missionDesign?false:state.view!=='health';$('journal-view').hidden=window.missionDesign?false:state.view!=='journal';document.querySelector('.insight-column').hidden=window.missionDesign?false:state.view==='journal';
   $('journal-name').textContent=t.people[state.crew].name;$('journal-storage').textContent=journalState.messages.length?t.journalSaved:t.journalTitle;
   $('journal-capabilities').replaceChildren(element('span','',journalState.capabilities.memory?t.memoryReady:journalState.capabilities.history?t.historyReady:t.memoryOffline),element('span','',journalState.capabilities.assistantState==='unavailable'?t.aiTemporarilyUnavailable:journalState.capabilities.assistantState==='ready'?t.aiReady:journalState.capabilities.assistant?t.aiConfigured:t.aiOffline));
   $('journal-input').placeholder=t.composerPlaceholder;
@@ -45,7 +45,7 @@ async function loadJournal(older=false){
   }catch(error){if(version!==journalLoadVersion)return;journalState.loadError=true;journalState.notice='loadError'}
   finally{if(version===journalLoadVersion){journalState.loading=false;renderJournal();if(!older){$('journal-messages').scrollTop=$('journal-messages').scrollHeight;void window.photos?.load(crew[state.crew].id)}}}
 }
-window.journal={onProfileChange(){const profile=crew[state.crew].id;if(journalState.profile!==profile){window.reserveAssistant?.onProfileChange(profile);journalState.transient=null;window.photos?.onProfileChange();journalState.profile=profile;journalState.messages=[];journalState.hasMore=false;journalState.notice=null;journalState.loadError=false;++journalLoadVersion;if(state.view==='journal'){void loadJournal();return}}renderJournal()}};
+window.journal={onProfileChange(){const profile=crew[state.crew].id;if(journalState.profile!==profile){window.reserveAssistant?.onProfileChange(profile);journalState.transient=null;window.photos?.onProfileChange();journalState.profile=profile;journalState.messages=[];journalState.hasMore=false;journalState.notice=null;journalState.loadError=false;++journalLoadVersion;if(state.view==='journal'||window.missionDesign){void loadJournal();return}}renderJournal()}};
 document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>{state.view=button.dataset.view;renderJournal();if(state.view==='journal')void loadJournal()}));
 document.querySelector('.view-tabs').addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const selected=event.key==='Home'?'health':event.key==='End'?'journal':state.view==='health'?'journal':'health';document.querySelector('[data-view="'+selected+'"]').click();document.querySelector('[data-view="'+selected+'"]').focus()});
 document.querySelectorAll('[data-journal-mode]').forEach(button=>button.addEventListener('click',()=>{draftFor().mode=button.dataset.journalMode;renderJournal();$('journal-input').focus()}));

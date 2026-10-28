@@ -1,6 +1,6 @@
 import { readdir,readFile,mkdir,writeFile,rm,cp } from 'node:fs/promises';
 import { extname } from 'node:path';
-const mime={'.html':'text/html; charset=utf-8','.json':'application/json; charset=utf-8','.csv':'text/csv; charset=utf-8','.txt':'text/plain; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.jpg':'image/jpeg','.png':'image/png'};
+const mime={'.html':'text/html; charset=utf-8','.json':'application/json; charset=utf-8','.csv':'text/csv; charset=utf-8','.txt':'text/plain; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.jpg':'image/jpeg','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2'};
 const assets={};
 async function collect(directory,prefix=''){
   for(const item of await readdir(directory,{withFileTypes:true})){
@@ -17,7 +17,7 @@ await collect('public');
 await rm('dist',{recursive:true,force:true});
 await mkdir('dist/server',{recursive:true});
 await mkdir('dist/.openai',{recursive:true});
-const source=(await readFile('worker/photos.js','utf8'))+'\n'+(await readFile('worker/local-reply.js','utf8'))+'\n'+(await readFile('worker/index.js','utf8')); 
+const source=(await readFile('worker/photos.js','utf8'))+'\n'+(await readFile('worker/stories.js','utf8'))+'\n'+(await readFile('worker/local-reply.js','utf8'))+'\n'+(await readFile('worker/index.js','utf8'));
 await writeFile('dist/server/index.js','const assets='+JSON.stringify(assets)+';\n'+source);
 await cp('.openai/hosting.json','dist/.openai/hosting.json');
 try{await cp('drizzle','dist/.openai/drizzle',{recursive:true})}catch(error){if(error.code!=='ENOENT')throw error}

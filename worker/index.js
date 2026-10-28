@@ -142,7 +142,9 @@ export default {
       const user=owner(request,env);
       if(request.method!=='GET'&&((request.headers.get('origin')&&request.headers.get('origin')!==url.origin)||request.headers.get('sec-fetch-site')==='cross-site'))fail('forbidden',403);
       if(url.pathname==='/api/status'&&request.method==='GET')return json(await capabilities(env));
+      if(url.pathname==='/api/location'&&request.method==='GET')return json({country:/^[A-Z]{2}$/.test(request.cf?.country||'')?request.cf.country:null});
       if(url.pathname==='/api/me'&&request.method==='GET')return json(await videoLogIdentity(request,user));
+      const storyMatch=url.pathname.match(/^\/api\/stories(?:\/([a-f0-9-]{36})(\/media)?)?$/i);if(storyMatch)return await storiesRoute(request,env,user,storyMatch[1],Boolean(storyMatch[2]),url);
       const responseMatch=url.pathname.match(/^\/api\/astronauts\/([^/]+)\/messages\/([a-f0-9-]{36})\/(context|reply)$/i);if(responseMatch&&astronautIds.has(responseMatch[1]))return await localReplyRoute(request,env,user,responseMatch[1],responseMatch[2],responseMatch[3]);
       const photoMatch=url.pathname.match(/^\/api\/astronauts\/([^/]+)\/photos(?:\/([a-f0-9-]{36}))?$/i);if(photoMatch&&astronautIds.has(photoMatch[1]))return await photoRoute(request,env,user,photoMatch[1],photoMatch[2],url);
       const match=url.pathname.match(/^\/api\/astronauts\/([^/]+)\/(messages|search)$/);if(!match||!astronautIds.has(match[1]))fail('not_found',404);

@@ -1,0 +1,47 @@
+{
+  "description": "Силуэты стран из предоставленного пользователем набора 03-solid. SVG скопированы без изменений.",
+  "geometry_source": "Natural Earth, Admin 0, 1:110m - по описанию исходного набора",
+  "reference": "https://www.naturalearthdata.com/downloads/110m-cultural-vectors/110m-admin-0-countries/",
+  "files": [
+    {
+      "code": "AE",
+      "file": "ae.svg",
+      "sha256": "deca602371347dc2a5b10a7330e6e99afe787a7c3ec0de1b5be9b9c883c9e7f2"
+    },
+    {
+      "code": "AU",
+      "file": "au.svg",
+      "sha256": "8ca708f9ba4caeae22b4e017d9300181ee4120017a7f764199f22fed37d72f7f"
+    },
+    {
+      "code": "CN",
+      "file": "cn.svg",
+      "sha256": "c231af7a56a2cf648c38441e7e8fabab220737ab5b3909aecdd8f6cf9c6f71e7"
+    },
+    {
+      "code": "ES",
+      "file": "es.svg",
+      "sha256": "70a857047e87b24b30b9f99e9bde0a94a2dd742cd9bd4e7828732959bb4df72b"
+    },
+    {
+      "code": "FR",
+      "file": "fr.svg",
+      "sha256": "58f6fb36e9b050c59caa2364fce297c7e25ba59a05290668b88d05e3f49f01bf"
+    },
+    {
+      "code": "GB",
+      "file": "gb.svg",
+      "sha256": "4ea9e6c388009b4db7cf196c9831cb4db3b7afcc15b1bd46ade04b1228821000"
+    },
+    {
+      "code": "NZ",
+      "file": "nz.svg",
+      "sha256": "359b89cb50128dec1888d99c804925a247750026a2a0a6b04255a063419ed3f1"
+    },
+    {
+      "code": "RU",
+      "file": "ru.svg",
+      "sha256": "08f4ed562ce88e4dafc655a3ccbf8545a731b9f3c0696b9a568686093c8c2454"
+    }
+  ]
+}

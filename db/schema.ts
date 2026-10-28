@@ -33,3 +33,19 @@ export const journalPhotos=sqliteTable('journal_photos',{
   model:text('model'),
   vector:text('vector_json')
 },table=>[index('photos_owner_profile_region_time').on(table.ownerId,table.astronautId,table.regionKey,table.createdAt)]);
+export const personalStories=sqliteTable('personal_stories',{
+  id:text('id').primaryKey(),
+  ownerId:text('owner_id').notNull(),
+  authorName:text('author_name').notNull(),
+  caption:text('caption').notNull().default(''),
+  kind:text('media_kind').notNull(),
+  objectKey:text('object_key').notNull(),
+  posterKey:text('poster_key'),
+  mime:text('mime').notNull(),
+  bytes:integer('bytes').notNull(),
+  width:integer('width').notNull(),
+  height:integer('height').notNull(),
+  duration:integer('duration_ms'),
+  digest:text('digest').notNull(),
+  createdAt:text('created_at').notNull()
+},table=>[index('stories_owner_time').on(table.ownerId,table.createdAt)]);

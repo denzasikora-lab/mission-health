@@ -1,0 +1,65 @@
+{
+  "kind": "NASA archive",
+  "items": [
+    {
+      "id": "iss074e0789939",
+      "profile": "jessica-meir",
+      "title": "Выход в открытый космос",
+      "description": "Работы у роботизированной руки Canadarm2.",
+      "credit": "NASA/Chris Williams",
+      "createdAt": "2026-06-30T00:00:00Z",
+      "image": "/assets/stories/iss074e0789939.jpg",
+      "source": "https://images.nasa.gov/details/iss074e0789939",
+      "original": "https://images-assets.nasa.gov/image/iss074e0789939/iss074e0789939~large.jpg",
+      "bytes": 321977
+    },
+    {
+      "id": "iss075e0003980",
+      "profile": "jessica-meir",
+      "title": "Работа снаружи станции",
+      "description": "Подготовка энергетической системы МКС.",
+      "credit": "NASA",
+      "createdAt": "2026-08-06T00:00:00Z",
+      "image": "/assets/stories/iss075e0003980.jpg",
+      "source": "https://images.nasa.gov/details/iss075e0003980",
+      "original": "https://images-assets.nasa.gov/image/iss075e0003980/iss075e0003980~large.jpg",
+      "bytes": 267670
+    },
+    {
+      "id": "jsc2025e070062",
+      "profile": "jack-hathaway",
+      "title": "Медицинская тренировка",
+      "description": "Подготовка экипажа Crew-12 в Космическом центре Джонсона.",
+      "credit": "NASA/Bill Stafford",
+      "createdAt": "2025-08-21T00:00:00Z",
+      "image": "/assets/stories/jsc2025e070062.jpg",
+      "source": "https://images.nasa.gov/details/jsc2025e070062",
+      "original": "https://images-assets.nasa.gov/image/jsc2025e070062/jsc2025e070062~large.jpg",
+      "bytes": 236669
+    },
+    {
+      "id": "jsc2025e070056",
+      "profile": "jack-hathaway",
+      "title": "Тренировка СЛР",
+      "description": "Jack Hathaway повторяет приемы сердечно-легочной реанимации.",
+      "credit": "NASA/Bill Stafford",
+      "createdAt": "2025-08-21T00:00:00Z",
+      "image": "/assets/stories/jsc2025e070056.jpg",
+      "source": "https://images.nasa.gov/details/jsc2025e070056",
+      "original": "https://images-assets.nasa.gov/image/jsc2025e070056/jsc2025e070056~large.jpg",
+      "bytes": 255548
+    },
+    {
+      "id": "iss061e011828",
+      "profile": "christina-koch",
+      "title": "Земля за спиной",
+      "description": "Снимок во время первого полностью женского выхода в открытый космос.",
+      "credit": "NASA",
+      "createdAt": "2019-10-18T00:00:00Z",
+      "image": "/assets/stories/iss061e011828.jpg",
+      "source": "https://images.nasa.gov/details/iss061e011828",
+      "original": "https://images-assets.nasa.gov/image/iss061e011828/iss061e011828~medium.jpg",
+      "bytes": 107844
+    }
+  ]
+}
