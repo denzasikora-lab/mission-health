@@ -20,6 +20,12 @@
     const homeButton=document.querySelector('[data-mission-nav="overview"]');homeButton.hidden=isHome;homeButton.querySelector('span').textContent=state.visiting?'Домой':'Моя страница';
     document.querySelectorAll('[data-crew]').forEach(button=>button.setAttribute('aria-pressed',String(state.visiting&&Number(button.dataset.crew)===state.crew)));
     document.body.dataset.home=String(isHome);document.body.dataset.visiting=String(Boolean(state.visiting));home.hidden=!isHome;
+    const chat=document.getElementById('nasagpt-sidebar'),legacy=document.getElementById('journal-view');
+    if(isHome){
+      const activity=home.querySelector('#personal-activity');
+      if(activity){if(chat.nextElementSibling!==activity)activity.before(chat);}
+      else if(chat.parentElement!==home)home.querySelector('.home-checkin').after(chat);
+    }else if(chat.parentElement!==legacy.parentElement)legacy.before(chat);
     friendProfile.classList.toggle('friend-profile',true);
     const report=window.missionCheckin.current(),vital=home.querySelector('[data-home-metric=wellbeing]');vital.querySelector('strong').textContent=(report?report.score:80)+' / 100';vital.querySelector('small').textContent=report?'Твоя самооценка':'Демо / пример самооценки';vital.dataset.source=report?'self_report':'demo';
     if(isHome){document.getElementById('mission-heading-title').textContent='Моя страница';document.getElementById('mission-heading-description').textContent='Личный дневник и самочувствие';document.querySelector('.mission-data-label').textContent='Личное';}

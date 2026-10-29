@@ -25,3 +25,5 @@ html[data-theme=light] .home-human img{filter:brightness(.48) saturate(.8);opaci
 @keyframes watch-link-flow{to{stroke-dashoffset:-90}}
 @container mission (max-width:500px){.home-vitals{grid-template-columns:minmax(0,1fr) 94px minmax(0,1fr);gap:12px 9px}.home-body-panel .home-vital{padding:10px 7px;min-height:85px}.home-vital>span{font-size:.51rem}.home-vital strong{font-size:1.15rem}.home-vital[data-home-metric=pressure] strong{font-size:1rem}.home-vital small{font-size:.43rem}.home-body-panel .home-human{min-height:285px}.home-body-panel .home-human img{height:285px}.home-body-watch,.home-body-watch svg{width:22px;height:29px}}
 @media(prefers-reduced-motion:reduce){.watch-connection .watch-connection-flow{animation:none}}
+
+body[data-home=true] .mission-content .layout{grid-template-columns:minmax(0,1fr)}body[data-home=true] .mission-content .insight-column{display:none}
