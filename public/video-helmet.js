@@ -61,7 +61,7 @@
     const bottom=c.createLinearGradient(0,535,0,720);bottom.addColorStop(0,'#01060900');bottom.addColorStop(1,'#010609f2');c.fillStyle=bottom;c.fillRect(0,535,1280,185);
     c.fillStyle='#8ab2bc';c.font='11px monospace';c.fillText('RESEARCHER / PERSONAL DIARY',402,615);
     c.fillStyle='#d7faff';c.font='24px monospace';c.fillText(name,402,648,560);
-    c.fillStyle=cyan;c.font='13px monospace';c.fillText('LOCATION: '+location,402,677,560);
+    c.fillStyle=cyan;c.font='13px monospace';c.fillText('EARTH SOURCE: '+location,402,677,560);
     c.fillStyle='#77b6c5';c.font='11px monospace';c.fillText(new Date().toLocaleTimeString('en-GB',{hour12:false}),1090,678);
     if(!active){c.fillStyle='#70a1b0';c.font='14px monospace';c.textAlign='center';c.fillText('ВКЛЮЧИ КАМЕРУ / ЛИЦО ПО ЦЕНТРУ',640,363);}
     c.restore();

@@ -25,7 +25,7 @@ function speechMedia(bytes){
 }
 async function speechRoute(request,env,isConfig=false){
   const settings=speechSettings(env);
-  if(isConfig){if(request.method!=='GET')fail('method_not_allowed',405);return json({api:settings.cloud,local:settings.local,airGap:settings.airGap,localModel:settings.local?(env.LOCAL_SPEECH_MODEL||'local'):'not_connected'});}
+  if(isConfig){if(request.method!=='GET')fail('method_not_allowed',405);return json({api:settings.cloud,local:settings.local,airGap:settings.airGap,cloudModel:env.SPEECH_MODEL||'openai/whisper-1',localModel:settings.local?(env.LOCAL_SPEECH_MODEL||'local'):'not_connected'});}
   if(request.method!=='POST')fail('method_not_allowed',405);
   if(!request.headers.get('content-type')?.startsWith('multipart/form-data;'))fail('invalid_input',400);
   const maxBytes=8*1024*1024;if(Number(request.headers.get('content-length')||0)>maxBytes+65536)fail('speech_too_large',413);
@@ -40,12 +40,11 @@ async function speechRoute(request,env,isConfig=false){
   const endpoint=mode==='local'?env.LOCAL_SPEECH_URL:settings.cloudUrl;
   let target;try{target=new URL(endpoint)}catch{fail('speech_unavailable',503)}
   if(!['http:','https:'].includes(target.protocol)||mode==='api'&&target.protocol!=='https:')fail('speech_unavailable',503);
-  const form=new FormData();form.set('file',new Blob([bytes],{type:media[0]}),'voice.'+media[1]);form.set('model',mode==='local'?(env.LOCAL_SPEECH_MODEL||'local'):(env.SPEECH_MODEL||'openai/gpt-4o-mini-transcribe'));form.set('response_format','json');
-  form.set('prompt','Mission Health, NASA, EmbeddingGemma, AudioFM.');
+  const form=new FormData();form.set('file',new Blob([bytes],{type:media[0]}),'voice.'+media[1]);form.set('model',mode==='local'?(env.LOCAL_SPEECH_MODEL||'local'):(env.SPEECH_MODEL||'openai/whisper-1'));form.set('response_format','json');
   const headers={},token=mode==='local'?env.LOCAL_SPEECH_KEY:settings.key;if(token)headers.authorization='Bearer '+token;
   let upstream;try{upstream=await fetch(target.href,{method:'POST',headers,body:form,redirect:'manual',signal:AbortSignal.timeout(65000)});}catch(error){console.warn('Транскрибация: ошибка соединения',error.name);fail('speech_unavailable',503)}
   if(!upstream.ok){const status=upstream.status;await upstream.body?.cancel();return json({error:mode==='local'?'speech_local_unavailable':'speech_upstream_error',upstreamStatus:status},503);}
   let body;try{body=await upstream.json()}catch(error){console.warn('Транскрибация: ответ не JSON',upstream.status,upstream.headers.get('content-type'));fail('speech_unavailable',503)}
   if(typeof body.text!=='string'||body.text.length>40000)fail('speech_unavailable',503);
-  return json({text:body.text.replaceAll('\u0451','\u0435').replaceAll('\u0401','\u0415').replace(/[\u2013\u2014]/g,'-').trim(),mode,model:mode==='local'?(env.LOCAL_SPEECH_MODEL||'local'):(env.SPEECH_MODEL||'openai/gpt-4o-mini-transcribe')});
+  return json({text:body.text.replaceAll('\u0451','\u0435').replaceAll('\u0401','\u0415').replace(/[\u2013\u2014]/g,'-').trim(),mode,model:mode==='local'?(env.LOCAL_SPEECH_MODEL||'local'):(env.SPEECH_MODEL||'openai/whisper-1')});
 }

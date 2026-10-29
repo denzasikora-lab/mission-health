@@ -21,7 +21,8 @@
   let phase = 'idle', epoch = 0, stream, worker, workerReady = false, workerBusy = false;
   let portrait, frame = 0, lastDraw = 0, lastSegmentation = 0;
   let recorder, recordedStream, recordingStarted = 0, recordingTimer, cameraTimer, workerTimer;
-  let clipUrl, clipDate, entry = 1, identity, identityPromise;
+  let clipUrl, clipDate, entry = 1, identity, identityPromise, nameDirty = false, ownProfileChange = false;
+  const earthStation = () => locationName.dataset.station || 'HOUSTON / JOHNSON';
   const storageKey = suffix => 'mission-health-log-' + (identity?.researcherId || 'local') + '-' + suffix;
   function normalized(value) { return String(value || '').replaceAll('\u0451', '\u0435').replaceAll('\u0401', '\u0415').replace(/[\u2013\u2014]/g, '-'); }
   function filmName(value) { return normalized(value).trim().replace(/\s+/g, ' ') || 'Участник'; }
@@ -32,14 +33,14 @@
       identity = await response.json();
       try {
         entry = Math.max(1, Number(localStorage.getItem(storageKey('entry'))) || 1);
-        researcher.value = normalized(localStorage.getItem(storageKey('name')) || identity.name || '');
-        const savedLocation=normalized(localStorage.getItem(storageKey('location')) || 'HOUSTON, TX');
-        locationName.value=[...locationName.options].some(option=>option.value===savedLocation)?savedLocation:'HOUSTON, TX';
-      } catch { researcher.value = normalized(identity.name || ''); }
-      const parts = researcher.value.trim().split(/\s+/);
-      firstName.value = parts.length > 1 ? parts.slice(0, -1).join(' ') : parts[0] || '';
-      lastName.value = parts.length > 1 ? parts.at(-1) : '';
-      updateSignature();
+        if (!nameDirty) researcher.value = normalized(localStorage.getItem(storageKey('name')) || identity.name || '');
+      } catch { if (!nameDirty) researcher.value = normalized(identity.name || ''); }
+      if (!nameDirty) {
+        const parts = researcher.value.trim().split(/\s+/);
+        firstName.value = parts.length > 1 ? parts.slice(0, -1).join(' ') : parts[0] || '';
+        lastName.value = parts.length > 1 ? parts.at(-1) : '';
+        updateSignature();
+      } else saveSignature();
       renderControls();
     } catch { message('Не удалось прочитать профиль. Обнови страницу после входа в аккаунт.', true); }
   }
@@ -52,6 +53,7 @@
   function message(value, error = false) { notice.textContent = value; notice.dataset.error = String(error); }
   function renderControls() {
     const active = phase === 'live' || phase === 'recording';
+    canvas.setAttribute('aria-label', backgroundChoice.value === 'room' ? 'Исходная камера без фона и надписей' : 'Камера видеодневника с выбранным оформлением');
     cameraButton.textContent = phase === 'requesting' ? 'Отменить подключение' : active ? 'Выключить камеру' : clipUrl ? 'Новая запись' : 'Включить камеру';
     cameraButton.disabled = phase === 'finishing';
     cameraButton.setAttribute('aria-pressed', String(active));
@@ -61,7 +63,7 @@
     backgroundChoice.disabled = phase === 'recording' || phase === 'finishing';
     helmetZoom.disabled = backgroundChoice.disabled;
     document.getElementById('video-log-zoom-label').hidden = backgroundChoice.value !== 'helmet';
-    firstName.disabled = lastName.disabled = locationName.disabled = identityForm.querySelector('button').disabled = phase === 'recording' || phase === 'finishing';
+    firstName.disabled = lastName.disabled = phase === 'recording' || phase === 'finishing';
     download.hidden = !clipUrl || phase !== 'review';
     review.hidden = phase !== 'review';
   }
@@ -86,7 +88,7 @@
   function prepareBackground(attempt) {
     if (worker || backgroundChoice.value === 'room') return;
     if (!window.Worker || !window.OffscreenCanvas || !window.createImageBitmap) {
-      message('Этот браузер не поддерживает замену фона. Выбери «Моя комната», чтобы включить обычную камеру.', true); return;
+      message('Этот браузер не поддерживает замену фона. Выбери «Без фона», чтобы включить обычную камеру.', true); return;
     }
     message('Загружаю обработчик фона. Кадры остаются на устройстве.');
     worker = new Worker('/video-background-worker.js?v=20261028-log1');
@@ -100,7 +102,7 @@
       activeWorker.terminate(); if (worker === activeWorker) worker = null;
       workerReady = workerBusy = false; portrait?.close(); portrait = null;
       if (recorder?.state === 'recording') stopCamera();
-      message('Фон не удалось обработать. Повтори подключение или выбери «Моя комната» для обычной камеры.', true);
+      message('Фон не удалось обработать. Повтори подключение или выбери «Без фона» для обычной камеры.', true);
       renderControls();
     }
     worker.onmessage = event => {
@@ -134,6 +136,7 @@
       stream = incoming; video.srcObject = incoming; await video.play();
       if (attempt !== epoch || !dialog.open) return;
       phase = 'live'; renderControls();
+      void window.missionSpeech?.start('video', stream);
       incoming.getTracks().forEach(track => track.addEventListener('ended', () => {
         if (attempt !== epoch) return;
         stopCamera(); if (phase !== 'finishing') phase = 'idle'; renderControls(); message('Устройство отключено. Можно подключить камеру снова.', true);
@@ -209,7 +212,7 @@
     context.fillStyle = cyan; context.font = 'bold 16px Arial, sans-serif';
     const name = filmName(researcher.value), id = identity?.researcherId || '--- --- ---';
     context.fillText('LOG ENTRY: ' + String(entry).padStart(2, '0'), 140, 604);
-    context.fillText('LOCATION: ' + normalized(locationName.value || 'HOUSTON, TX'), 140, 618);
+    context.fillText('EARTH SOURCE: ' + earthStation(), 140, 618);
     context.fillText('RESEARCHER: ' + name, 140, 632, 300); context.fillText('P.I.: ' + name, 140, 646, 300);
     context.fillText('ID# ' + id, 450, 632); context.fillText('ID# ' + id, 450, 646);
     const clock = [date.getHours(), date.getMinutes(), date.getSeconds(), Math.floor(date.getMilliseconds() / 1000 * 24)].map(value => String(value).padStart(2, '0')).join(':');
@@ -239,19 +242,26 @@
     frame = requestAnimationFrame(animate);
     if (time - lastDraw < 33 || phase === 'review') return;
     lastDraw = time;
-    context.fillStyle = '#102027'; context.fillRect(0, 0, 1280, 720);
+    context.fillStyle = backgroundChoice.value === 'room' ? '#000' : '#102027'; context.fillRect(0, 0, 1280, 720);
+    if (backgroundChoice.value === 'room') {
+      // Исходный кадр без замены фона, зеркалирования, обрезки и надписей.
+      if (stream && video.readyState >= 2) {
+        const scale = Math.min(canvas.width / video.videoWidth, canvas.height / video.videoHeight);
+        context.drawImage(video, (canvas.width - video.videoWidth * scale) / 2, (canvas.height - video.videoHeight * scale) / 2, video.videoWidth * scale, video.videoHeight * scale);
+      }
+      return;
+    }
     const helmet=backgroundChoice.value==='helmet';
     const backdrop=backgroundChoice.value==='orbit'?orbitBackground:background;
     if(helmet) window.missionHelmet.backdrop(context);
     else if (backdrop.complete && backdrop.naturalWidth) cover(backdrop);
     if (stream && video.readyState >= 2) {
-      if (backgroundChoice.value === 'room') cover(video, true);
-      else {
+      {
         if (portrait) { if(helmet)window.missionHelmet.portrait(context,portrait,Number(helmetZoom.value)||1.45);else cover(portrait, true); }
         if (workerReady && !workerBusy && time - lastSegmentation > 80) void sendFrame(time);
       }
     }
-    if(helmet) window.missionHelmet.hud(context,{time,active:phase==='live'||phase==='recording',recording:phase==='recording',seconds:phase==='recording'?Math.max(0,Math.floor((time-recordingStarted)/1000)):0,name:filmName(researcher.value),location:normalized(locationName.value||'HOUSTON, TX'),entry,audio:Boolean(stream?.getAudioTracks().some(track=>track.readyState!=='ended'&&track.enabled))});
+    if(helmet) window.missionHelmet.hud(context,{time,active:phase==='live'||phase==='recording',recording:phase==='recording',seconds:phase==='recording'?Math.max(0,Math.floor((time-recordingStarted)/1000)):0,name:filmName(researcher.value),location:earthStation(),entry,audio:Boolean(stream?.getAudioTracks().some(track=>track.readyState!=='ended'&&track.enabled))});
     else drawOverlay(time);
   }
 
@@ -287,7 +297,6 @@
         phase = 'review'; renderControls(); message('Запись готова. Посмотри ее и скачай файл, чтобы сохранить.');
       };
       clipDate = new Date(); recordingStarted = performance.now(); phase = 'recording';
-      window.missionSpeech?.start('video', stream);
       recording.start(250); clearTimeout(cameraTimer);
       recordingTimer = setInterval(() => {
         if (performance.now() - recordingStarted >= 120000 && recording.state === 'recording') { phase = 'finishing'; recording.stop(); renderControls(); }
@@ -321,22 +330,21 @@
   backgroundChoice.addEventListener('change', () => {
     portrait?.close(); portrait = null;
     if (stream && backgroundChoice.value !== 'room') prepareBackground(epoch);
-    if (backgroundChoice.value === 'room') { clearTimeout(workerTimer); workerTimer = null; worker?.terminate(); worker = null; workerReady = workerBusy = false; if (stream) message('В кадре твоя комната.'); }
+    if (backgroundChoice.value === 'room') { clearTimeout(workerTimer); workerTimer = null; worker?.terminate(); worker = null; workerReady = workerBusy = false; if (stream) message(''); }
     renderControls();
   });
-  for (const [node, key] of [[researcher, 'name'], [locationName, 'location']]) node.addEventListener('change', () => {
-    node.value = normalized(node.value);
-    if (identity) try { localStorage.setItem(storageKey(key), node.value.trim()); } catch {}
-  });
-  firstName.addEventListener('input', updateSignature); lastName.addEventListener('input', updateSignature);
-  identityForm.addEventListener('submit', event => {
-    event.preventDefault(); updateSignature();
-    if (!identity) { message('Дождись загрузки профиля и повтори сохранение.', true); return; }
-    try { localStorage.setItem(storageKey('name'), researcher.value); localStorage.setItem(storageKey('location'), normalized(locationName.value)); window.dispatchEvent(new Event('mission-profile-change')); message('Подпись сохранена на этом устройстве: ' + filmName(researcher.value)); }
-    catch { message('Подпись обновлена для этой записи. Браузер не разрешил сохранить ее на устройстве.', true); }
-  });
+  function saveSignature() {
+    updateSignature();
+    if (!identity) return;
+    try {
+      localStorage.setItem(storageKey('name'), researcher.value);
+      ownProfileChange = true; window.dispatchEvent(new Event('mission-profile-change')); ownProfileChange = false;
+    } catch { message('Браузер не разрешил сохранить имя на устройстве.', true); }
+  }
+  for (const node of [firstName, lastName]) node.addEventListener('input', () => { nameDirty = true; saveSignature(); });
+  identityForm.addEventListener('submit', event => event.preventDefault());
   window.addEventListener('mission-profile-change', () => {
-    if (!identity || phase === 'recording') return;
+    if (!identity || ownProfileChange || phase === 'recording') return;
     try {
       const saved = localStorage.getItem(storageKey('name'));
       if (saved) { const parts = saved.trim().split(/\s+/); firstName.value = parts.length > 1 ? parts.slice(0, -1).join(' ') : parts[0]; lastName.value = parts.length > 1 ? parts.at(-1) : ''; updateSignature(); }
@@ -345,7 +353,7 @@
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       stopCamera(); review.pause(); cancelAnimationFrame(frame); frame = 0;
-      if (phase !== 'finishing') phase = clipUrl ? 'review' : 'idle'; renderControls(); message('Камера выключена: вкладка была скрыта.');
+      if (phase !== 'finishing') phase = clipUrl ? 'review' : 'idle'; renderControls(); message('');
     } else if (dialog.open && !frame) frame = requestAnimationFrame(animate);
   });
   window.addEventListener('pagehide', () => { stopCamera(); discardClip(); });
