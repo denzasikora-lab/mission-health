@@ -7,9 +7,12 @@
   const context = canvas.getContext('2d');
   const micButton = document.getElementById('voice-mic');
   const demoButton = document.getElementById('voice-demo');
+  const styleChoice = document.getElementById('voice-style');
   const notice = document.getElementById('voice-notice');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   let source = 'idle', style = 'silo', sequence = 0, frame = 0;
+  try { const savedStyle=localStorage.getItem('mission-health-voice-style'); if(['silo','particles','wave'].includes(savedStyle))style=savedStyle; } catch {}
+  if(styleChoice)styleChoice.value=style;
   let stream, audioContext, audioSource, analyser, samples, frequencies;
   let startedAt = 0, previousFrame = 0, level = 0, decibels = -90;
   let width = 0, height = 0, lastReadout = 0;
@@ -40,6 +43,7 @@
     notice.textContent = message || (active ? 'Слушаю. Говори в обычном темпе.' : source === 'demo' ? 'Искусственный сигнал. Включи микрофон, чтобы увидеть свой голос.' : waiting ? 'Ожидаю разрешение на доступ к микрофону.' : 'Микрофон выключен.');
     notice.dataset.error = String(error);
     document.querySelectorAll('[data-voice-style]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.voiceStyle === style)));
+    if(styleChoice)styleChoice.value=style;
     if (!active && source !== 'demo') updateReadings(performance.now());
   }
 
@@ -258,9 +262,12 @@
     if (!wasDemo) { source = 'demo'; startedAt = performance.now(); }
     renderStatus();
   });
-  document.querySelectorAll('[data-voice-style]').forEach(button => button.addEventListener('click', () => {
-    style = button.dataset.voiceStyle; renderStatus();
-  }));
+  function setStyle(value) {
+    if(!['silo','particles','wave'].includes(value))return;
+    style=value;try{localStorage.setItem('mission-health-voice-style',style);}catch{}renderStatus();
+  }
+  styleChoice?.addEventListener('change',()=>setStyle(styleChoice.value));
+  document.querySelectorAll('[data-voice-style]').forEach(button => button.addEventListener('click', () => setStyle(button.dataset.voiceStyle)));
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       stopSignal(); cancelAnimationFrame(frame); frame = 0;

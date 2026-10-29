@@ -155,7 +155,7 @@
   const sidebar=create('section','nasagpt-sidebar panel glass');sidebar.id='nasagpt-sidebar';
   const legacy=document.getElementById('journal-view');legacy.classList.add('legacy-journal-archive');legacy.before(sidebar);const sidebarView=panel(sidebar,'chat',{favoriteShortcut:true});
   const mediaTools=create('div','nasagpt-media-tools');
-  for(const [mode,title,icon] of [['video','Открыть камеру','<path d="M3 7h4l2-3h6l2 3h4v14H3Z"/><circle cx="12" cy="13" r="4"/>'],['audio','Открыть микрофон','<rect x="8" y="2" width="8" height="13" rx="4"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4m-4 0h8"/>']]){
+  for(const [mode,title,icon] of [['video','Добавить фото или видео','<path d="m21.4 11.6-8.5 8.5a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/>'],['audio','Открыть микрофон','<rect x="8" y="2" width="8" height="13" rx="4"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4m-4 0h8"/>']]){
     const button=create('button','');button.type='button';button.setAttribute('aria-label',title);button.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'+icon+'</svg>';button.addEventListener('click',()=>window.missionDiary.open(mode));mediaTools.append(button);
   }
   sidebarView.form.querySelector('footer').prepend(mediaTools);
