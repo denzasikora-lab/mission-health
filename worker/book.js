@@ -14,12 +14,19 @@ async function bookRoute(request,env,user,profile,action,url){
     return json({entries:await Promise.all(rows.map(row=>hydratedMessage(env,user,profile,row))),total:count.total,hasMore:results.length>24,cursor:last?JSON.stringify([last.created_at,last.id]):null});
   }
   if(action==='book-index'&&request.method==='GET'){
-    const {results}=await db.prepare("SELECT m.id,m.content,m.created_at FROM journal_messages m LEFT JOIN journal_text_vectors v ON v.message_id=m.id AND v.owner_id=m.owner_id AND v.astronaut_id=m.astronaut_id AND v.model=? WHERE m.owner_id=? AND m.astronaut_id=? AND m.role!='assistant' AND v.message_id IS NULL ORDER BY m.created_at DESC,m.id DESC LIMIT 12").bind(bookVectorModel,user,profile).all();
-    return json({entries:results.map(row=>({id:row.id,content:row.content,createdAt:row.created_at})),model:bookVectorModel});
+    const {results}=await db.prepare("SELECT m.id,m.content,m.created_at,m.wellbeing_json FROM journal_messages m LEFT JOIN journal_text_vectors v ON v.message_id=m.id AND v.owner_id=m.owner_id AND v.astronaut_id=m.astronaut_id AND v.model=? WHERE m.owner_id=? AND m.astronaut_id=? AND m.role!='assistant' AND v.message_id IS NULL ORDER BY m.created_at DESC,m.id DESC LIMIT 12").bind(bookVectorModel,user,profile).all();
+    return json({entries:results.map(row=>({id:row.id,content:diaryDocument(row),createdAt:row.created_at})),model:bookVectorModel});
   }
-  if(!['book-vectors','book-search'].includes(action)||request.method!=='POST')fail('method_not_allowed',405);
+  if(!['book-vectors','book-search','book-answer'].includes(action)||request.method!=='POST')fail('method_not_allowed',405);
   if(!request.headers.get('content-type')?.startsWith('application/json'))fail('invalid_input',400);
   const raw=await request.text();if(raw.length>100000)fail('invalid_input',400);let input;try{input=JSON.parse(raw)}catch{fail('invalid_input',400)}
+  if(action==='book-answer'){
+    if(typeof input?.query!=='string'||!input.query.trim()||input.query.length>1000||!Array.isArray(input.ids)||!input.ids.length||input.ids.length>6||input.ids.some(id=>typeof id!=='string'||!/^[a-f0-9-]{36}$/i.test(id)))fail('invalid_input',400);
+    const rows=[];for(const id of [...new Set(input.ids)]){const row=await db.prepare("SELECT * FROM journal_messages WHERE id=? AND owner_id=? AND astronaut_id=? AND role!='assistant'").bind(id,user,profile).first();if(!row)fail('not_found',404);rows.push(row);}
+    if(!languageModelConfigured(env))fail('assistant_unavailable',503);
+    const answer=await languageModelAnswer(env,{query:input.query.trim(),language:'ru',history:[],photos:[],references:rows.map(row=>({...serialize(row),content:diaryDocument(row)}))});
+    return json({answer:answer.text.slice(0,16000).replaceAll('\u0451','\u0435').replaceAll('\u0401','\u0415').replace(/[\u2013\u2014]/g,'-'),references:rows.map(serialize)});
+  }
   if(action==='book-vectors'){
     if(input?.model!==bookVectorModel||typeof input.id!=='string'||!Array.isArray(input.vectors)||!input.vectors.length||input.vectors.length>8)fail('invalid_input',400);
     const vectors=input.vectors.map(bookUnitVector);

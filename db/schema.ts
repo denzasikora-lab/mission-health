@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 export const journalMessages=sqliteTable('journal_messages',{
   id:text('id').primaryKey(),
   ownerId:text('owner_id').notNull(),
@@ -11,7 +11,8 @@ export const journalMessages=sqliteTable('journal_messages',{
   replyTo:text('reply_to'),
   references:text('references_json').notNull().default('[]'),
   attachments:text('attachments_json').notNull().default('[]'),
-  assistantSource:text('assistant_source').notNull().default('server')
+  assistantSource:text('assistant_source').notNull().default('server'),
+  wellbeing:text('wellbeing_json')
 },table=>[index('journal_owner_astronaut_time').on(table.ownerId,table.astronautId,table.createdAt)]);
 export const journalPhotos=sqliteTable('journal_photos',{
   id:text('id').primaryKey(),
@@ -70,3 +71,11 @@ export const journalTrainingJobs=sqliteTable('journal_training_jobs',{
   createdAt:text('created_at').notNull(),
   updatedAt:text('updated_at').notNull()
 },table=>[index('training_owner_profile_time').on(table.ownerId,table.astronautId,table.createdAt)]);
+
+export const generalChatMessages=sqliteTable('general_chat_messages',{
+  id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),role:text('role').notNull(),content:text('content').notNull(),createdAt:text('created_at').notNull(),replyTo:text('reply_to'),wellbeing:text('wellbeing_json')
+},table=>[index('general_chat_owner_time').on(table.ownerId,table.createdAt,table.id),uniqueIndex('general_chat_owner_reply').on(table.ownerId,table.replyTo)]);
+
+export const personalFavorites=sqliteTable('personal_favorites',{
+  id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),sourceType:text('source_type').notNull(),sourceId:text('source_id').notNull(),profileId:text('profile_id'),content:text('content').notNull(),sourceCreatedAt:text('source_created_at').notNull(),createdAt:text('created_at').notNull(),wellbeing:text('wellbeing_json')
+},table=>[uniqueIndex('favorites_owner_source').on(table.ownerId,table.sourceType,table.sourceId),index('favorites_owner_time').on(table.ownerId,table.createdAt,table.id)]);

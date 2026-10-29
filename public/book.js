@@ -3,7 +3,7 @@
   const book=document.createElement('section');book.id='mission-book';book.className='mission-book';book.lang='ru';book.hidden=true;
   book.innerHTML=`<header class="book-toolbar"><div><span class="book-eyebrow">PERSONAL ARCHIVE / MISSION HEALTH</span><h2>Книга наблюдений</h2><p id="book-scope"></p></div><div class="book-toolbar-actions"><button type="button" id="book-write">+ Запись</button><button type="button" id="book-search-open"><span aria-hidden="true">✧</span> NasaGPT</button></div></header>
     <div id="book-demo-banner" class="book-demo-banner" hidden>ПРИМЕР / записи придуманы и не сохраняются <button type="button" id="book-demo-exit">Моя история</button></div>
-    <div class="book-stage" id="book-stage"><button type="button" id="book-cover" class="book-cover" aria-label="Открыть книгу наблюдений"><span class="cover-corner top"></span><span class="cover-kicker">MISSION HEALTH</span><span class="cover-orbit" aria-hidden="true">✧</span><strong>Личная<br>история</strong><span id="book-author">Мой дневник</span><span class="cover-rule"></span><span class="cover-caption">НАБЛЮДАТЬ · ЗАПОМИНАТЬ · ВОЗВРАЩАТЬСЯ</span><span class="cover-open">Открыть книгу ↗</span><span class="cover-corner bottom"></span></button><div id="book-spread" class="book-spread" tabindex="0" role="region" aria-label="Страницы личной истории" hidden></div></div>
+    <div class="book-stage" id="book-stage"><button type="button" id="book-cover" class="book-cover" aria-label="Открыть книгу наблюдений"><span class="cover-corner top"></span><span class="cover-kicker">MISSION HEALTH</span><img class="cover-nasa" src="assets/nasa-brand/nasa-insignia.png" alt="NASA"><strong>Личная<br>история</strong><span id="book-author">Мой дневник</span><span class="cover-rule"></span><span class="cover-caption">НАБЛЮДАТЬ · ЗАПОМИНАТЬ · ВОЗВРАЩАТЬСЯ</span><span class="cover-open">Открыть книгу ↗</span><span class="cover-corner bottom"></span></button><div id="book-spread" class="book-spread" tabindex="0" role="region" aria-label="Страницы личной истории" hidden></div></div>
     <nav class="book-navigation" aria-label="Листать книгу"><button type="button" id="book-prev" aria-label="Предыдущие страницы">← Назад</button><span id="book-position" role="status" aria-live="polite">Обложка</span><button type="button" id="book-next" aria-label="Следующие страницы">Далее →</button></nav>
     <div class="book-bottom"><button type="button" id="book-older" hidden>Загрузить ранние записи</button><button type="button" id="book-close-cover">На обложку</button><button type="button" id="book-demo">Посмотреть пример</button><span id="book-notice" role="status"></span></div>`;
   document.querySelector('.main-column').prepend(book);
@@ -33,6 +33,8 @@
     if(page){
       const date=create('time','book-page-date',stamp(page.entry.createdAt));date.dateTime=page.entry.createdAt;article.append(date);
       article.append(create('h3','',page.part?'Продолжение':page.content.split(/\n|[.!?]\s/)[0].slice(0,72)||'Наблюдение'));
+      if(!page.part&&page.entry.wellbeing&&window.missionFavorites)article.append(window.missionFavorites.badge(page.entry.wellbeing));
+      if(!page.part&&!B.demo&&window.missionFavorites)article.append(window.missionFavorites.button(page.entry,'diary',B.profile));
       const lines=page.content.split('\n'),body=!page.part&&lines.length>1&&lines[0].length<=72?lines.slice(1).join('\n').trim():page.content;
       const text=create('div','book-page-text',body);text.dir='auto';article.append(text);
       if(!page.part)for(const media of page.entry.attachments||[]){const node=create(media.kind==='video'?'video':'img','book-media');node.src=media.url;if(media.kind==='video'){node.controls=true;node.playsInline=true;node.preload='metadata';if(media.posterUrl)node.poster=media.posterUrl}else{node.alt=media.region||'Фото из записи';node.loading='lazy'}article.append(node);}
@@ -88,9 +90,13 @@
     if(!B.entries.some(item=>item.id===entry.id)){B.entries.push(entry);rebuild()}
     B.index=Math.max(0,B.pages.findIndex(page=>page.entry.id===entry.id));B.cover=false;draw();search.close();$b('book-spread').focus();
   }
-  function results(items,caption){
+  async function results(items,caption,query){
     const list=$b('book-search-results');list.replaceChildren();status(caption+(items.length?' / '+items.length+' ближайших записей':' / записей пока нет'));
+    const version=searchVersion,id=B.profile;
+    let answer;
+    if(items.length&&!B.demo){answer=create('div','book-rag-answer','Собираю ответ по найденным записям...');answer.setAttribute('role','status');list.append(answer);}
     for(const entry of items){const card=create('button','book-result');card.type='button';card.append(create('time','',stamp(entry.createdAt)),create('strong','',entry.content.split('\n')[0].slice(0,90)),create('span','',entry.content.slice(0,210)),create('small','','Открыть страницу ↗'));card.addEventListener('click',()=>void openResult(entry));list.append(card)}
+    if(answer)try{const data=await journalApi('/api/astronauts/'+id+'/book-answer',{method:'POST',signal:controller?.signal,body:JSON.stringify({query,ids:items.map(item=>item.id).slice(0,6)})});if(version===searchVersion&&id===B.profile)answer.textContent='NasaGPT\n\n'+data.answer;}catch{if(version===searchVersion&&id===B.profile)answer.textContent='Записи найдены по смыслу. Ответ языкового сервиса пока недоступен; можно открыть исходные страницы.';}
   }
   $b('book-search-form').addEventListener('submit',async event=>{
     event.preventDefault();if(searching)return;const query=$b('book-query').value.trim();if(!query)return;
@@ -98,11 +104,11 @@
     searching=true;$b('book-find').disabled=true;$b('book-search-stop').hidden=false;$b('book-search-results').replaceChildren();status('Ищу в памяти книги...');
     try{
       let found=demo?{needsVector:true}:await journalApi('/api/astronauts/'+id+'/book-search',{method:'POST',signal,body:JSON.stringify({query})});check();
-      if(!found.needsVector){results(found.matches,'Векторный поиск / Qdrant');return}
-      if(!demo&&B.loaded&&!B.entries.length){results([],'В книге пока нет сохраненных записей');return}
+      if(!found.needsVector){await results(found.matches,'Векторный поиск / Qdrant',query);return}
+      if(!demo&&B.loaded&&!B.entries.length){await results([],'В книге пока нет сохраненных записей',query);return}
       if(demo){
         const entries=[];for(const entry of demoEntries){status('Индексирую пример '+(entries.length+1)+' / '+demoEntries.length);entries.push({...entry,vectors:await entryVectors(entry,check)});check()}
-        const queryVector=await embed('task: search result | query: '+query);check();results(tools.rank(queryVector,entries),'Пример / локальные векторы EmbeddingGemma 2');return;
+        const queryVector=await embed('task: search result | query: '+query);check();await results(tools.rank(queryVector,entries),'Пример / локальные векторы EmbeddingGemma 2',query);return;
       }
       let indexed=0;
       while(indexed<500){
@@ -110,14 +116,14 @@
         for(const entry of pending.entries){check();status('Готовлю векторную память / запись '+(indexed+1));const vectors=await entryVectors(entry,check);check();await journalApi('/api/astronauts/'+id+'/book-vectors',{method:'POST',signal,body:JSON.stringify({id:entry.id,model,vectors})});indexed++;if(indexed>=500)break;}
       }
       status('Сравниваю смысл запроса и страниц...');const vector=await embed('task: search result | query: '+query);check();
-      found=await journalApi('/api/astronauts/'+id+'/book-search',{method:'POST',signal,body:JSON.stringify({query,model,vector})});check();results(found.matches,'Векторный поиск / '+found.searchedCount+' записей из последних '+found.limit);
+      found=await journalApi('/api/astronauts/'+id+'/book-search',{method:'POST',signal,body:JSON.stringify({query,model,vector})});check();await results(found.matches,'Векторный поиск / '+found.searchedCount+' записей из последних '+found.limit,query);
     }catch(error){if(error.name!=='AbortError')console.warn('NasaGPT:',error.name);if(error.name!=='AbortError'&&version===searchVersion)status('Не удалось запустить векторный поиск. История сохранена. Проверь сеть для первой загрузки модели или повтори на устройстве с WebGPU.');}
     finally{if(version===searchVersion){searching=false;$b('book-find').disabled=false;$b('book-search-stop').hidden=true;}}
   });
   $b('book-entry-text').addEventListener('input',()=>{if(!saving)saveId=null});
   $b('book-entry-form').addEventListener('submit',async event=>{
     event.preventDefault();const content=$b('book-entry-text').value.trim();if(!content||saving)return;saving=true;saveId||=crypto.randomUUID();const id=B.profile,version=B.version,button=$b('book-save');button.disabled=true;$b('book-entry-text').disabled=true;
-    try{await journalApi('/api/astronauts/'+id+'/messages',{method:'POST',body:JSON.stringify({id:saveId,content,mode:'diary',language:'ru',attachments:[]})});if(version!==B.version)return;editor.close();saveId=null;$b('book-entry-text').value='';B.demo=false;B.loading=false;await load();B.cover=false;B.index=Math.max(0,B.pages.length-perSpread());draw();void loadJournal();}
+    try{await journalApi('/api/astronauts/'+id+'/messages',{method:'POST',body:JSON.stringify({id:saveId,content,mode:'diary',language:'ru',attachments:[],wellbeing:window.missionCheckin?.current()||null})});if(version!==B.version)return;editor.close();saveId=null;$b('book-entry-text').value='';B.demo=false;B.loading=false;await load();B.cover=false;B.index=Math.max(0,B.pages.length-perSpread());draw();void loadJournal();}
     catch{if(version===B.version)$b('book-save-status').textContent='Не удалось сохранить. Текст остается здесь, попробуй еще раз.';}finally{saving=false;button.disabled=false;$b('book-entry-text').disabled=false}
   });
   $b('book-cover').addEventListener('click',()=>turn(1));$b('book-next').addEventListener('click',()=>turn(1));$b('book-prev').addEventListener('click',()=>turn(-1));

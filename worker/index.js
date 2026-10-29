@@ -4,6 +4,13 @@ const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:
 const fail=(code,status)=>{throw Object.assign(new Error(code),{code,status})};
 function database(env){if(!env.DB)fail('storage_unavailable',503);return env.DB}
 function owner(request,env){const value=request.headers.get('oai-authenticated-user-id');if(value)return value;if(env.LOCAL_PREVIEW==='1')return 'local-preview';fail('sign_in_required',401)}
+function selfReport(value){
+  if(value===undefined||value===null)return null;
+  if(typeof value!=='object'||!Number.isInteger(value.score)||value.score<1||value.score>10)fail('invalid_wellbeing',400);
+  const label=value.score<=2?'Очень плохо':value.score<=4?'Ниже обычного':value.score<=6?'Нормально':value.score<=8?'Хорошо':'Отлично';
+  return {score:value.score,label,source:'self_report',recordedAt:new Date().toISOString()};
+}
+function diaryDocument(row){const report=row.wellbeing_json?JSON.parse(row.wellbeing_json):null;return row.content+(report?'\nСамочувствие: '+report.score+'/10 / '+report.label+'. Самооценка пользователя.':'');}
 async function videoLogIdentity(request,user){
   let name=request.headers.get('oai-authenticated-user-full-name')||'';
   if(request.headers.get('oai-authenticated-user-full-name-encoding')==='percent-encoded-utf-8')try{name=decodeURIComponent(name)}catch{name=''}
@@ -26,7 +33,7 @@ async function capabilities(env){
   if(!memoryConfigured(env))return result;
   try{const health=await memoryRequest(env,'/health');return {...result,memory:health.semantic===true,assistant:result.assistant||health.generation===true,assistantState:result.assistantState==='offline'&&health.generation===true?'ready':result.assistantState}}catch{return result}
 }
-function serialize(row){return {id:row.id,role:row.role,content:row.role==='assistant'?row.content.replaceAll('ё','е').replaceAll('Ё','Е').replace(/[—–]/g,'-'):row.content,language:row.language,createdAt:row.created_at,vectorStatus:row.vector_status,references:JSON.parse(row.references_json||'[]'),attachmentIds:JSON.parse(row.attachments_json||'[]'),source:row.assistant_source||'server',replyTo:row.reply_to||null,replyStatus:row.role==='user'?(row.answered?'answered':'pending'):'not_applicable',attachments:[]} }
+function serialize(row){return {id:row.id,role:row.role,content:row.role==='assistant'?row.content.replaceAll('ё','е').replaceAll('Ё','Е').replace(/[—–]/g,'-'):row.content,language:row.language,createdAt:row.created_at,vectorStatus:row.vector_status,references:JSON.parse(row.references_json||'[]'),attachmentIds:JSON.parse(row.attachments_json||'[]'),source:row.assistant_source||'server',...(row.wellbeing_json?{wellbeing:JSON.parse(row.wellbeing_json)}:{}),replyTo:row.reply_to||null,replyStatus:row.role==='user'?(row.answered?'answered':'pending'):'not_applicable',attachments:[]} }
 async function history(env,user,astronaut,before){
   const db=database(env),query=before?`SELECT m.*,EXISTS(SELECT 1 FROM journal_messages r WHERE r.reply_to=m.id AND r.owner_id=m.owner_id AND r.astronaut_id=m.astronaut_id AND COALESCE(r.assistant_source,'server') NOT IN ('history','comparison') AND COALESCE(r.assistant_source,'server') NOT LIKE 'browser:%') AS answered FROM journal_messages m WHERE owner_id=? AND astronaut_id=? AND created_at<? ORDER BY created_at DESC,id DESC LIMIT 61`:`SELECT m.*,EXISTS(SELECT 1 FROM journal_messages r WHERE r.reply_to=m.id AND r.owner_id=m.owner_id AND r.astronaut_id=m.astronaut_id AND COALESCE(r.assistant_source,'server') NOT IN ('history','comparison') AND COALESCE(r.assistant_source,'server') NOT LIKE 'browser:%') AS answered FROM journal_messages m WHERE owner_id=? AND astronaut_id=? ORDER BY created_at DESC,id DESC LIMIT 61`;
   const {results}=await db.prepare(query).bind(...[user,astronaut,...(before?[before]:[])]).all();
@@ -35,7 +42,7 @@ async function history(env,user,astronaut,before){
 async function indexEntry(env,row){
   if(!memoryConfigured(env)||row.role==='assistant')return false;
   try{
-    await memoryRequest(env,'/upsert',{id:row.id,ownerId:row.owner_id,astronautId:row.astronaut_id,text:row.content,language:row.language,createdAt:row.created_at});
+    await memoryRequest(env,'/upsert',{id:row.id,ownerId:row.owner_id,astronautId:row.astronaut_id,text:diaryDocument(row),language:row.language,createdAt:row.created_at});
     await database(env).prepare('UPDATE journal_messages SET vector_status=? WHERE id=? AND owner_id=? AND astronaut_id=?').bind('indexed',row.id,row.owner_id,row.astronaut_id).run();return true;
   }catch(error){console.warn('Индексация дневника отложена:',error.code||error.name);return false}
 }
@@ -78,6 +85,9 @@ async function languageModelAnswer(env,query){
   const messages=[{role:'system',content:instruction},...trustedHistory.slice(-10).map(item=>({role:item.role==='assistant'?'assistant':'user',content:item.role==='assistant'?item.content.slice(0,2000):'Дата: '+item.createdAt+'\n'+item.content.slice(0,2400)}))];
   if(trustedHistory.at(-1)?.content!==query.query||trustedHistory.at(-1)?.role!=='user')messages.push({role:'user',content:query.query});
   if(query.photos?.length){const last=messages.at(-1);last.content=[{type:'text',text:typeof last.content==='string'?last.content:query.query},...query.photos.flatMap(photo=>[{type:'text',text:'Фото '+photo.position+'; дата '+photo.createdAt+'; участок '+photo.region},{type:'image_url',image_url:{url:photo.dataUrl,detail:'high'}}])]}
+  return completeLanguageMessages(env,messages);
+}
+async function completeLanguageMessages(env,messages){
   let response;
   for(let attempt=0;attempt<2;attempt++){
     try{response=await fetch(env.LLM_BASE_URL.replace(/\/$/,'')+'/chat/completions',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+env.LLM_API_KEY},body:JSON.stringify({model:env.LLM_MODEL,messages,max_completion_tokens:1536,reasoning_effort:'low',store:false}),signal:AbortSignal.timeout(40000)})}
@@ -101,6 +111,7 @@ async function addMessage(request,env,user,astronaut){
   let input;try{input=JSON.parse(raw)}catch{fail('invalid_input',400)}
   if(!input||typeof input.id!=='string'||! /^[a-f0-9-]{36}$/i.test(input.id)||typeof input.content!=='string'||!input.content.trim()||input.content.length>6000||!languages.has(input.language)||!['diary','ask'].includes(input.mode))fail('invalid_input',400);
   const attachmentIds=input.attachments||[];if(!Array.isArray(attachmentIds)||attachmentIds.length>1||attachmentIds.some(id=>typeof id!=='string'||! /^[a-f0-9-]{36}$/i.test(id)))fail('invalid_input',400);
+  const report=selfReport(input.wellbeing);
   const db=database(env),existing=await db.prepare('SELECT * FROM journal_messages WHERE id=?').bind(input.id).first();
   if(existing){
     if(existing.owner_id!==user||existing.astronaut_id!==astronaut||existing.role!==(input.mode==='ask'?'user':'note')||(existing.content!==input.content.trim()||existing.attachments_json!==JSON.stringify(attachmentIds)))fail('id_conflict',409);
@@ -109,8 +120,8 @@ async function addMessage(request,env,user,astronaut){
   }
   if(!existing)for(const id of attachmentIds)if(!await photoRow(env,user,astronaut,id))fail('not_found',404);
   const features=await capabilities(env);if(input.mode==='ask'&&!features.assistant)fail('assistant_unavailable',503);
-  const row=existing||{id:input.id,owner_id:user,astronaut_id:astronaut,role:input.mode==='diary'?'note':'user',content:input.content.trim(),language:input.language,created_at:new Date().toISOString(),vector_status:'pending',references_json:'[]',attachments_json:JSON.stringify(attachmentIds)};
-  if(!existing)await db.prepare('INSERT INTO journal_messages (id,owner_id,astronaut_id,role,content,language,created_at,vector_status,references_json,attachments_json) VALUES (?,?,?,?,?,?,?,?,?,?)').bind(row.id,user,astronaut,row.role,row.content,row.language,row.created_at,'pending','[]',row.attachments_json).run();
+  const row=existing||{id:input.id,owner_id:user,astronaut_id:astronaut,role:input.mode==='diary'?'note':'user',content:input.content.trim(),language:input.language,created_at:new Date().toISOString(),vector_status:'pending',references_json:'[]',attachments_json:JSON.stringify(attachmentIds),wellbeing_json:report?JSON.stringify(report):null};
+  if(!existing)await db.prepare('INSERT INTO journal_messages (id,owner_id,astronaut_id,role,content,language,created_at,vector_status,references_json,attachments_json,wellbeing_json) VALUES (?,?,?,?,?,?,?,?,?,?,?)').bind(row.id,user,astronaut,row.role,row.content,row.language,row.created_at,'pending','[]',row.attachments_json,row.wellbeing_json).run();
   let reply=null,replyError=null,assistantError=null;
   if(input.mode==='ask'){
     try{
@@ -147,8 +158,10 @@ export default {
       if(url.pathname==='/api/status'&&request.method==='GET')return json(await capabilities(env));
       if(url.pathname==='/api/location'&&request.method==='GET')return json({country:/^[A-Z]{2}$/.test(request.cf?.country||'')?request.cf.country:null});
       if(url.pathname==='/api/me'&&request.method==='GET')return json(await videoLogIdentity(request,user));
+      if(url.pathname==='/api/chat')return await generalChatRoute(request,env,user,url);
+      const favoritesMatch=url.pathname.match(/^\/api\/favorites(?:\/([a-f0-9-]{36}))?$/i);if(favoritesMatch)return await favoritesRoute(request,env,user,favoritesMatch[1],url);
       const trainingMatch=url.pathname.match(/^\/api\/astronauts\/([^/]+)\/training(?:\/([a-f0-9-]{36}))?$/i);if(trainingMatch&&astronautIds.has(trainingMatch[1]))return await trainingRoute(request,env,user,trainingMatch[1],trainingMatch[2]);
-      const bookMatch=url.pathname.match(/^\/api\/astronauts\/([^/]+)\/(book|book-index|book-vectors|book-search)$/);if(bookMatch&&astronautIds.has(bookMatch[1]))return await bookRoute(request,env,user,bookMatch[1],bookMatch[2],url);
+      const bookMatch=url.pathname.match(/^\/api\/astronauts\/([^/]+)\/(book|book-index|book-vectors|book-search|book-answer)$/);if(bookMatch&&astronautIds.has(bookMatch[1]))return await bookRoute(request,env,user,bookMatch[1],bookMatch[2],url);
       const storyMatch=url.pathname.match(/^\/api\/stories(?:\/([a-f0-9-]{36})(\/media)?)?$/i);if(storyMatch)return await storiesRoute(request,env,user,storyMatch[1],Boolean(storyMatch[2]),url);
       const responseMatch=url.pathname.match(/^\/api\/astronauts\/([^/]+)\/messages\/([a-f0-9-]{36})\/(context|reply)$/i);if(responseMatch&&astronautIds.has(responseMatch[1]))return await localReplyRoute(request,env,user,responseMatch[1],responseMatch[2],responseMatch[3]);
       const photoMatch=url.pathname.match(/^\/api\/astronauts\/([^/]+)\/photos(?:\/([a-f0-9-]{36}))?$/i);if(photoMatch&&astronautIds.has(photoMatch[1]))return await photoRoute(request,env,user,photoMatch[1],photoMatch[2],url);
