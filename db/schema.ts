@@ -49,3 +49,23 @@ export const personalStories=sqliteTable('personal_stories',{
   digest:text('digest').notNull(),
   createdAt:text('created_at').notNull()
 },table=>[index('stories_owner_time').on(table.ownerId,table.createdAt)]);
+
+export const journalTextVectors=sqliteTable('journal_text_vectors',{
+  messageId:text('message_id').primaryKey(),
+  ownerId:text('owner_id').notNull(),
+  astronautId:text('astronaut_id').notNull(),
+  model:text('model').notNull(),
+  vectors:text('vectors_json').notNull(),
+  indexedAt:text('indexed_at').notNull()
+},table=>[index('text_vectors_owner_profile_model').on(table.ownerId,table.astronautId,table.model)]);
+
+export const journalTrainingJobs=sqliteTable('journal_training_jobs',{
+  id:text('id').primaryKey(),
+  ownerId:text('owner_id').notNull(),
+  astronautId:text('astronaut_id').notNull(),
+  status:text('status').notNull(),
+  exampleCount:integer('example_count').notNull(),
+  progress:text('progress_json').notNull().default('{}'),
+  createdAt:text('created_at').notNull(),
+  updatedAt:text('updated_at').notNull()
+},table=>[index('training_owner_profile_time').on(table.ownerId,table.astronautId,table.createdAt)]);

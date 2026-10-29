@@ -64,6 +64,7 @@
     heading.querySelector('h1').textContent = state.workspace === 'research' ? researchState.dataset === 'library' ? 'Источники и исследования' : 'Реальные наблюдения' : 'Состояние и наблюдения';
     document.getElementById('mission-heading-description').textContent = state.workspace === 'research' ? 'NASA OSD-575 / BIDMC / открытые исследования' : 'Ключевые показатели выбранного профиля';
     document.querySelector('.mission-data-label').textContent = state.workspace === 'research' ? 'Исходные данные' : 'Демо-данные';
+    window.missionBook?.render();
     const active = state.workspace === 'research' ? researchState.dataset === 'library' ? 'sources' : 'observations' : state.view === 'journal' ? 'diary' : 'overview';
     navigation.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.missionNav===active)));
     themeGroup.querySelectorAll('[data-theme-choice]').forEach(button=>{button.setAttribute('aria-pressed',String(button.dataset.themeChoice===themeMode));if(button.dataset.themeChoice==='system'){button.setAttribute('aria-label','Системная тема');button.title='Системная тема';}});
@@ -74,7 +75,7 @@
     else if (section === 'observations' && researchState.dataset === 'library') researchState.dataset = 'nasa';
     state.view = section === 'diary' ? 'journal' : 'health';
     window.research.render(); renderJournal(); render();
-    if (section === 'diary') { void loadJournal(); journal.scrollIntoView({behavior:'smooth',block:'start'}); document.getElementById('journal-input').focus({preventScroll:true}); }
+    if (section === 'diary') { void loadJournal();window.missionBook?.refresh(); document.getElementById('mission-book')?.scrollIntoView({behavior:'smooth',block:'start'}); }
   }
   navigation.addEventListener('click',event=>{const button=event.target.closest('[data-mission-nav]');if(button)navigate(button.dataset.missionNav)});
   iconButton.addEventListener('click',()=>navigate('sources'));

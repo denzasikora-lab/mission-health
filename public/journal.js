@@ -27,6 +27,7 @@ function renderJournalMessages(){
   if(journalState.transient){const article=element('article','journal-message assistant');article.append(element('div','message-meta',t.reserveAssistant),element('div','message-content',journalState.transient));list.append(article)}
 }
 function renderJournal(){
+  window.missionBook?.render();
   const t=text(),draft=draftFor();document.querySelectorAll('[data-view]').forEach(button=>button.setAttribute('aria-selected',String(button.dataset.view===state.view)));
   $('health-view').hidden=window.missionDesign?false:state.view!=='health';$('journal-view').hidden=window.missionDesign?false:state.view!=='journal';document.querySelector('.insight-column').hidden=window.missionDesign?false:state.view==='journal';
   $('journal-name').textContent=t.people[state.crew].name;$('journal-storage').textContent=journalState.messages.length?t.journalSaved:t.journalTitle;

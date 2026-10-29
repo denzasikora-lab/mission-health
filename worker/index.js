@@ -146,6 +146,8 @@ export default {
       if(url.pathname==='/api/status'&&request.method==='GET')return json(await capabilities(env));
       if(url.pathname==='/api/location'&&request.method==='GET')return json({country:/^[A-Z]{2}$/.test(request.cf?.country||'')?request.cf.country:null});
       if(url.pathname==='/api/me'&&request.method==='GET')return json(await videoLogIdentity(request,user));
+      const trainingMatch=url.pathname.match(/^\/api\/astronauts\/([^/]+)\/training(?:\/([a-f0-9-]{36}))?$/i);if(trainingMatch&&astronautIds.has(trainingMatch[1]))return await trainingRoute(request,env,user,trainingMatch[1],trainingMatch[2]);
+      const bookMatch=url.pathname.match(/^\/api\/astronauts\/([^/]+)\/(book|book-index|book-vectors|book-search)$/);if(bookMatch&&astronautIds.has(bookMatch[1]))return await bookRoute(request,env,user,bookMatch[1],bookMatch[2],url);
       const storyMatch=url.pathname.match(/^\/api\/stories(?:\/([a-f0-9-]{36})(\/media)?)?$/i);if(storyMatch)return await storiesRoute(request,env,user,storyMatch[1],Boolean(storyMatch[2]),url);
       const responseMatch=url.pathname.match(/^\/api\/astronauts\/([^/]+)\/messages\/([a-f0-9-]{36})\/(context|reply)$/i);if(responseMatch&&astronautIds.has(responseMatch[1]))return await localReplyRoute(request,env,user,responseMatch[1],responseMatch[2],responseMatch[3]);
       const photoMatch=url.pathname.match(/^\/api\/astronauts\/([^/]+)\/photos(?:\/([a-f0-9-]{36}))?$/i);if(photoMatch&&astronautIds.has(photoMatch[1]))return await photoRoute(request,env,user,photoMatch[1],photoMatch[2],url);
