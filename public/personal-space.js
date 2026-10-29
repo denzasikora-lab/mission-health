@@ -1,7 +1,7 @@
 (() => {
   const modal=document.getElementById('media-diary-dialog'),views=[],sliders=[],cache=new Map(),selections=new Map(),favoriteBusy=new Set();
   let identity,identityTask,modalKind='chat',profileSeen='',favoriteItems=[],favoriteLoaded=false,favoriteCursor=null,favoriteMore=false,favoriteLoading=false;
-  const profile=()=>crew[state.crew].id;
+  const profile=()=>personalProfileId;
   const label=value=>value<=2?'Очень плохо':value<=4?'Ниже обычного':value<=6?'Нормально':value<=8?'Хорошо':'Отлично';
   const hue=value=>Math.round((value-1)/9*150);
   const stamp=value=>new Intl.DateTimeFormat('ru-RU',{dateStyle:'short',timeStyle:'short'}).format(new Date(value));
@@ -15,12 +15,12 @@
   function restoreScore(){
     if(!identity||selections.has(profile()))return;
     try{const saved=JSON.parse(localStorage.getItem(storageKey())||'null');if(Number.isInteger(saved?.score)&&saved.score>=1&&saved.score<=10&&Date.now()-saved.at>=0&&Date.now()-saved.at<12*3600000)selections.set(profile(),saved);}catch{}
-    renderScores();
+    renderScores();window.dispatchEvent(new Event('mission-wellbeing-change'));
   }
   function choose(score){
     const value={score,at:Date.now()};selections.set(profile(),value);
     try{if(identity)localStorage.setItem(storageKey(),JSON.stringify(value));}catch{}
-    renderScores();
+    renderScores();window.dispatchEvent(new Event('mission-wellbeing-change'));
   }
   function renderScores(){
     const chosen=selection();
@@ -37,8 +37,8 @@
     root.innerHTML='<header><div><span class="personal-eyebrow">CHECK IN</span><h3>Как ты сейчас?</h3></div><div class="wellbeing-face" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="9" r="1"/><circle cx="16" cy="9" r="1"/><path d="M7 14Q12 14 17 14"/></svg></div></header><div class="wellbeing-readout"><strong></strong><span></span></div><label class="sr-only">Твое самочувствие от 1 до 10<input type="range" min="1" max="10" step="1" value="5"></label><div class="wellbeing-range-shell"></div><div class="wellbeing-endpoints"><span>Очень плохо</span><span>Отлично</span></div><small class="wellbeing-time"></small>';
     const input=root.querySelector('input');input.setAttribute('aria-label','Твое самочувствие от 1 до 10');root.querySelector('.wellbeing-range-shell').append(input);root.querySelector('label').remove();
     input.addEventListener('input',()=>choose(Number(input.value)));
-    const reset=create('button','wellbeing-reset','Сбросить оценку');reset.type='button';reset.hidden=true;reset.addEventListener('click',()=>{selections.delete(profile());try{if(identity)localStorage.removeItem(storageKey());}catch{}renderScores();});root.append(reset);
-    sliders.push({root,input,reset,value:root.querySelector('strong'),label:root.querySelector('.wellbeing-readout span'),mouth:root.querySelector('path'),time:root.querySelector('.wellbeing-time')});return root;
+    const reset=create('button','wellbeing-reset','Сбросить оценку');reset.type='button';reset.hidden=true;reset.addEventListener('click',()=>{selections.delete(profile());try{if(identity)localStorage.removeItem(storageKey());}catch{}renderScores();window.dispatchEvent(new Event('mission-wellbeing-change'));});root.append(reset);
+    sliders.push({root,input,reset,value:root.querySelector('strong'),label:root.querySelector('.wellbeing-readout span'),mouth:root.querySelector('path'),time:root.querySelector('.wellbeing-time')});renderScores();return root;
   }
   function badge(report){const node=create('span','wellbeing-badge',report.score+' / 10 · '+report.label);node.style.setProperty('--mood-hue',hue(report.score));return node;}
   function store(kind){const key=kind==='diary'?'diary:'+profile():kind;if(!cache.has(key))cache.set(key,{kind,profile:profile(),messages:[],loaded:false,loading:false,cursor:null,more:false,draft:'',pending:null,busy:false,notice:''});return cache.get(key);}
@@ -154,7 +154,7 @@
   }
   function onOpen(){void prepare();setKind(modalView,modalKind);if(!favoriteLoaded)void favorites();renderScores();}
   new MutationObserver(()=>{if(modal.open)onOpen();}).observe(modal,{attributes:true,attributeFilter:['open']});
-  window.missionCheckin={current:()=>selection()?{score:selection().score}:null};
+  window.missionCheckin={widget:slider,current:()=>selection()?{score:selection().score}:null};
   window.missionFavorites={button:star,badge,refresh:favorites};window.missionConversations={render};
   void prepare();void load('chat');render();if(modal.open)onOpen();
 })();

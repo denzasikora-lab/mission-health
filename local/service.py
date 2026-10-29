@@ -21,7 +21,7 @@ from sentence_transformers import SentenceTransformer
 
 ROOT = Path(__file__).resolve().parents[1]
 COLLECTION = "mission_health_embeddinggemma2_v1"
-ASTRONAUTS = {"jessica-meir", "jack-hathaway", "christina-koch"}
+ASTRONAUTS = {"personal", "jessica-meir", "jack-hathaway", "christina-koch"}
 LOCK = threading.RLock()
 runtime = {}
 
@@ -82,7 +82,7 @@ def authorize(authorization: str = Header(default="")):
 
 class Scope(BaseModel):
     ownerId: str = Field(min_length=1, max_length=160)
-    astronautId: Literal["jessica-meir", "jack-hathaway", "christina-koch"]
+    astronautId: Literal["personal", "jessica-meir", "jack-hathaway", "christina-koch"]
 
 
 class Entry(Scope):

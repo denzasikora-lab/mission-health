@@ -7,10 +7,10 @@
   const navigation = document.createElement('nav'); navigation.className = 'mission-nav'; navigation.lang = 'ru'; navigation.setAttribute('aria-label', 'Разделы Mission Health');
   const icons = {overview:'M3 10 12 3l9 7v11h-6v-7H9v7H3Z',observations:'M16 16 22 22M19 10a9 9 0 1 1-18 0 9 9 0 0 1 18 0',diary:'M3 4h6a4 4 0 0 1 3 2 4 4 0 0 1 3-2h6v16h-6a4 4 0 0 0-3 2 4 4 0 0 0-3-2H3Z M12 6v16',sources:'M3 5c0-5 18-5 18 0v14c0 5-18 5-18 0Zm0 0c0 5 18 5 18 0M3 12c0 5 18 5 18 0'};
   icons.chat='M4 3h16v13H8l-4 5Z M8 8h8M8 12h5';icons.favorites='m12 3 2.8 5.7 6.3.9-4.55 4.43 1.07 6.27L12 17.34l-5.62 2.96 1.07-6.27L2.9 9.6l6.3-.9Z';
-  navigation.innerHTML = [['overview','Обзор'],['observations','Наблюдения'],['chat','Общий чат'],['diary','Дневник'],['favorites','Избранное'],['sources','Источники']].map(([key,label])=>`<button type="button" data-mission-nav="${key}" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[key]}"/></svg><span>${label}</span></button>`).join('');
+  navigation.innerHTML = [['overview','Домой'],['observations','Наблюдения'],['chat','Общий чат'],['diary','Дневник'],['favorites','Избранное'],['sources','Источники']].map(([key,label])=>`<button type="button" data-mission-nav="${key}" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[key]}"/></svg><span>${label}</span></button>`).join('');
   profile.after(navigation);
   const switcher = document.createElement('details'); switcher.className = 'mission-profiles';
-  switcher.innerHTML = '<summary>Сменить профиль</summary>';
+  switcher.innerHTML = '<summary>Друзья</summary>';
   switcher.append(document.querySelector('.panel-heading'), document.getElementById('crew-list'));
   navigation.after(switcher);
   document.querySelector('.aside-note').textContent = 'Профили NASA. Показатели здоровья и дневники - демонстрация.';
@@ -69,10 +69,12 @@
     window.missionConversations?.render(state.view);
     const active = state.workspace === 'research' ? researchState.dataset === 'library' ? 'sources' : 'observations' : state.view === 'journal' ? 'diary' : ['chat','favorites'].includes(state.view)?state.view:'overview';
     if(active==='chat'||active==='favorites'){heading.querySelector('h1').textContent=active==='chat'?'NasaGPT':'Избранное';document.getElementById('mission-heading-description').textContent=active==='chat'?'Разговор с NasaGPT':'Важные записи и ответы в одном месте';document.querySelector('.mission-data-label').textContent='Личное';}
-    navigation.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.missionNav===active)));
+    navigation.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.missionNav===active&&!(active==='overview'&&state.visiting))));
+    window.missionHome?.render();
     themeGroup.querySelectorAll('[data-theme-choice]').forEach(button=>{button.setAttribute('aria-pressed',String(button.dataset.themeChoice===themeMode));if(button.dataset.themeChoice==='system'){button.setAttribute('aria-label','Системная тема');button.title='Системная тема';}});
   }
   function navigate(section) {
+    state.visiting=false;
     researchStop(); state.workspace = section === 'observations' || section === 'sources' ? 'research' : 'crew';
     if (section === 'sources') researchState.dataset = 'library';
     else if (section === 'observations' && researchState.dataset === 'library') researchState.dataset = 'nasa';

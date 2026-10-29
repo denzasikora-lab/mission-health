@@ -1,7 +1,7 @@
 (() => {
   const tools=window.missionBookTools,model='embeddinggemma-2:daa72c51243991dfcaf9f9137d2c573d8f7790c0:q4:text:256:v1';
   const book=document.createElement('section');book.id='mission-book';book.className='mission-book';book.lang='ru';book.hidden=true;
-  book.innerHTML=`<header class="book-toolbar"><div><span class="book-eyebrow">PERSONAL ARCHIVE / MISSION HEALTH</span><h2>Книга наблюдений</h2><p id="book-scope"></p></div><div class="book-toolbar-actions"><button type="button" id="book-write">+ Запись</button><button type="button" id="book-search-open"><span aria-hidden="true">✧</span> NasaGPT</button></div></header>
+  book.innerHTML=`<header class="book-toolbar"><div><span class="book-eyebrow">PERSONAL ARCHIVE / MISSION HEALTH</span><h2>Книга наблюдений</h2><p id="book-scope"></p><label class="book-archive-label">История <select id="book-archive-select" aria-label="Архив дневника"><option value="personal">Мой дневник</option><option value="jessica-meir">Прежние записи / Jessica</option><option value="jack-hathaway">Прежние записи / Jack</option><option value="christina-koch">Прежние записи / Christina</option></select></label></div><div class="book-toolbar-actions"><button type="button" id="book-write">+ Запись</button><button type="button" id="book-search-open"><span aria-hidden="true">✧</span> NasaGPT</button></div></header>
     <div id="book-demo-banner" class="book-demo-banner" hidden>ПРИМЕР / записи придуманы и не сохраняются <button type="button" id="book-demo-exit">Моя история</button></div>
     <div class="book-stage" id="book-stage"><button type="button" id="book-cover" class="book-cover" aria-label="Открыть книгу наблюдений"><span class="cover-corner top"></span><span class="cover-kicker">MISSION HEALTH</span><img class="cover-nasa" src="assets/nasa-brand/nasa-insignia.png" alt="NASA"><strong>Личная<br>история</strong><span id="book-author">Мой дневник</span><span class="cover-rule"></span><span class="cover-caption">НАБЛЮДАТЬ · ЗАПОМИНАТЬ · ВОЗВРАЩАТЬСЯ</span><span class="cover-open">Открыть книгу ↗</span><span class="cover-corner bottom"></span></button><div id="book-spread" class="book-spread" tabindex="0" role="region" aria-label="Страницы личной истории" hidden></div></div>
     <nav class="book-navigation" aria-label="Листать книгу"><button type="button" id="book-prev" aria-label="Предыдущие страницы">← Назад</button><span id="book-position" role="status" aria-live="polite">Обложка</span><button type="button" id="book-next" aria-label="Следующие страницы">Далее →</button></nav>
@@ -22,7 +22,7 @@
     {id:'demo-window',createdAt:'2026-10-28T18:20:00Z',content:'Момент у иллюминатора\n\nВыделил несколько минут, чтобы посмотреть на Землю и спокойно записать впечатления. Такие небольшие паузы помогают мне упорядочить мысли. Сохранил этот момент в личной истории.'}
   ];
   const stamp=value=>new Intl.DateTimeFormat('ru',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(value));
-  const profile=()=>crew[state.crew].id;
+  const profile=()=>$b('book-archive-select').value;
   const visible=()=>state.workspace==='crew'&&state.view==='journal';
   function create(tag,className,text){const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node}
   function perSpread(){return $b('book-stage').clientWidth>=580?2:1}
@@ -52,7 +52,7 @@
     $b('book-position').textContent=B.cover?'Обложка':B.pages.length?'Страницы '+(B.index+1)+(count===2?' / '+(B.index+2):'')+' · записей: '+B.entries.length:'Чистый лист';
     $b('book-prev').disabled=B.cover||B.index===0;$b('book-next').disabled=B.loading||!B.cover&&B.index+count>=B.pages.length;
     $b('book-older').hidden=B.demo||!B.hasMore;$b('book-older').disabled=B.loading;$b('book-demo-banner').hidden=!B.demo;window.missionTraining?.render({visible:visible(),profile:B.profile,demo:B.demo});$b('book-demo').hidden=B.demo;
-    $b('book-author').textContent=B.name;$b('book-scope').textContent='Твои записи / профиль '+crew[state.crew].name+(B.demo?' / пример':'');
+    $b('book-author').textContent=B.name;$b('book-scope').textContent=(B.profile===personalProfileId?'Твои личные записи':'Твой прежний архив / '+(crew.find(person=>person.id===B.profile)?.name||''))+(B.demo?' / пример':'');
     $b('book-cover').setAttribute('aria-label','Открыть книгу / '+B.name);
   }
   function rebuild(anchor){B.pages=tools.pages(B.entries);if(anchor){const index=B.pages.findIndex(page=>page.entry.id===anchor);if(index>=0)B.index=index}draw()}
@@ -126,6 +126,7 @@
     try{await journalApi('/api/astronauts/'+id+'/messages',{method:'POST',body:JSON.stringify({id:saveId,content,mode:'diary',language:'ru',attachments:[],wellbeing:window.missionCheckin?.current()||null})});if(version!==B.version)return;editor.close();saveId=null;$b('book-entry-text').value='';B.demo=false;B.loading=false;await load();B.cover=false;B.index=Math.max(0,B.pages.length-perSpread());draw();void loadJournal();}
     catch{if(version===B.version)$b('book-save-status').textContent='Не удалось сохранить. Текст остается здесь, попробуй еще раз.';}finally{saving=false;button.disabled=false;$b('book-entry-text').disabled=false}
   });
+  $b('book-archive-select').addEventListener('change',render);
   $b('book-cover').addEventListener('click',()=>turn(1));$b('book-next').addEventListener('click',()=>turn(1));$b('book-prev').addEventListener('click',()=>turn(-1));
   $b('book-close-cover').addEventListener('click',()=>{B.cover=true;draw()});$b('book-write').addEventListener('click',openEditor);
   $b('book-older').addEventListener('click',()=>void load(true));$b('book-editor-close').addEventListener('click',()=>editor.close());

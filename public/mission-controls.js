@@ -28,6 +28,12 @@
   }
   countryButton.addEventListener('click',()=>{const open=countryPanel.hidden;closePanels();countryPanel.hidden=!open;countryButton.setAttribute('aria-expanded',String(open));if(open)countrySelect.focus();});
   countrySelect.addEventListener('change',()=>{selected=countrySelect.value;savePreference('mission-health-country',selected);if(selected)renderCountry();else void detectCountry();});
+  document.getElementById('language-menu').addEventListener('click',event=>{
+    const language=event.target.closest('[data-language]')?.dataset.language;
+    const code={en:'GB',ru:'RU',ur:'PK'}[language];
+    if(!code)return;
+    selected=code;savePreference('mission-health-country',selected);renderCountry();
+  });
   document.getElementById('mission-country-auto').addEventListener('click',()=>{selected='';savePreference('mission-health-country','');countrySelect.value='';automatic=null;void detectCountry();});
   deviceButton.addEventListener('click',()=>{const open=deviceMenu.hidden;closePanels();deviceMenu.hidden=!open;deviceButton.setAttribute('aria-expanded',String(open));if(open)deviceMenu.querySelector(`[data-display-mode="${mode}"]`).focus();});
   deviceMenu.addEventListener('click',event=>{const button=event.target.closest('[data-display-mode]');if(button){setMode(button.dataset.displayMode);closePanels(deviceButton);}});

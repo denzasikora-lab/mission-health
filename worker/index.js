@@ -1,4 +1,4 @@
-const astronautIds=new Set(['jessica-meir','jack-hathaway','christina-koch']);
+const astronautIds=new Set(['personal','jessica-meir','jack-hathaway','christina-koch']);
 const languages=new Set(['en','ru','ur','zh','ar','es']);
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'private, no-store'}});
 const fail=(code,status)=>{throw Object.assign(new Error(code),{code,status})};

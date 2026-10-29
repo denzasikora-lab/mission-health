@@ -2,6 +2,11 @@ function validatedStoryHealth(raw){
   if(raw===null||raw===undefined||raw==='')return null;
   if(typeof raw!=='string'||raw.length>2000)fail('invalid_story_health',400);
   let value;try{value=JSON.parse(raw)}catch{fail('invalid_story_health',400)}
+  if(value?.version===2){
+    if(value.source!=='self_report'||value.profileId!=='personal'||typeof value.capturedAt!=='string'||!Number.isFinite(Date.parse(value.capturedAt))||Date.parse(value.capturedAt)>Date.now()+300000)fail('invalid_story_health',400);
+    const report=selfReport(value.wellbeing);
+    return {version:2,source:'self_report',profileId:'personal',capturedAt:new Date(value.capturedAt).toISOString(),wellbeing:report,metrics:{hr:null,spo2:null,temp:null,fatigue:null}};
+  }
   const profiles={'jessica-meir':'Jessica Meir','jack-hathaway':'Jack Hathaway','christina-koch':'Christina Koch'};
   if(!value||value.version!==1||value.source!=='demo_dashboard'||!Object.hasOwn(profiles,value.profileId)||!value.metrics||typeof value.capturedAt!=='string'||!Number.isFinite(Date.parse(value.capturedAt))||Date.parse(value.capturedAt)>Date.now()+300000)fail('invalid_story_health',400);
   const metrics={};for(const [key,min,max]of [['hr',20,250],['spo2',50,100],['temp',30,45],['fatigue',0,10]]){const number=value.metrics[key];if(typeof number!=='number'||!Number.isFinite(number)||number<min||number>max)fail('invalid_story_health',400);metrics[key]=number;}

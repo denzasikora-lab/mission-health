@@ -7,7 +7,8 @@ const sourceKeywords=[
   ["heart","cardiovascular","pulse","circulation","心率","心血管","心脏","循环","القلب","قلب","نبض","الدورة","corazón","cardiovascular","pulso","circulación"],
   ["research","astronaut","medicine","performance","sleep","研究","航天员","医学","表现","睡眠","بحث","أبحاث","رائد","طب","نوم","investigación","astronauta","medicina","rendimiento","sueño"]
 ];
-const state={crew:0,metric:"hr",period:"24h",view:"health",workspace:"research",language:"ru",theme:document.documentElement.dataset.theme,query:""};
+const personalProfileId='personal';
+const state={visiting:false,crew:0,metric:"hr",period:"24h",view:"health",workspace:"research",language:"ru",theme:document.documentElement.dataset.theme,query:""};
 try{const language=localStorage.getItem("mission-health-language");if(languageInfo[language])state.language=language}catch{}
 const $=id=>document.getElementById(id);
 const text=()=>translations[state.language];
@@ -24,7 +25,7 @@ function renderStatic(){
   $("lookup-input").placeholder=t.placeholder;document.title=`Mission Health | ${t.headline}`;document.querySelector('meta[name="description"]').content=t.metaDescription;document.querySelector('meta[name="theme-color"]').content=state.theme==="dark"?"#030d0a":"#eaf5f0";
 }
 function renderCrew(){
-  const t=text();$("crew-list").innerHTML=crew.map((person,index)=>`<button class="crew-button" type="button" data-crew="${index}" aria-pressed="${index===state.crew}"><img class="avatar-photo" src="${person.photo}" alt="" title="${person.credit}"><span><span class="crew-name">${t.people[index].name}</span><span class="crew-role">${t.people[index].role}</span></span><span class="crew-state ${person.status}" aria-hidden="true"></span></button>`).join("");
+  const t=text();$("crew-list").innerHTML=crew.map((person,index)=>`<button class="crew-button" type="button" data-crew="${index}" aria-pressed="${state.visiting&&index===state.crew}"><img class="avatar-photo" src="${person.photo}" alt="" title="${person.credit}"><span><span class="crew-name">${t.people[index].name}</span><span class="crew-role">${t.people[index].role}</span></span><span class="crew-state ${person.status}" aria-hidden="true"></span></button>`).join("");
 }
 function renderMetrics(person){
   const t=text();const labels=state.language==='ru'?{hr:'Пульс',spo2:'SpO₂',temp:'Температура',fatigue:'Усталость'}:t.metrics;
@@ -65,7 +66,7 @@ function renderLookup(){
 function render(){renderStatic();const person=crew[state.crew];renderCrew();renderMetrics(person);renderChart(person);renderAssessment(person);renderSources();renderLookup();window.journal?.onProfileChange();window.research?.render()}
 function closeLanguageMenu(returnFocus=false){$("language-menu").hidden=true;$("language-button").setAttribute("aria-expanded","false");if(returnFocus)$("language-button").focus()}
 function openLanguageMenu(focusItem=false){$("language-menu").hidden=false;$("language-button").setAttribute("aria-expanded","true");if(focusItem)document.querySelector(`[data-language="${state.language}"]`).focus()}
-$("crew-list").addEventListener("click",event=>{const button=event.target.closest("[data-crew]");if(button){state.crew=Number(button.dataset.crew);render()}});
+$("crew-list").addEventListener("click",event=>{const button=event.target.closest("[data-crew]");if(button){state.crew=Number(button.dataset.crew);state.visiting=true;state.workspace='crew';state.view='health';render()}});
 $("metrics").addEventListener("click",event=>{const button=event.target.closest("[data-metric]");if(button){state.metric=button.dataset.metric;render()}});
 document.querySelectorAll("[data-period]").forEach(button=>button.addEventListener("click",()=>{state.period=button.dataset.period;renderChart(crew[state.crew])}));
 document.querySelectorAll("[data-theme-choice]").forEach(button=>button.addEventListener("click",()=>{state.theme=button.dataset.themeChoice;savePreference("mission-health-theme",state.theme);render()}));
@@ -78,5 +79,5 @@ $("lookup-form").addEventListener("submit",event=>{event.preventDefault();state.
 render();
 if(document.modelContext?.registerTool){
   const toolController=new AbortController();
-  try{void Promise.resolve(document.modelContext.registerTool({name:"select_crew_health_view",title:"Показать показатели члена экипажа",description:"Открывает показатели выбранного члена экипажа и нужный график в текущем прототипе.",inputSchema:{type:"object",properties:{crewName:{type:"string",enum:crew.map(person=>person.name)},metric:{type:"string",enum:Object.keys(metricInfo)},period:{type:"string",enum:["1m","1h","24h","7d","1mo","1y"]}},required:["crewName"],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute(input){const index=crew.findIndex(person=>person.name===input?.crewName);if(index<0||input?.metric!==undefined&&!metricInfo[input.metric]||input?.period!==undefined&&!["1m","1h","24h","7d","1mo","1y"].includes(input.period))throw new Error("Недопустимый выбор экипажа или графика.");state.workspace='crew';state.view='health';state.crew=index;if(input.metric)state.metric=input.metric;if(input.period)state.period=input.period;render();return {crewName:crew[index].name,metric:state.metric,period:state.period,status:crew[index].statusText,reading:crew[index].metrics[state.metric],language:state.language,theme:state.theme}}},{signal:toolController.signal})).catch(()=>{});}catch{}
+  try{void Promise.resolve(document.modelContext.registerTool({name:"select_crew_health_view",title:"Показать показатели члена экипажа",description:"Открывает показатели выбранного члена экипажа и нужный график в текущем прототипе.",inputSchema:{type:"object",properties:{crewName:{type:"string",enum:crew.map(person=>person.name)},metric:{type:"string",enum:Object.keys(metricInfo)},period:{type:"string",enum:["1m","1h","24h","7d","1mo","1y"]}},required:["crewName"],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute(input){const index=crew.findIndex(person=>person.name===input?.crewName);if(index<0||input?.metric!==undefined&&!metricInfo[input.metric]||input?.period!==undefined&&!["1m","1h","24h","7d","1mo","1y"].includes(input.period))throw new Error("Недопустимый выбор экипажа или графика.");state.workspace='crew';state.view='health';state.visiting=true;state.crew=index;if(input.metric)state.metric=input.metric;if(input.period)state.period=input.period;render();return {crewName:crew[index].name,metric:state.metric,period:state.period,status:crew[index].statusText,reading:crew[index].metrics[state.metric],language:state.language,theme:state.theme}}},{signal:toolController.signal})).catch(()=>{});}catch{}
 }
