@@ -50,6 +50,7 @@
   function updateSignature() {
     researcher.value = normalized([firstName.value.trim(), lastName.value.trim()].filter(Boolean).join(' '));
     document.getElementById('video-log-title').textContent = researcher.value ? 'Дневник / ' + researcher.value : 'Личный дневник';
+    window.missionAppearance?.setIdentity({storageScope:identity?.storageScope,name:researcher.value});
   }
 
   function message(value, error = false) { notice.textContent = value; notice.dataset.error = String(error); }
@@ -73,6 +74,7 @@
 
   function stopCamera() {
     epoch++; window.missionSpeech?.stop('video');
+    window.missionAppearance?.stop();
     if (recorder?.state === 'recording') { phase = 'finishing'; recorder.stop(); }
     clearTimeout(cameraTimer); clearTimeout(workerTimer); clearInterval(recordingTimer);
     cameraTimer = workerTimer = recordingTimer = null;
@@ -140,6 +142,7 @@
       if (attempt !== epoch || !visible()) return;
       phase = 'live'; renderControls();
       void window.missionSpeech?.start('video', stream);
+      window.missionAppearance?.start(video,incoming.getVideoTracks?.()[0]?.getSettings?.());
       incoming.getTracks().forEach(track => track.addEventListener('ended', () => {
         if (attempt !== epoch) return;
         stopCamera(); if (phase !== 'finishing') phase = 'idle'; renderControls(); message('Устройство отключено. Можно подключить камеру снова.', true);

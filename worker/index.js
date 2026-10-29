@@ -11,7 +11,7 @@ async function videoLogIdentity(request,user){
   // Идентификатор подписи связан с аккаунтом, исходный идентификатор не передается клиенту.
   const digest=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(user)));
   const digits=String(new DataView(digest.buffer).getUint32(0)%1000000000).padStart(9,'0');
-  return {name:name.trim().slice(0,100),researcherId:digits.match(/.{3}/g).join(' ')};
+  return {name:name.trim().slice(0,100),researcherId:digits.match(/.{3}/g).join(' '),storageScope:Array.from(digest,value=>value.toString(16).padStart(2,'0')).join('')};
 }
 function memoryConfigured(env){return Boolean(env.MEMORY_URL&&(env.MEMORY_API_KEY||env.LOCAL_PREVIEW==='1'))}
 function languageModelConfigured(env){return env.AIR_GAP!=='1'&&Boolean(env.LLM_API_KEY&&env.LLM_BASE_URL&&env.LLM_MODEL)}
@@ -135,8 +135,9 @@ export default {
     if(!url.pathname.startsWith('/api/')){
       const asset=assets[url.pathname==='/'?'/index.html':url.pathname];
       if(!asset||!['GET','HEAD'].includes(request.method))return new Response('Not found',{status:404});
-      const binary=atob(asset.data),bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));
-      return new Response(request.method==='HEAD'?null:bytes,{headers:{'content-type':asset.type,'cache-control':url.pathname==='/'?'no-cache':'public, max-age=3600','x-content-type-options':'nosniff'}});
+      const binary=atob(asset.data),bytes=new Uint8Array(binary.length);
+      for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+      return new Response(request.method==='HEAD'?null:bytes,{encodeBody:asset.encoding?'manual':'automatic',headers:{'content-type':asset.type,...(asset.encoding?{'content-encoding':asset.encoding}:{}),'cache-control':url.pathname==='/'?'no-cache':'public, max-age=3600','x-content-type-options':'nosniff'}});
     }
     try{
       const user=owner(request,env);

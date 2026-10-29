@@ -1,12 +1,16 @@
 import { readdir,readFile,mkdir,writeFile,rm,cp } from 'node:fs/promises';
 import { extname } from 'node:path';
-const mime={'.html':'text/html; charset=utf-8','.json':'application/json; charset=utf-8','.csv':'text/csv; charset=utf-8','.txt':'text/plain; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.jpg':'image/jpeg','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2'};
+import { gzipSync } from 'node:zlib';
+const mime={'.html':'text/html; charset=utf-8','.json':'application/json; charset=utf-8','.csv':'text/csv; charset=utf-8','.txt':'text/plain; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.wasm':'application/wasm','.jpg':'image/jpeg','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2'};
 const assets={};
 async function collect(directory,prefix=''){
   for(const item of await readdir(directory,{withFileTypes:true})){
     const filename=directory+'/'+item.name,path=prefix+'/'+item.name;
     if(item.isDirectory())await collect(filename,path);
-    else assets[path]={type:mime[extname(item.name)]||'application/octet-stream',data:(await readFile(filename)).toString('base64')};
+    else {
+      const bytes=await readFile(filename),gzip=gzipSync(bytes,{level:9}),compressed=gzip.length<bytes.length*.95;
+      assets[path]={type:mime[extname(item.name)]||'application/octet-stream',data:(compressed?gzip:bytes).toString('base64'),...(compressed?{encoding:'gzip'}:{})};
+    }
   }
 }
 await rm('public/vendor',{recursive:true,force:true});

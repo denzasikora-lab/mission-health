@@ -1,0 +1,76 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFile} from 'node:fs/promises';
+import {webcrypto} from 'node:crypto';
+import {gzipSync,gunzipSync} from 'node:zlib';
+const coreSource=await readFile(new URL('../public/appearance-core.js',import.meta.url),'utf8');
+const controller=await readFile(new URL('../public/appearance.js',import.meta.url),'utf8');
+const server=await readFile(new URL('../worker/index.js',import.meta.url),'utf8');
+const sandbox={};vm.runInNewContext(coreSource,sandbox);const core=sandbox.MissionAppearanceCore;
+const clone=value=>JSON.parse(JSON.stringify(value));
+function fixture(scale=1){
+  const width=Math.round(960*scale),height=Math.round(720*scale),data=new Uint8ClampedArray(width*height*4);
+  for(let y=0;y<height;y++)for(let x=0;x<width;x++){const i=(y*width+x)*4,grain=(x+y)%2?3:-3;data[i]=160+grain;data[i+1]=125+grain;data[i+2]=100+grain;data[i+3]=255;}
+  const landmarks=Array.from({length:478},()=>({x:.5,y:.5,z:0}));
+  const points={10:[480,100],9:[480,200],33:[300,260],133:[415,260],362:[545,260],263:[660,260],234:[200,400],454:[760,400],1:[480,350],152:[480,650],13:[480,440],14:[480,442]};
+  for(const [k,[x,y]] of Object.entries(points))landmarks[k]={x:x/960,y:y/720,z:0};
+  return {image:{width,height,data},result:{faceLandmarks:[landmarks],facialTransformationMatrixes:[{data:[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]}]}};
+}
+function measured(){const f=fixture();const s=core.measure(f.image,f.result);assert.equal(s.valid,true,s.reason);return s;}
+function reference(sample=measured()){return core.summarize(Array.from({length:24},()=>clone(sample)));}
+
+test('CIELAB переводит белый и черный без мнимой красноты',()=>{const white=core.lab(255,255,255),black=core.lab(0,0,0);assert.ok(Math.abs(white.l-100)<.001);assert.ok(Math.abs(white.a)<.001);assert.equal(black.l,0);assert.ok(core.lab(220,90,90).a>30);});
+test('Геометрия инвариантна к равномерному масштабированию кадра',()=>{const a=fixture(),b=fixture(.75),x=core.measure(a.image,a.result),y=core.measure(b.image,b.result);assert.equal(x.valid,true);assert.equal(y.valid,true);assert.ok(Math.abs(x.metrics.width-y.metrics.width)<1e-10);assert.ok(Math.abs(x.metrics.balance-y.metrics.balance)<1e-10);});
+test('Лицо без изменений дает нулевое отличие, а не случайные шкалы',()=>{const sample=measured(),r=core.comparison(sample,reference(sample));assert.equal(r.valid,true);for(const v of Object.values(r.values)){assert.equal(v.delta,0);assert.equal(v.z,0);}assert.equal(core.level(0), 'green');});
+test('Отсутствие лица и два лица блокируют измерения',()=>{const f=fixture();assert.equal(core.measure(f.image,{faceLandmarks:[]}).valid,false);f.result.faceLandmarks.push(f.result.faceLandmarks[0]);assert.equal(core.measure(f.image,f.result).valid,false);});
+test('Смазанный или пересвеченный кадр не получает зеленую оценку',()=>{for(const rgb of [[160,125,100],[255,255,255]]){const f=fixture();for(let i=0;i<f.image.data.length;i+=4)f.image.data.set([...rgb,255],i);assert.equal(core.measure(f.image,f.result).valid,false);}});
+test('Открытый рот и поворот головы приостанавливают сравнение',()=>{const f=fixture();f.result.faceLandmarks[0][14].y+=.08;assert.equal(core.measure(f.image,f.result).valid,false);const g=fixture();g.result.facialTransformationMatrixes[0].data[8]=.4;assert.equal(core.measure(g.image,g.result).valid,false);});
+test('Реальное затемнение зоны под глазами изменяет цветовой признак',()=>{const f=fixture(),base=core.measure(f.image,f.result);for(let y=280;y<318;y++)for(const [left,right]of [[318,397],[563,642]])for(let x=left;x<right;x++){const i=(y*960+x)*4;for(let c=0;c<3;c++)f.image.data[i+c]-=20;}const next=core.measure(f.image,f.result);assert.equal(next.valid,true,next.reason);assert.ok(next.metrics.underEye>base.metrics.underEye+5);assert.equal(next.metrics.width,base.metrics.width);});
+test('Смена света блокирует цветовые шкалы и оставляет геометрию',()=>{const s=measured(),r=reference(s);s.light.l+=8;const result=core.comparison(s,r);assert.equal(result.valid,true);assert.equal(result.colorOk,false);assert.equal(result.values.redness.valid,false);assert.equal(result.values.underEye.valid,false);assert.equal(result.values.width.valid,true);});
+test('Расстояние и ракурс должны совпадать с эталоном',()=>{const s=measured(),r=reference(s);s.distance*=1.2;assert.equal(core.comparison(s,r).valid,false);s.distance=r.distance;s.pose.pitch=7;assert.equal(core.comparison(s,r).valid,false);});
+test('Эталон с нулевой дисперсией сохраняет технический минимум шума',()=>{const r=reference();assert.equal(core.referenceValid(r),true);for(const m of core.metrics)assert.equal(r.metrics[m.key].noise,m.floor);assert.throws(()=>core.summarize([measured()]),/insufficient/);});
+test('Процент контура рассчитывается относительно эталона, а единицы цвета не становятся процентами',()=>{const s=measured(),r=reference(s);s.metrics.width*=1.02;s.metrics.redness+=2;const c=core.comparison(s,r);assert.ok(Math.abs(c.values.width.delta-2)<1e-10);assert.equal(c.values.redness.delta,2);});
+test('Один всплеск не становится красной тревогой, поврежденный эталон отклоняется',()=>{assert.equal(core.level(4,0),'amber');assert.equal(core.level(4,2999),'amber');assert.equal(core.level(4,3000),'red');const r=reference();r.metrics.width.noise=0;assert.equal(core.referenceValid(r),false);assert.equal(core.comparison(measured(),r).valid,false);});
+
+function environment(storage=new Map()){
+  const nodes=new Map(),workers=[],frames=new Map(),timers=new Map();let now=0,seq=0,pendingBitmap=null,blockStorage=false;
+  const context=new Proxy({}, {get:()=>()=>{}});
+  class Element{
+    constructor(){this.children=[];this.dataset={};this.style={setProperty(k,v){this[k]=v;}};this.events={};this.width=256;this.height=152;this.disabled=false;}
+    append(...values){this.children.push(...values);}setAttribute(){}getContext(){return context;}
+    addEventListener(k,fn){this.events[k]=fn;}
+  }
+  const node=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);};
+  const document={hidden:false,getElementById:node,createElement:()=>new Element(),addEventListener(){}};
+  class Worker{constructor(url){this.url=url;this.closed=false;this.sent=[];workers.push(this);}postMessage(v){this.sent.push(v);}terminate(){this.closed=true;}emit(data){this.onmessage({data});}}
+  const window={Worker,OffscreenCanvas:class{},createImageBitmap(){}};
+  const localStorage={getItem:k=>{if(blockStorage)throw new Error();return storage.get(k)||null;},setItem:(k,v)=>{if(blockStorage)throw new Error();storage.set(k,v);}};
+  vm.runInNewContext(controller,{MissionAppearanceCore:core,window,document,Worker,localStorage,performance:{now:()=>now},Date,Math,JSON,setTimeout:(fn,delay)=>{timers.set(++seq,{fn,delay});return seq;},clearTimeout:id=>timers.delete(id),requestAnimationFrame:fn=>{frames.set(++seq,fn);return seq;},cancelAnimationFrame:id=>frames.delete(id),createImageBitmap:async()=>pendingBitmap?await pendingBitmap:{close(){}}});
+  const input={videoWidth:1280,videoHeight:720,readyState:2,srcObject:{}};
+  const tick=async(time)=>{now=time;const callbacks=[...frames.values()];frames.clear();for(const cb of callbacks)cb(time);await Promise.resolve();};
+  const api=window.missionAppearance;
+  function begin(owner='owner-a',name='Egor Fedosov',device='camera-a'){api.setIdentity({storageScope:owner,name});api.start(input,{deviceId:device});workers.at(-1).emit({type:'ready'});}
+  function sample(value=measured(),timestamp=now+333){now=timestamp;workers.at(-1).emit({type:'measurement',measurement:clone(value),timestamp});}
+  function collect(){for(let i=0;i<24;i++)sample();}
+  return {api,node,workers,frames,timers,input,tick,sample,begin,collect,storage,setBitmap:p=>pendingBitmap=p,blockStorage:()=>blockStorage=true};
+}
+test('Первое включение собирает настоящий эталон и повторное включение восстанавливает его',()=>{const e=environment();e.begin();e.collect();assert.equal(e.storage.size,1);for(let i=0;i<5;i++)e.sample();assert.equal(e.node('appearance-metrics').children[0].dataset.level,'green');e.api.stop();const next=environment(e.storage);next.begin();assert.match(next.node('appearance-reference').textContent,/Эталон/);for(let i=0;i<5;i++)next.sample();assert.equal(next.storage.size,1);assert.equal(next.node('appearance-metrics').children[0].dataset.level,'green');});
+test('Неподходящий кадр сбрасывает набор эталона, а не добавляется в него',()=>{const e=environment();e.begin();for(let i=0;i<20;i++)e.sample();e.sample({valid:false,reason:'Мало света'});for(let i=0;i<10;i++)e.sample();assert.equal(e.storage.size,0);assert.equal(e.node('appearance-progress').textContent,'10/24');});
+test('Эталон изолирован по аккаунту, полному имени и камере',()=>{const e=environment();e.begin();e.collect();const first=[...e.storage.keys()][0];for(const [owner,name,device]of [['owner-b','Egor Fedosov','camera-a'],['owner-a','Other Person','camera-a'],['owner-a','Egor Fedosov','camera-b']]){const next=environment(e.storage);next.begin(owner,name,device);next.sample();assert.equal(next.node('appearance-progress').textContent,'1/24');next.collect();}assert.equal(e.storage.size,4);assert.ok(e.storage.has(first));});
+test('Устойчивый сдвиг становится красным только спустя три секунды и сбрасывается при плохом кадре',()=>{const e=environment();e.begin();e.collect();const s=measured();s.metrics.width+=.1;for(let i=0;i<5;i++)e.sample(s);const card=e.node('appearance-metrics').children[0];assert.equal(card.dataset.level,'amber');for(let i=0;i<10;i++)e.sample(s);assert.equal(card.dataset.level,'red');e.sample({valid:false,reason:'Поверни голову'});assert.equal(card.dataset.level,'neutral');});
+test('Закрытие завершает обработчик и отвергает поздно пришедшие измерения',()=>{const e=environment();e.begin();const old=e.workers[0];e.api.stop();old.emit({type:'measurement',measurement:measured(),timestamp:5000});assert.equal(e.storage.size,0);assert.equal(old.closed,true);assert.equal(e.frames.size,0);assert.equal(e.node('appearance-status').textContent,'Ожидание камеры');});
+test('Запоздалый ImageBitmap закрывается после остановки без отправки обработчику',async()=>{const e=environment();e.begin();let resolve;const pending=new Promise(r=>resolve=r);e.setBitmap(pending);await e.tick(1000);e.api.stop();let closed=false;resolve({close(){closed=true;}});await new Promise(r=>setImmediate(r));assert.equal(closed,true);assert.equal(e.workers[0].sent.length,1);});
+test('Отказ памяти не маскируется сообщением об успешном сохранении',()=>{const e=environment();e.blockStorage();e.begin();e.collect();assert.equal(e.storage.size,0);assert.match(e.node('appearance-reference').textContent,/сеанса/);});
+test('Обновление эталона не стирает предыдущий до завершения новой серии',()=>{const e=environment();e.begin();e.collect();const before=[...e.storage.values()][0];e.node('appearance-reset').events.click();for(let i=0;i<8;i++)e.sample();assert.equal([...e.storage.values()][0],before);e.api.stop();assert.equal([...e.storage.values()][0],before);});
+test('Переход к другому профилю завершает старый обработчик и игнорирует его результат',()=>{const e=environment();e.begin();const old=e.workers[0];e.api.setIdentity({storageScope:'owner-b',name:'Egor Fedosov'});old.emit({type:'measurement',measurement:measured(),timestamp:5000});assert.equal(old.closed,true);assert.equal(e.storage.size,0);assert.equal(e.workers.length,2);});
+test('Ключ локального эталона стабилен для аккаунта, различается между аккаунтами и защищен входом',async()=>{
+  const sandbox={URL,Request,Response,TextEncoder,DataView,Uint8Array,crypto:webcrypto};vm.runInNewContext(server.replace('export default','globalThis.app ='),sandbox);
+  const identity=async user=>{const response=await sandbox.app.fetch(new Request('https://example.test/api/me',{headers:{'oai-authenticated-user-id':user}}),{},{});assert.equal(response.status,200);return response.json();};
+  const a=await identity('owner-a'),b=await identity('owner-b');assert.match(a.storageScope,/^[0-9a-f]{64}$/);assert.notEqual(a.storageScope,b.storageScope);assert.equal(a.storageScope,(await identity('owner-a')).storageScope);assert.equal((await sandbox.app.fetch(new Request('https://example.test/api/me'),{},{})).status,401);
+});
+test('Сжатый WASM возвращается с правильными заголовками и без изменения байтов',async()=>{
+  const bytes=await readFile(new URL('../public/camera-engine/vision_wasm_nosimd_internal.wasm',import.meta.url));
+  const sandbox={URL,Request,Response,TextEncoder,DataView,Uint8Array,crypto:webcrypto,atob,assets:{'/test.wasm':{type:'application/wasm',encoding:'gzip',data:gzipSync(bytes).toString('base64')}}};vm.runInNewContext(server.replace('export default','globalThis.app ='),sandbox);
+  const response=await sandbox.app.fetch(new Request('https://example.test/test.wasm'),{},{});assert.equal(response.status,200);assert.equal(response.headers.get('content-type'),'application/wasm');assert.equal(response.headers.get('content-encoding'),'gzip');assert.deepEqual(gunzipSync(Buffer.from(await response.arrayBuffer())),bytes);
+});
