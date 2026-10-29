@@ -38,6 +38,7 @@ export const personalStories=sqliteTable('personal_stories',{
   ownerId:text('owner_id').notNull(),
   authorName:text('author_name').notNull(),
   caption:text('caption').notNull().default(''),
+  health:text('health_json'),
   kind:text('media_kind').notNull(),
   objectKey:text('object_key').notNull(),
   posterKey:text('poster_key'),

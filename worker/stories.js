@@ -1,4 +1,14 @@
-function storyView(row){return {id:row.id,author:row.author_name,caption:row.caption,kind:row.media_kind,createdAt:row.created_at,duration:row.duration_ms?row.duration_ms/1000:null,url:'/api/stories/'+row.id+'/media',poster:row.poster_key?'/api/stories/'+row.id+'/media?poster=1':'/api/stories/'+row.id+'/media'}}
+function validatedStoryHealth(raw){
+  if(raw===null||raw===undefined||raw==='')return null;
+  if(typeof raw!=='string'||raw.length>2000)fail('invalid_story_health',400);
+  let value;try{value=JSON.parse(raw)}catch{fail('invalid_story_health',400)}
+  const profiles={'jessica-meir':'Jessica Meir','jack-hathaway':'Jack Hathaway','christina-koch':'Christina Koch'};
+  if(!value||value.version!==1||value.source!=='demo_dashboard'||!Object.hasOwn(profiles,value.profileId)||!value.metrics||typeof value.capturedAt!=='string'||!Number.isFinite(Date.parse(value.capturedAt))||Date.parse(value.capturedAt)>Date.now()+300000)fail('invalid_story_health',400);
+  const metrics={};for(const [key,min,max]of [['hr',20,250],['spo2',50,100],['temp',30,45],['fatigue',0,10]]){const number=value.metrics[key];if(typeof number!=='number'||!Number.isFinite(number)||number<min||number>max)fail('invalid_story_health',400);metrics[key]=number;}
+  return {version:1,source:'demo_dashboard',profileId:value.profileId,profileName:profiles[value.profileId],capturedAt:new Date(value.capturedAt).toISOString(),metrics};
+}
+function savedStoryHealth(row){try{return row.health_json?JSON.parse(row.health_json):null}catch{return null}}
+function storyView(row){return {id:row.id,author:row.author_name,caption:row.caption,health:savedStoryHealth(row),kind:row.media_kind,createdAt:row.created_at,duration:row.duration_ms?row.duration_ms/1000:null,url:'/api/stories/'+row.id+'/media',poster:row.poster_key?'/api/stories/'+row.id+'/media?poster=1':'/api/stories/'+row.id+'/media'}}
 async function storyRow(env,user,id){return database(env).prepare('SELECT * FROM personal_stories WHERE id=? AND owner_id=?').bind(id,user).first()}
 async function storiesRoute(request,env,user,id,media,url){
   if(!id){
@@ -7,6 +17,7 @@ async function storiesRoute(request,env,user,id,media,url){
     const bytes=await boundedBytes(request,22000000);let form;try{form=await new Response(bytes,{headers:{'content-type':request.headers.get('content-type')||''}}).formData()}catch{fail('invalid_story',400)}
     const storyId=String(form.get('id')||''),file=form.get('file'),kind=form.get('kind'),author=String(form.get('author')||'').trim(),caption=String(form.get('caption')||'').trim(),width=Number(form.get('width')),height=Number(form.get('height')),duration=kind==='video'?Number(form.get('duration')):null;
     if(!/^[a-f0-9-]{36}$/i.test(storyId)||!['photo','video'].includes(kind)||!file||typeof file.arrayBuffer!=='function'||!author||author.length>100||caption.length>300||!Number.isInteger(width)||!Number.isInteger(height)||width<32||height<32||width>7680||height>7680)fail('invalid_story',400);
+    const health=validatedStoryHealth(form.get('health'));
     const content=new Uint8Array(await file.arrayBuffer());if(content.length<64||content.length>(kind==='video'?20000000:3000000))fail('story_too_large',413);
     const mime=kind==='video'?videoMime(content):photoMime(content);
     if(kind==='video'&&(!Number.isFinite(duration)||duration<.1||duration>15.5))fail('invalid_story',400);
@@ -18,7 +29,7 @@ async function storiesRoute(request,env,user,id,media,url){
     await photoStore(env).put(key,content,{httpMetadata:{contentType:mime}});
     try{
       if(poster)await photoStore(env).put(posterKey,poster,{httpMetadata:{contentType:'image/jpeg'}});
-      await database(env).prepare('INSERT INTO personal_stories (id,owner_id,author_name,caption,media_kind,object_key,poster_key,mime,bytes,width,height,duration_ms,digest,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(storyId,user,author,caption,kind,key,posterKey,mime,content.length,width,height,duration?Math.round(duration*1000):null,digest,new Date().toISOString()).run();
+      await database(env).prepare('INSERT INTO personal_stories (id,owner_id,author_name,caption,health_json,media_kind,object_key,poster_key,mime,bytes,width,height,duration_ms,digest,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(storyId,user,author,caption,health?JSON.stringify(health):null,kind,key,posterKey,mime,content.length,width,height,duration?Math.round(duration*1000):null,digest,new Date().toISOString()).run();
     }catch(error){await photoStore(env).delete([key,...(posterKey?[posterKey]:[])]);throw error}
     return json({story:storyView(await storyRow(env,user,storyId))},201);
   }

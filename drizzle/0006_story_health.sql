@@ -1,0 +1,1 @@
+ALTER TABLE `personal_stories` ADD `health_json` text;
