@@ -1,5 +1,7 @@
 (() => {
-  const dialog = document.getElementById('video-log-dialog');
+  const dialog = document.getElementById('media-diary-dialog');
+  const panel = document.getElementById('video-log-dialog');
+  const visible = () => dialog.open && !panel.hidden;
   const canvas = document.getElementById('video-log-canvas');
   const context = canvas.getContext('2d');
   const video = document.getElementById('video-log-input');
@@ -47,7 +49,7 @@
 
   function updateSignature() {
     researcher.value = normalized([firstName.value.trim(), lastName.value.trim()].filter(Boolean).join(' '));
-    document.getElementById('video-log-title').textContent = researcher.value ? 'Видеодневник / ' + researcher.value : 'Твой видеодневник';
+    document.getElementById('video-log-title').textContent = researcher.value ? 'Дневник / ' + researcher.value : 'Личный дневник';
   }
 
   function message(value, error = false) { notice.textContent = value; notice.dataset.error = String(error); }
@@ -64,6 +66,7 @@
     helmetZoom.disabled = backgroundChoice.disabled;
     document.getElementById('video-log-zoom-label').hidden = backgroundChoice.value !== 'helmet';
     firstName.disabled = lastName.disabled = phase === 'recording' || phase === 'finishing';
+    window.missionDiary.lock('video', phase === 'recording' || phase === 'finishing');
     download.hidden = !clipUrl || phase !== 'review';
     review.hidden = phase !== 'review';
   }
@@ -131,10 +134,10 @@
         audio: { echoCancellation: true, noiseSuppression: true }
       });
       // Разрешение после закрытия или отмены не должно возобновлять камеру.
-      if (attempt !== epoch || !dialog.open) { incoming.getTracks().forEach(track => track.stop()); return; }
+      if (attempt !== epoch || !visible()) { incoming.getTracks().forEach(track => track.stop()); return; }
       if(!incoming.getAudioTracks().length){incoming.getTracks().forEach(track=>track.stop());throw new Error('audio_required');}
       stream = incoming; video.srcObject = incoming; await video.play();
-      if (attempt !== epoch || !dialog.open) return;
+      if (attempt !== epoch || !visible()) return;
       phase = 'live'; renderControls();
       void window.missionSpeech?.start('video', stream);
       incoming.getTracks().forEach(track => track.addEventListener('ended', () => {
@@ -226,7 +229,7 @@
     workerBusy = true; lastSegmentation = time;
     try {
       const bitmap = await createImageBitmap(video, { resizeWidth: 640, resizeHeight: 360 });
-      if (attempt !== epoch || worker !== activeWorker || !dialog.open) { bitmap.close(); return; }
+      if (attempt !== epoch || worker !== activeWorker || !visible()) { bitmap.close(); return; }
       activeWorker.postMessage({ type: 'frame', bitmap, timestamp: time }, [bitmap]);
     } catch {
       if (attempt === epoch) {
@@ -238,7 +241,7 @@
   }
 
   function animate(time) {
-    if (!dialog.open || document.hidden) { frame = 0; return; }
+    if (!visible() || document.hidden) { frame = 0; return; }
     frame = requestAnimationFrame(animate);
     if (time - lastDraw < 33 || phase === 'review') return;
     lastDraw = time;
@@ -308,19 +311,18 @@
     }
   }
 
-  function open() {
-    if (dialog.open) return;
-    document.getElementById('voice-dialog').close();
-    identityPromise ||= loadIdentity();
-    dialog.showModal(); if (clipUrl) phase = 'review'; renderControls();
+  function prepare() { identityPromise ||= loadIdentity(); }
+  function enter() {
+    prepare(); if (clipUrl) phase = 'review'; renderControls();
     if (!frame) frame = requestAnimationFrame(animate);
   }
-  document.querySelectorAll('[data-open-video-log]').forEach(button => button.addEventListener('click', open));
-  document.getElementById('video-log-close').addEventListener('click', () => dialog.close());
-  dialog.addEventListener('close', () => {
+  function leave() {
     stopCamera(); review.pause(); cancelAnimationFrame(frame); frame = 0;
     if (phase !== 'finishing') phase = clipUrl ? 'review' : 'idle'; renderControls();
-  });
+  }
+  function open() { window.missionDiary.open('video'); }
+  window.missionDiary.register('video', {enter, leave, prepare});
+  document.querySelectorAll('[data-open-video-log]').forEach(button => button.addEventListener('click', open));
   cameraButton.addEventListener('click', () => {
     if (phase === 'requesting' || phase === 'live' || phase === 'recording') {
       stopCamera(); if (phase !== 'finishing') phase = 'idle'; renderControls(); message('Камера выключена.');
@@ -354,7 +356,7 @@
     if (document.hidden) {
       stopCamera(); review.pause(); cancelAnimationFrame(frame); frame = 0;
       if (phase !== 'finishing') phase = clipUrl ? 'review' : 'idle'; renderControls(); message('');
-    } else if (dialog.open && !frame) frame = requestAnimationFrame(animate);
+    } else if (visible() && !frame) frame = requestAnimationFrame(animate);
   });
   window.addEventListener('pagehide', () => { stopCamera(); discardClip(); });
   const query=new URLSearchParams(location.search);

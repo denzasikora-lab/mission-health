@@ -1,5 +1,7 @@
 (() => {
-  const dialog = document.getElementById('voice-dialog');
+  const dialog = document.getElementById('media-diary-dialog');
+  const panel = document.getElementById('voice-dialog');
+  const visible = () => dialog.open && !panel.hidden;
   const stage = document.getElementById('voice-stage');
   const canvas = document.getElementById('voice-canvas');
   const context = canvas.getContext('2d');
@@ -57,10 +59,10 @@
       void resume.catch(() => {});
       const incoming = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
       // Позднее разрешение не должно включать микрофон после отмены или закрытия окна.
-      if (attempt !== sequence || !dialog.open) { incoming.getTracks().forEach(track => track.stop()); return; }
+      if (attempt !== sequence || !visible()) { incoming.getTracks().forEach(track => track.stop()); return; }
       stream = incoming; window.missionSpeech?.start('voice', incoming);
       await resume;
-      if (attempt !== sequence || !dialog.open) return;
+      if (attempt !== sequence || !visible()) return;
       if (engine.state !== 'running') throw new Error('audio_suspended');
       analyser = engine.createAnalyser();
       analyser.fftSize = 2048;
@@ -229,7 +231,7 @@
   }
 
   function animate(time) {
-    if (!dialog.open || document.hidden) { frame = 0; return; }
+    if (!visible() || document.hidden) { frame = 0; return; }
     frame = requestAnimationFrame(animate);
     if (time - previousFrame < (reducedMotion.matches ? 125 : 32)) return;
     previousFrame = time;
@@ -243,17 +245,14 @@
     if (time - lastReadout > 100) { updateReadings(time); lastReadout = time; }
   }
 
-  function open() {
-    if (dialog.open) return;
-    dialog.showModal(); resize(); renderStatus();
+  function enter() {
+    resize(); renderStatus();
     if (!frame) frame = requestAnimationFrame(animate);
   }
-
+  function leave() { stopSignal(); cancelAnimationFrame(frame); frame = 0; renderStatus(); }
+  function open() { window.missionDiary.open('audio'); }
+  window.missionDiary.register('audio', {enter, leave});
   document.querySelectorAll('[data-open-voice]').forEach(button => button.addEventListener('click', open));
-  document.getElementById('voice-close').addEventListener('click', () => dialog.close());
-  dialog.addEventListener('close', () => {
-    stopSignal(); cancelAnimationFrame(frame); frame = 0; renderStatus();
-  });
   micButton.addEventListener('click', () => {
     if (source === 'mic' || source === 'requesting') { stopSignal(); renderStatus(); }
     else void startMicrophone();
@@ -268,10 +267,9 @@
   }));
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-      const wasListening = source === 'mic' || source === 'requesting';
       stopSignal(); cancelAnimationFrame(frame); frame = 0;
-      renderStatus(wasListening ? 'Микрофон выключен: вкладка была скрыта.' : '');
-    } else if (dialog.open && !frame) frame = requestAnimationFrame(animate);
+      renderStatus();
+    } else if (visible() && !frame) frame = requestAnimationFrame(animate);
   });
   window.addEventListener('pagehide', stopSignal);
   new ResizeObserver(resize).observe(stage);

@@ -32,7 +32,7 @@
   const attachments = document.createElement('details'); attachments.className = 'mission-attachments'; attachments.innerHTML = '<summary>Фото и видео для сравнения</summary>';
   const tools = document.querySelector('.photo-tools'); tools.before(attachments); attachments.append(tools);
   const audio = document.createElement('section'); audio.className = 'mission-audio panel glass'; audio.lang = 'ru';
-  audio.innerHTML = '<h2>Голосовой дневник</h2><p>Мысли, ощущения и наблюдения за день</p><div class="mission-audio-body"><svg viewBox="0 0 290 60" aria-hidden="true">'+Array.from({length:65},(_,i)=>{const h=5+Math.abs(Math.sin(i*1.9)*Math.sin(i*.19))*42;return `<path d="M${i*4.4+3} ${30-h/2}v${h}"/>`}).join('')+'</svg><div><button type="button" data-open-voice>Включить микрофон</button><button type="button" data-open-video-log>Записать видео</button></div></div>';
+  audio.innerHTML = '<h2>Медиадневник</h2><p>Мысли, ощущения и наблюдения за день</p><div class="mission-audio-body"><svg viewBox="0 0 290 60" aria-hidden="true">'+Array.from({length:65},(_,i)=>{const h=5+Math.abs(Math.sin(i*1.9)*Math.sin(i*.19))*42;return `<path d="M${i*4.4+3} ${30-h/2}v${h}"/>`}).join('')+'</svg><div><button type="button" data-open-voice>Аудио</button><button type="button" data-open-video-log>Видео</button></div></div>';
   document.querySelector('.bottom-grid').before(audio);
   document.querySelector('.bottom-grid').classList.add('mission-observations');
   const medical = '<svg viewBox="0 0 70 70" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M35 14v50M28 26c-16 0-20-7-25-10 16 3 22-8 28-7m11 17c16 0 20-7 25-10-16 3-22-8-28-7M29 18c-11 4-15 3-20 2m20 3c-8 3-11 3-15 2m27-7c11 4 15 3 20 2m-20 3c8 3 11 3 15 2M30 31c-11 7 21 10 13 18-4 4-16 5-13 11m10-29c11 7-21 10-13 18 4 4 16 5 13 11"/><circle cx="35" cy="7" r="3" fill="currentColor"/></g></svg>';
@@ -50,7 +50,7 @@
   const atom='<svg viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1"><ellipse cx="16" cy="16" rx="15" ry="6"/><ellipse cx="16" cy="16" rx="15" ry="6" transform="rotate(60 16 16)"/><ellipse cx="16" cy="16" rx="15" ry="6" transform="rotate(120 16 16)"/></g><circle cx="16" cy="16" r="2" fill="currentColor"/></svg>';
   assistantTitle.insertAdjacentHTML('afterbegin',atom);
   const chatTools=document.createElement('div');chatTools.className='mission-chat-tools';chatTools.innerHTML='<button type="button" data-chat-camera aria-label="Добавить фото в чат"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h4l2-3h6l2 3h4v14H3Z"/><circle cx="12" cy="13" r="4"/></svg></button><button type="button" data-chat-voice aria-label="Открыть микрофон"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="2" width="8" height="13" rx="4"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4m-4 0h8"/></svg></button>';document.querySelector('.composer-footer').append(chatTools);
-  chatTools.querySelector('[data-chat-camera]').addEventListener('click',()=>document.getElementById('open-camera').click());chatTools.querySelector('[data-chat-voice]').addEventListener('click',()=>document.querySelector('.toolbar [data-open-voice]').click());
+  chatTools.querySelector('[data-chat-camera]').addEventListener('click',()=>document.getElementById('open-camera').click());chatTools.querySelector('[data-chat-voice]').addEventListener('click',()=>window.missionDiary.open('audio'));
   anatomy.addEventListener('click',event=>{const button=event.target.closest('[data-body-metric]');if(button){state.metric=button.dataset.bodyMetric;window.render();}});
   const palette = matchMedia('(prefers-color-scheme: dark)');
   let themeMode; try { themeMode = localStorage.getItem('mission-health-theme-mode') || localStorage.getItem('mission-health-theme') || 'system'; } catch { themeMode='system'; }
@@ -81,8 +81,8 @@
   iconButton.addEventListener('click',()=>navigate('sources'));
   themeToggle.addEventListener('click',()=>{themeMode=state.theme==='dark'?'light':'dark';state.theme=themeMode;savePreference('mission-health-theme-mode',themeMode);savePreference('mission-health-theme',themeMode);window.render();});
   palette.addEventListener('change',()=>{if(themeMode==='system'){state.theme=palette.matches?'dark':'light';window.render();}});
-  audio.querySelector('[data-open-voice]').addEventListener('click',()=>document.querySelector('.toolbar [data-open-voice]').click());
-  audio.querySelector('[data-open-video-log]').addEventListener('click',()=>document.querySelector('.toolbar [data-open-video-log]').click());
+  audio.querySelector('[data-open-voice]').addEventListener('click',()=>window.missionDiary.open('audio'));
+  audio.querySelector('[data-open-video-log]').addEventListener('click',()=>window.missionDiary.open('video'));
   const chartBody=document.createElement('div');chartBody.className='mission-chart-body';const plot=document.createElement('div');plot.className='mission-chart-plot';const chart=document.querySelector('.chart-wrap');chart.before(chartBody);chartBody.append(plot);plot.append(chart,document.getElementById('chart-axis'));const stats=document.createElement('div');stats.className='mission-chart-stats';chartBody.append(stats);
   document.querySelectorAll('[data-period]').forEach(button=>button.addEventListener('click',render));
   window.missionDesign = {render,navigate,content,rail};

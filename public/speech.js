@@ -6,7 +6,7 @@
   function idle(){return mode==='local'&&!config.local?labels.speech_local_not_connected:mode==='api'&&!config.api?labels.speech_api_not_configured:mode==='local'?'Локальное распознавание / без отправки в облако.':'Whisper через ProxyAPI / в сервис передается только звук.';}
   function createState(id){const state={id,transcript:'',status:idle(),version:0,queue:[],tracks:[],active:false,captureVersion:0};states.set(id,state);render(state);}
   function render(state){
-    const badge=document.querySelector('[data-speech-environment="'+state.id+'"]');if(!badge)return;
+    const badge=document.querySelector('[data-speech-environment="'+state.id+'"]')||document.querySelector('[data-speech-environment="diary"]');if(!badge)return;
     badge.querySelector('span').textContent=environmentLabel;
     badge.querySelector('svg').innerHTML=environmentLabel==='On prem'?'<rect x="4" y="3" width="16" height="7" rx="2"/><rect x="4" y="14" width="16" height="7" rx="2"/><path d="M7 6.5h.01M7 17.5h.01"/>':'<path d="M7 18h11a4 4 0 0 0 .5-8 6 6 0 0 0-11.6-1.5A5 5 0 0 0 7 18Z"/>';
     badge.setAttribute('aria-label','Метка интерфейса: '+environmentLabel);
