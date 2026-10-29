@@ -19,10 +19,16 @@
   function show(state,prefix,completion){
     state.prefix=prefix;state.completion=completion;state.prefixNode.textContent=prefix;state.suffixNode.textContent=completion;state.layer.hidden=false;state.hint.hidden=false;sync(state);
   }
+  function starter(state){
+    const hasConversation=state.form.closest('.personal-conversation')?.querySelector('.personal-message');
+    return hasConversation?'Хочу продолжить наш разговор.':'Хочу обсудить свое самочувствие.';
+  }
   function schedule(state){
     clear(state);
     const prefix=state.input.value;
-    if(!eligible(state)||prefix.trim().length<3||prefix.length>=state.input.maxLength||prefix===state.dismissed)return;
+    if(!eligible(state)||prefix.length>=state.input.maxLength||prefix===state.dismissed)return;
+    if(!prefix){show(state,'',starter(state).slice(0,state.input.maxLength));return;}
+    if(prefix.trim().length<3)return;
     const body=JSON.stringify({prefix});
     if(new TextEncoder().encode(body).length>20000)return;
     const version=state.version;
@@ -74,6 +80,7 @@
     },true);
     input.addEventListener('keyup',event=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(event.key))schedule(state);});
     if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{if(state.completion)sync(state);}).observe(input);
+    if(document.activeElement===input)schedule(state);
     return state;
   }
   function scan(){for(const input of document.querySelectorAll(selector))attach(input);}

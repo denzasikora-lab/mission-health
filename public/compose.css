@@ -2,7 +2,7 @@
 .personal-composer .compose-ghost-wrap textarea{display:block;position:relative;z-index:1;margin:0;background:transparent}
 .compose-ghost-layer{position:absolute;top:0;left:0;z-index:2;overflow:hidden;white-space:pre-wrap;pointer-events:none;user-select:none;border-style:solid;border-color:transparent;color:transparent}
 .compose-ghost-prefix{color:transparent}
-.compose-ghost-suffix{color:var(--muted,#86a393);opacity:.58}
+.compose-ghost-suffix{color:#96a29c;opacity:.68}
 .compose-tab-hint{display:inline-flex;align-items:center;margin-left:auto;white-space:nowrap;font:400 .53rem/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--muted,#86a393);opacity:.8}
 .compose-ghost-layer[hidden],.compose-tab-hint[hidden]{display:none}
-html[data-theme=light] .compose-ghost-suffix{opacity:.63}
+html[data-theme=light] .compose-ghost-suffix{color:#66756d;opacity:.68}

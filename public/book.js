@@ -83,7 +83,7 @@
     if(url.searchParams.get('book')==='1'){url.searchParams.delete('book');window.history.replaceState(window.history.state,'',url);}
     cancelSearch();if(search.open)search.close();if(editor.open)editor.close();
     window.missionDesign.navigate('overview');window.scrollTo({top:0,behavior:'auto'});
-    const target=document.querySelector('.mission-self-profile .self-avatar')||document.querySelector('[data-mission-nav="diary"]');target?.focus({preventScroll:true});
+    const target=document.querySelector('.stories-row .story-person>button')||document.querySelector('[data-mission-nav="diary"]');target?.focus({preventScroll:true});
   }
   function status(text){$b('book-search-status').textContent=text}
   function embed(text){

@@ -174,60 +174,56 @@
     context.globalAlpha = 1;
   }
 
-  let sand = [], sandColumns = 0;
-  function prepareSand() {
-    const columns = width < 500 ? 170 : 300;
-    if (columns === sandColumns) return;
-    sandColumns = columns; sand = [];
-    let seed = 7319;
-    const random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
-    const rows = width < 500 ? 90 : 140;
-    for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) {
-      const x = (column + random()) / columns * 2 - 1;
-      const z = (row + random()) / rows * 2 - 1;
-      if (x * x + z * z < 1) sand.push({x,z,jitter:random(),grain:random()});
-    }
-  }
-
   function drawSilo(time) {
-    prepareSand();
-    const motion = reducedMotion.matches ? 0 : time * .00012;
-    const active = source === 'mic' || source === 'demo';
-    const energy = active ? level : 0;
-    const spectrum = frequencies ? frequencies.slice(5, 80).reduce((sum,value)=>sum+value,0) / (75 * 255) : energy * .6;
-    const center = height * .64, reach = height * (.058 + energy * .18);
-    const drift = Math.sin(motion * .62) * .18;
-    const haze = context.createRadialGradient(width * .5, center, 0, width * .5, center, width * .47);
-    haze.addColorStop(0, `rgba(218,221,216,${.018 + energy * .025})`);
-    haze.addColorStop(.7, 'rgba(204,208,201,.006)'); haze.addColorStop(1, 'rgba(204,208,201,0)');
-    context.fillStyle=haze; context.fillRect(0,0,width,height);
-    // Неподвижные зерна образуют узловые гребни. Голос меняет рельеф и смешение мод.
-    context.fillStyle = '#ecf0e8';
-    for (const grain of sand) {
-      const x = grain.x, z = grain.z, depth = (z + 1) * .5;
-      const edge = Math.min(1, (1 - x*x - z*z) * 5);
-      const u = x + Math.sin(motion * .6 + z * 3) * .045;
-      const v = z + drift * .1;
-      const a = Math.cos(u * Math.PI * 2.6 + drift) * Math.cos(v * Math.PI * 1.9);
-      const b = Math.cos(u * Math.PI * 1.9) * Math.cos(v * Math.PI * 2.6 - drift);
-      const secondary = Math.sin(u * 8 + motion) * Math.sin(v * 7 - motion * .7);
-      const field = a - b + secondary * (.12 + spectrum * .45);
-      const ridge = Math.exp(-field * field * (8 + energy * 6));
-      const undulation = Math.sin(u * 4 + motion) * Math.cos(v * 4 - motion) * (.22 + energy * .2);
-      const elevation = (ridge * .88 + undulation) * reach * edge;
-      const px = width * .5 + x * width * .46 * (.7 + depth * .3);
-      const py = center + z * height * .16 - elevation * (.65 + depth * .35);
-      const size = (.62 + grain.grain * .65 + ridge * .35) * (.5 + depth * .8);
-      context.globalAlpha = Math.min(1,edge * (.02 + Math.pow(ridge, 1.2) * (.65 + grain.jitter * .85)) * (.5 + depth * .5));
-      context.fillRect(px,py,size,size);
-      // Рассеянные зерна над гребнями добавляют объем без вертикальных столбиков.
-      if (grain.jitter > .88 && ridge > .45) {
-        const lift = (grain.jitter - .88) * 100 * (.3 + energy * 1.8);
-        context.globalAlpha *= .28;
-        context.fillRect(px + Math.sin(motion * 2 + grain.x * 25) * lift * .12, py - lift, size * .65, size * .65);
-      }
+    const motion = reducedMotion.matches ? 0 : time * .0006;
+    const energy = source === 'mic' || source === 'demo' ? level : 0;
+    const center = width * .5, base = height * .84, reach = height * (.43 + energy * .3);
+    context.save();
+    const background = context.createLinearGradient(0,0,0,height);
+    background.addColorStop(0,'#061321');background.addColorStop(.55,'#12344e');background.addColorStop(1,'#071a2a');
+    context.fillStyle=background;context.fillRect(0,0,width,height);
+    const haze=context.createRadialGradient(center,height*.58,0,center,height*.58,width*.52);
+    haze.addColorStop(0,`rgba(64,161,231,${.2+energy*.15})`);haze.addColorStop(1,'rgba(29,90,144,0)');
+    context.fillStyle=haze;context.fillRect(0,0,width,height);
+    // Изогнутые линии задают глубину голубого экрана вокруг звуковой голограммы.
+    for(let line=0;line<7;line++){
+      const y=height*(.07+line*.14);
+      context.beginPath();context.moveTo(-width*.04,y-height*.055);
+      context.bezierCurveTo(width*.25,y+height*.09,width*.75,y+height*.09,width*1.04,y-height*.055);
+      context.strokeStyle=`rgba(118,215,255,${line===4?.23:.11})`;context.lineWidth=line===4?1.4:.7;context.stroke();
     }
-    context.globalAlpha = 1;
+    for(let line=1;line<12;line++){
+      const x=width*line/12,bend=(x-center)*.1;
+      context.beginPath();context.moveTo(x-bend,0);context.quadraticCurveTo(x+bend,height*.5,x-bend,height);
+      context.strokeStyle='rgba(104,186,234,.045)';context.lineWidth=.6;context.stroke();
+    }
+    const glow=context.createRadialGradient(center,base,0,center,base,width*.23);
+    glow.addColorStop(0,`rgba(118,215,255,${.2+energy*.3})`);glow.addColorStop(1,'rgba(67,169,245,0)');
+    context.fillStyle=glow;context.fillRect(center-width*.25,base-height*.3,width*.5,height*.45);
+    context.globalCompositeOperation='lighter';
+    const light=context.createLinearGradient(0,base-reach,0,base);
+    light.addColorStop(0,'rgba(118,215,255,0)');light.addColorStop(.25,'rgba(118,215,255,.22)');light.addColorStop(.8,'rgba(118,215,255,.72)');light.addColorStop(1,'rgba(118,215,255,.08)');
+    context.strokeStyle=light;
+    const columns=width<500?72:112;
+    // Высота и плотность центральных световых нитей реагируют на существующий сигнал микрофона.
+    for(let layer=0;layer<3;layer++)for(let column=0;column<columns;column++){
+      const u=column/(columns-1)*2-1,envelope=Math.exp(-u*u*4.5);
+      const bin=frequencies?frequencies[Math.min(frequencies.length-1,5+Math.floor(column/columns*80))]/255:energy*Math.abs(Math.sin(column*.91+motion));
+      const crest=.28+.72*Math.pow(.5+.5*Math.sin(column*1.71+layer*.8+motion*(.3+energy)),2);
+      const lift=reach*envelope*(.2+crest*.7+bin*.4);
+      const x=center+u*width*(.13+energy*.035)+(layer-1)*2;
+      context.beginPath();
+      for(let step=0;step<=14;step++){
+        const fraction=step/14,y=base-fraction*lift+Math.sin(column*.6+layer)*height*.018;
+        const ripple=Math.sin(fraction*13+column*.7+motion*2)*(1.1+energy*2.7)*Math.sin(fraction*Math.PI);
+        if(step)context.lineTo(x+ripple,y);else context.moveTo(x,y);
+      }
+      context.globalAlpha=(.12+energy*.2)*(.4+envelope*.6);context.lineWidth=.6+layer*.25;context.stroke();
+      const rise=(column*.618+motion*.12)%1;
+      context.fillStyle='#76d7ff';context.globalAlpha=(.12+energy*.22)*envelope*(1-rise);
+      context.fillRect(x+Math.sin(column+motion)*2,base-rise*lift,1,1.6+energy*2);
+    }
+    context.restore();
   }
 
   function animate(time) {

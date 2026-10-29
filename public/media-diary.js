@@ -2,14 +2,14 @@
   const dialog=document.getElementById('media-diary-dialog');
   const panels={audio:document.getElementById('voice-dialog'),video:document.getElementById('video-log-dialog')};
   const buttons=[...dialog.querySelectorAll('[data-diary-mode]')],engines=new Map();
-  let current='audio',locked=false;
+  let current='video',locked=false;
   function render(){
     dialog.dataset.mode=current;
     for(const [mode,panel]of Object.entries(panels))panel.hidden=mode!==current;
     for(const button of buttons){const selected=button.dataset.diaryMode===current;button.setAttribute('aria-selected',String(selected));button.tabIndex=selected?0:-1;button.disabled=locked&&!selected;}
     dialog.querySelector('[data-diary-video-analysis]').hidden=current!=='video';
   }
-  function open(mode='audio'){
+  function open(mode='video'){
     if(!panels[mode]||dialog.open&&locked&&mode!==current)return;
     if(dialog.open&&mode===current)return;
     if(dialog.open)engines.get(current)?.leave();
@@ -26,10 +26,10 @@
     button.addEventListener('click',()=>open(button.dataset.diaryMode));
     button.addEventListener('keydown',event=>{
       if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)||locked)return;
-      event.preventDefault();const next=event.key==='Home'?'audio':event.key==='End'?'video':current==='audio'?'video':'audio';
+      event.preventDefault();const next=event.key==='Home'?'video':event.key==='End'?'audio':current==='audio'?'video':'audio';
       open(next);buttons.find(node=>node.dataset.diaryMode===next).focus();
     });
   }
-  document.querySelectorAll('[data-open-media-diary]').forEach(button=>button.addEventListener('click',()=>open('audio')));
+  document.querySelectorAll('[data-open-media-diary]').forEach(button=>button.addEventListener('click',()=>open('video')));
   window.missionDiary={open,register,lock};render();
 })();
