@@ -31,6 +31,7 @@
   }
   function render(){
     const isHome=state.workspace==='crew'&&state.view==='health'&&!state.visiting;
+    const homeButton=document.querySelector('[data-mission-nav="overview"]');homeButton.hidden=isHome;homeButton.querySelector('span').textContent=state.visiting?'Домой':'Моя страница';
     document.querySelectorAll('[data-crew]').forEach(button=>button.setAttribute('aria-pressed',String(state.visiting&&Number(button.dataset.crew)===state.crew)));
     document.body.dataset.home=String(isHome);document.body.dataset.visiting=String(Boolean(state.visiting));home.hidden=!isHome;
     own.hidden=Boolean(state.visiting);friendProfile.classList.toggle('friend-profile',true);

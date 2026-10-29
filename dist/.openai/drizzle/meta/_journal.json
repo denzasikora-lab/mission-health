@@ -64,6 +64,13 @@
       "when": 1793297401755,
       "tag": "0008_activity_events",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1793299357188,
+      "tag": "0009_actiwatch_imports",
+      "breakpoints": true
     }
   ]
 }

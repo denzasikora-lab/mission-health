@@ -12,3 +12,4 @@ body[data-visiting=true] .mission-nav [data-mission-nav=overview]{border:1px sol
 
 html[data-theme=light] .home-human img{filter:brightness(.48) saturate(.8);opacity:.9}.home-welcome{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:15px;padding:18px 22px;align-items:center}.home-welcome>.home-eyebrow,.home-welcome>h2,.home-welcome>p{grid-column:1}.home-welcome h2{font-size:1.35rem;margin:8px 0}.home-welcome>p{font-size:.7rem;margin:0}.home-actions{grid-column:2;grid-row:1/4;display:grid;gap:6px;margin:0}.home-actions button{font-size:.64rem;padding:9px 12px}
 @container mission (max-width:500px){.home-welcome{display:block;padding:18px}.home-actions{display:flex;margin-top:16px}.home-welcome h2{font-size:1.4rem}.home-actions button{flex:1;font-size:.6rem;padding:10px 8px}}
+ .mission-nav button[hidden]{display:none!important}

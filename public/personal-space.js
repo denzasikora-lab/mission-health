@@ -156,6 +156,6 @@
   function onOpen(){void prepare();setKind(modalView,modalKind);if(!favoriteLoaded)void favorites();renderScores();}
   new MutationObserver(()=>{if(modal.open)onOpen();}).observe(modal,{attributes:true,attributeFilter:['open']});
   window.missionCheckin={widget:slider,current:()=>selection()?{score:selection().score}:null};
-  window.missionFavorites={button:star,badge,refresh:favorites};window.missionConversations={render};
+  window.missionFavorites={button:star,badge,refresh:favorites};window.missionConversations={render,refreshDiary:()=>load('diary')};
   void prepare();void load('chat');render();if(modal.open)onOpen();
 })();

@@ -159,6 +159,7 @@ export default {
       if(url.pathname==='/api/status'&&request.method==='GET')return json(await capabilities(env));
       if(url.pathname==='/api/location'&&request.method==='GET')return json({country:/^[A-Z]{2}$/.test(request.cf?.country||'')?request.cf.country:null});
       if(url.pathname==='/api/me'&&request.method==='GET')return json(await videoLogIdentity(request,user));
+      const actiwatchMatch=url.pathname.match(/^\/api\/actiwatch(?:\/([a-f0-9-]{36}))?$/i);if(actiwatchMatch)return await actiwatchRoute(request,env,user,actiwatchMatch[1]);
       if(url.pathname==='/api/activity')return await activityRoute(request,env,user);
       if(url.pathname==='/api/chat')return await generalChatRoute(request,env,user,url);
       const favoritesMatch=url.pathname.match(/^\/api\/favorites(?:\/([a-f0-9-]{36}))?$/i);if(favoritesMatch)return await favoritesRoute(request,env,user,favoritesMatch[1],url);

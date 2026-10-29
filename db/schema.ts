@@ -81,3 +81,5 @@ export const personalFavorites=sqliteTable('personal_favorites',{
 },table=>[uniqueIndex('favorites_owner_source').on(table.ownerId,table.sourceType,table.sourceId),index('favorites_owner_time').on(table.ownerId,table.createdAt,table.id)]);
 
 export const activityEvents=sqliteTable('activity_events',{id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),kind:text('kind').notNull(),summary:text('summary').notNull(),createdAt:text('created_at').notNull()},table=>[index('activity_owner_time').on(table.ownerId,table.createdAt,table.id)]);
+
+export const actiwatchImports=sqliteTable('actiwatch_imports',{id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),digest:text('digest').notNull(),filename:text('filename').notNull(),objectKey:text('object_key').notNull(),summary:text('summary_json').notNull(),recordedEnd:text('recorded_end').notNull(),diaryMessageId:text('diary_message_id').notNull(),createdAt:text('created_at').notNull()},table=>[uniqueIndex('actiwatch_owner_digest').on(table.ownerId,table.digest),index('actiwatch_owner_end').on(table.ownerId,table.recordedEnd,table.createdAt)]);
