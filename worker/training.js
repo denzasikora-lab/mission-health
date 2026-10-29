@@ -33,11 +33,11 @@ async function trainingRoute(request,env,user,profile,id){
   const existing=await db.prepare('SELECT * FROM journal_training_jobs WHERE id=?').bind(input.id).first();if(existing){if(existing.owner_id!==user||existing.astronaut_id!==profile)fail('id_conflict',409);return json({job:trainingJob(existing)})}
   if(count.total<20)fail('training_not_enough_data',409);if(!trainingEndpoint(env,''))fail('trainer_not_connected',503);
   const active=await db.prepare("SELECT id FROM journal_training_jobs WHERE owner_id=? AND astronaut_id=? AND status IN ('queued','running','unconfirmed') LIMIT 1").bind(user,profile).first();if(active)fail('training_already_running',409);
-  const {results}=await db.prepare("SELECT content,MAX(created_at) AS latest FROM journal_messages WHERE owner_id=? AND astronaut_id=? AND role='note' AND length(content)>=80 GROUP BY content ORDER BY latest DESC LIMIT 500").bind(user,profile).all();
+  const {results}=await db.prepare("SELECT content,wellbeing_json,MAX(created_at) AS latest FROM journal_messages WHERE owner_id=? AND astronaut_id=? AND role='note' AND length(content)>=80 GROUP BY content ORDER BY latest DESC LIMIT 500").bind(user,profile).all();
   const date=new Date().toISOString(),progress=JSON.stringify({step:0,total:200,adapterReady:false});
   // Сначала сохраняется идентификатор запуска, чтобы повтор запроса не создавал второе обучение.
   await db.prepare('INSERT INTO journal_training_jobs (id,owner_id,astronaut_id,status,example_count,progress_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)').bind(input.id,user,profile,'queued',results.length,progress,date,date).run();
-  try{const accepted=await trainerRequest(env,'/jobs',{id:input.id,ownerId:user,profile,entries:results.map(row=>row.content)});if(accepted.id!==input.id)fail('trainer_unavailable',503)}catch(error){await db.prepare('UPDATE journal_training_jobs SET status=?,updated_at=? WHERE id=? AND owner_id=? AND astronaut_id=?').bind('unconfirmed',date,input.id,user,profile).run();throw error}
+  try{const accepted=await trainerRequest(env,'/jobs',{id:input.id,ownerId:user,profile,entries:results.map(diaryDocument)});if(accepted.id!==input.id)fail('trainer_unavailable',503)}catch(error){await db.prepare('UPDATE journal_training_jobs SET status=?,updated_at=? WHERE id=? AND owner_id=? AND astronaut_id=?').bind('unconfirmed',date,input.id,user,profile).run();throw error}
   if(typeof activityWrite==='function')await activityWrite(env,user,'training_queued','Запустил fine-tuning / LoRA / '+results.length+' записей','training:'+input.id);
   return json({job:{id:input.id,status:'queued',examples:results.length,createdAt:date,updatedAt:date,progress:JSON.parse(progress)}},202);
 }

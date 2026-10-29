@@ -31,8 +31,8 @@
     const s=latest.summary,w=s.latest24h;status.textContent='Из файла / '+latest.filename+' · окно 24 ч до '+date(w.end);
     values(panel.querySelector('.actiwatch-values'),s);if(recording)charts(panel.querySelector('.actiwatch-chart'),recording,s);
     panel.querySelector('.actiwatch-quality').textContent='За всю запись: снятые часы '+duration(s.offWristSeconds)+' / исключенные эпохи '+duration(s.excludedSeconds)+'. Пропуски не заполняются.';
-    const sleep=document.querySelector('[data-home-metric=sleep]');sleep.querySelector('strong').textContent=duration(w.sleepSeconds);sleep.querySelector('small').textContent='Actiwatch / до '+date(w.end)+' / разметка '+duration(w.sleepScoredSeconds);
-    document.querySelector('.home-body-panel>header small').textContent='Actiwatch / данные из файла';
+    const sleep=document.querySelector('[data-home-metric=sleep]');sleep.dataset.source='actiwatch';sleep.querySelector('strong').textContent=duration(w.sleepSeconds);sleep.querySelector('small').textContent='Actiwatch / до '+date(w.end)+' / разметка '+duration(w.sleepScoredSeconds);
+    document.querySelector('.home-body-panel>header small').textContent='Демо + Actiwatch / файл';
   }
   async function load(){
     const version=++loadVersion;

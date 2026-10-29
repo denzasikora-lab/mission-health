@@ -16,7 +16,7 @@ async function activityRoute(request,env,user){
   if(input.kind==='friend_visit'&&Object.hasOwn(people,input.profile)&&people[input.profile])summary='Зашел в гости / '+people[input.profile];
   if(input.kind==='media_open'&&['audio','video'].includes(input.mode))summary='Открыл '+(input.mode==='audio'?'аудиодневник':'видеодневник');
   if(input.kind==='draft'&&Object.hasOwn(areas,input.area)&&Number.isInteger(input.length)&&input.length>=0&&input.length<=6000)summary=(input.length?'Изменил черновик в '+areas[input.area]+' / '+input.length+' символов':'Очистил черновик в '+areas[input.area]);
-  if(input.kind==='wellbeing'&&Number.isInteger(input.score)&&input.score>=1&&input.score<=10)summary='Выбрал самочувствие / '+input.score+' из 10';
+  if(input.kind==='wellbeing'){const report=selfReport({score:input.score,wellbeingScale:input.wellbeingScale});summary='Выбрал самочувствие / '+report.score+' из 100';}
   if(input.kind==='training_review')summary='Открыл подготовку fine-tuning / LoRA';
   if(input.kind==='camera_click')summary='Нажал переключатель камеры';
   if(input.kind==='microphone_click')summary='Нажал переключатель микрофона';

@@ -71,6 +71,13 @@
       "when": 1793299357188,
       "tag": "0009_actiwatch_imports",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1793299800000,
+      "tag": "0010_wellbeing_hundred",
+      "breakpoints": true
     }
   ]
 }

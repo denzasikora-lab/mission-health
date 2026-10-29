@@ -12,7 +12,7 @@ function validatedStoryHealth(raw){
   const metrics={};for(const [key,min,max]of [['hr',20,250],['spo2',50,100],['temp',30,45],['fatigue',0,10]]){const number=value.metrics[key];if(typeof number!=='number'||!Number.isFinite(number)||number<min||number>max)fail('invalid_story_health',400);metrics[key]=number;}
   return {version:1,source:'demo_dashboard',profileId:value.profileId,profileName:profiles[value.profileId],capturedAt:new Date(value.capturedAt).toISOString(),metrics};
 }
-function savedStoryHealth(row){try{return row.health_json?JSON.parse(row.health_json):null}catch{return null}}
+function savedStoryHealth(row){try{const value=row.health_json?JSON.parse(row.health_json):null;return value?.version===2&&value.source==='self_report'?{...value,wellbeing:storedSelfReport(value.wellbeing)}:value}catch{return null}}
 function storyView(row){return {id:row.id,author:row.author_name,caption:row.caption,health:savedStoryHealth(row),kind:row.media_kind,createdAt:row.created_at,duration:row.duration_ms?row.duration_ms/1000:null,url:'/api/stories/'+row.id+'/media',poster:row.poster_key?'/api/stories/'+row.id+'/media?poster=1':'/api/stories/'+row.id+'/media'}}
 async function storyRow(env,user,id){return database(env).prepare('SELECT * FROM personal_stories WHERE id=? AND owner_id=?').bind(id,user).first()}
 async function storiesRoute(request,env,user,id,media,url){

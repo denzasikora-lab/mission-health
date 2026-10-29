@@ -1,7 +1,9 @@
 (() => {
   const root=document.createElement('section');root.id='personal-activity';root.className='personal-activity panel glass';
-  root.innerHTML='<header><h2>Недавние события</h2><span><i></i>Сейчас</span></header><ol aria-live="polite"></ol><p role="status"></p>';
-  document.querySelector('.home-friends').before(root);
+  root.innerHTML='<header><h2>Недавние события</h2><button type="button" class="activity-training">Fine-tuning / LoRA ↗</button><span><i></i>Сейчас</span></header><ol aria-live="polite"></ol><p role="status"></p>';
+  document.querySelector('.home-checkin').after(root);
+  root.querySelector('.activity-training').addEventListener('click',()=>window.missionTraining.openPersonal());
+  const secondaryTraining=document.createElement('button');secondaryTraining.type='button';secondaryTraining.className='activity-training';secondaryTraining.textContent='Fine-tuning / LoRA ↗';secondaryTraining.addEventListener('click',()=>window.missionTraining.openPersonal());document.getElementById('activity-heading').after(secondaryTraining);
   const list=root.querySelector('ol'),status=root.querySelector('p'),draftTimers=new WeakMap();let loading=false,queued=false,timer,lastEvents=[];
   function render(events=lastEvents){
     lastEvents=events;list.replaceChildren();

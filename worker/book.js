@@ -36,7 +36,7 @@ async function bookRoute(request,env,user,profile,action,url){
   }
   if(typeof input?.query!=='string'||!input.query.trim()||input.query.length>1000)fail('invalid_input',400);
   if(!input.vector){
-    if(memoryConfigured(env))try{return json({matches:await vectorMatches(env,user,profile,input.query),method:'qdrant',model:'EmbeddingGemma 2'})}catch{}
+    if(memoryConfigured(env))try{await syncPending(env,user,profile);return json({matches:await vectorMatches(env,user,profile,input.query),method:'qdrant',model:'EmbeddingGemma 2'})}catch{}
     return json({needsVector:true,model:bookVectorModel});
   }
   if(input.model!==bookVectorModel)fail('invalid_vector',400);const query=bookUnitVector(input.vector);

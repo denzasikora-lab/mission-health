@@ -4,13 +4,24 @@ const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:
 const fail=(code,status)=>{throw Object.assign(new Error(code),{code,status})};
 function database(env){if(!env.DB)fail('storage_unavailable',503);return env.DB}
 function owner(request,env){const value=request.headers.get('oai-authenticated-user-id');if(value)return value;if(env.LOCAL_PREVIEW==='1')return 'local-preview';fail('sign_in_required',401)}
+function wellbeingScore(value){
+  if(!value||typeof value!=='object'||Array.isArray(value)||!Number.isInteger(value.score))fail('invalid_wellbeing',400);
+  // Отсутствие масштаба обозначает сохраненный формат прежней шкалы.
+  const scale=value.wellbeingScale===undefined?10:value.wellbeingScale;
+  if(![10,100].includes(scale)||value.score<1||value.score>scale)fail('invalid_wellbeing',400);
+  return scale===10?value.score*10:value.score;
+}
+function wellbeingLabel(score){return score<=20?'Очень плохо':score<=40?'Ниже обычного':score<=60?'Нормально':score<=80?'Хорошо':'Отлично';}
 function selfReport(value){
   if(value===undefined||value===null)return null;
-  if(typeof value!=='object'||!Number.isInteger(value.score)||value.score<1||value.score>10)fail('invalid_wellbeing',400);
-  const label=value.score<=2?'Очень плохо':value.score<=4?'Ниже обычного':value.score<=6?'Нормально':value.score<=8?'Хорошо':'Отлично';
-  return {score:value.score,label,source:'self_report',recordedAt:new Date().toISOString()};
+  const score=wellbeingScore(value);
+  return {score,label:wellbeingLabel(score),source:'self_report',recordedAt:new Date().toISOString(),wellbeingScale:100};
 }
-function diaryDocument(row){const report=row.wellbeing_json?JSON.parse(row.wellbeing_json):null;return row.content+(report?'\nСамочувствие: '+report.score+'/10 / '+report.label+'. Самооценка пользователя.':'');}
+function storedSelfReport(raw){
+  if(raw===undefined||raw===null||raw==='')return null;
+  try{const value=typeof raw==='string'?JSON.parse(raw):raw,score=wellbeingScore(value);return {...value,score,label:wellbeingLabel(score),wellbeingScale:100};}catch{return null;}
+}
+function diaryDocument(row){const report=storedSelfReport(row.wellbeing_json);return row.content+(report?'\nСамочувствие: '+report.score+'/100 / '+report.label+'. Самооценка пользователя.':'');}
 async function videoLogIdentity(request,user){
   let name=request.headers.get('oai-authenticated-user-full-name')||'';
   if(request.headers.get('oai-authenticated-user-full-name-encoding')==='percent-encoded-utf-8')try{name=decodeURIComponent(name)}catch{name=''}
@@ -33,7 +44,7 @@ async function capabilities(env){
   if(!memoryConfigured(env))return result;
   try{const health=await memoryRequest(env,'/health');return {...result,memory:health.semantic===true,assistant:result.assistant||health.generation===true,assistantState:result.assistantState==='offline'&&health.generation===true?'ready':result.assistantState}}catch{return result}
 }
-function serialize(row){return {id:row.id,role:row.role,content:row.role==='assistant'?row.content.replaceAll('ё','е').replaceAll('Ё','Е').replace(/[—–]/g,'-'):row.content,language:row.language,createdAt:row.created_at,vectorStatus:row.vector_status,references:JSON.parse(row.references_json||'[]'),attachmentIds:JSON.parse(row.attachments_json||'[]'),source:row.assistant_source||'server',...(row.wellbeing_json?{wellbeing:JSON.parse(row.wellbeing_json)}:{}),replyTo:row.reply_to||null,replyStatus:row.role==='user'?(row.answered?'answered':'pending'):'not_applicable',attachments:[]} }
+function serialize(row){const report=storedSelfReport(row.wellbeing_json);return {id:row.id,role:row.role,content:row.role==='assistant'?row.content.replaceAll('ё','е').replaceAll('Ё','Е').replace(/[—–]/g,'-'):row.content,language:row.language,createdAt:row.created_at,vectorStatus:row.vector_status,references:JSON.parse(row.references_json||'[]'),attachmentIds:JSON.parse(row.attachments_json||'[]'),source:row.assistant_source||'server',...(report?{wellbeing:report}:{}),replyTo:row.reply_to||null,replyStatus:row.role==='user'?(row.answered?'answered':'pending'):'not_applicable',attachments:[]} }
 async function history(env,user,astronaut,before){
   const db=database(env),query=before?`SELECT m.*,EXISTS(SELECT 1 FROM journal_messages r WHERE r.reply_to=m.id AND r.owner_id=m.owner_id AND r.astronaut_id=m.astronaut_id AND COALESCE(r.assistant_source,'server') NOT IN ('history','comparison') AND COALESCE(r.assistant_source,'server') NOT LIKE 'browser:%') AS answered FROM journal_messages m WHERE owner_id=? AND astronaut_id=? AND created_at<? ORDER BY created_at DESC,id DESC LIMIT 61`:`SELECT m.*,EXISTS(SELECT 1 FROM journal_messages r WHERE r.reply_to=m.id AND r.owner_id=m.owner_id AND r.astronaut_id=m.astronaut_id AND COALESCE(r.assistant_source,'server') NOT IN ('history','comparison') AND COALESCE(r.assistant_source,'server') NOT LIKE 'browser:%') AS answered FROM journal_messages m WHERE owner_id=? AND astronaut_id=? ORDER BY created_at DESC,id DESC LIMIT 61`;
   const {results}=await db.prepare(query).bind(...[user,astronaut,...(before?[before]:[])]).all();
@@ -87,12 +98,13 @@ async function languageModelAnswer(env,query){
   if(query.photos?.length){const last=messages.at(-1);last.content=[{type:'text',text:typeof last.content==='string'?last.content:query.query},...query.photos.flatMap(photo=>[{type:'text',text:'Фото '+photo.position+'; дата '+photo.createdAt+'; участок '+photo.region},{type:'image_url',image_url:{url:photo.dataUrl,detail:'high'}}])]}
   return completeLanguageMessages(env,messages);
 }
-async function completeLanguageMessages(env,messages){
+async function completeLanguageMessages(env,messages,options={}){
   let response;
-  for(let attempt=0;attempt<2;attempt++){
-    try{response=await fetch(env.LLM_BASE_URL.replace(/\/$/,'')+'/chat/completions',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+env.LLM_API_KEY},body:JSON.stringify({model:env.LLM_MODEL,messages,max_completion_tokens:1536,reasoning_effort:'low',store:false}),signal:AbortSignal.timeout(40000)})}
-    catch(error){if(attempt===0)continue;console.error('Соединение с языковым сервисом недоступно:',error.name);fail('assistant_unavailable',503)}
-    if(response.ok||![502,503,504].includes(response.status)||attempt===1)break;
+  const attempts=options.attempts??2;
+  for(let attempt=0;attempt<attempts;attempt++){
+    try{response=await fetch(env.LLM_BASE_URL.replace(/\/$/,'')+'/chat/completions',{method:'POST',headers:{'content-type':'application/json',...(env.LLM_API_KEY?{'authorization':'Bearer '+env.LLM_API_KEY}:{})},body:JSON.stringify({model:env.LLM_MODEL,messages,max_completion_tokens:options.maxCompletionTokens??1536,reasoning_effort:'low',store:false}),signal:AbortSignal.timeout(options.timeoutMs??40000),...(options.redirect?{redirect:options.redirect}:{})})}
+    catch(error){if(attempt+1<attempts)continue;console.error('Соединение с языковым сервисом недоступно:',error.name);fail('assistant_unavailable',503)}
+    if(response.ok||![502,503,504].includes(response.status)||attempt+1===attempts)break;
     await response.body?.cancel();
   }
   if(!response.ok){
@@ -161,6 +173,7 @@ export default {
       if(url.pathname==='/api/me'&&request.method==='GET')return json(await videoLogIdentity(request,user));
       const actiwatchMatch=url.pathname.match(/^\/api\/actiwatch(?:\/([a-f0-9-]{36}))?$/i);if(actiwatchMatch)return await actiwatchRoute(request,env,user,actiwatchMatch[1]);
       if(url.pathname==='/api/activity')return await activityRoute(request,env,user);
+      if(url.pathname==='/api/compose')return await composeRoute(request,env);
       if(url.pathname==='/api/chat')return await generalChatRoute(request,env,user,url);
       const favoritesMatch=url.pathname.match(/^\/api\/favorites(?:\/([a-f0-9-]{36}))?$/i);if(favoritesMatch)return await favoritesRoute(request,env,user,favoritesMatch[1],url);
       const trainingMatch=url.pathname.match(/^\/api\/astronauts\/([^/]+)\/training(?:\/([a-f0-9-]{36}))?$/i);if(trainingMatch&&astronautIds.has(trainingMatch[1]))return await trainingRoute(request,env,user,trainingMatch[1],trainingMatch[2]);

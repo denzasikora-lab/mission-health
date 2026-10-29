@@ -1,7 +1,7 @@
 (() => {
   const tools=window.missionBookTools,model='embeddinggemma-2:daa72c51243991dfcaf9f9137d2c573d8f7790c0:q4:text:256:v1';
   const book=document.createElement('section');book.id='mission-book';book.className='mission-book';book.lang='ru';book.hidden=true;
-  book.innerHTML=`<header class="book-toolbar"><div><span class="book-eyebrow">PERSONAL ARCHIVE / MISSION HEALTH</span><h2>Книга наблюдений</h2><p id="book-scope"></p><label class="book-archive-label">История <select id="book-archive-select" aria-label="Архив дневника"><option value="personal">Мой дневник</option><option value="jessica-meir">Прежние записи / Jessica</option><option value="jack-hathaway">Прежние записи / Jack</option><option value="christina-koch">Прежние записи / Christina</option></select></label></div><div class="book-toolbar-actions"><button type="button" id="book-write">+ Запись</button><button type="button" id="book-search-open"><span aria-hidden="true">✧</span> NasaGPT</button></div></header>
+  book.innerHTML=`<header class="book-toolbar"><div><span class="book-eyebrow">PERSONAL ARCHIVE / MISSION HEALTH</span><h2>Книга наблюдений</h2><p id="book-scope"></p><label class="book-archive-label">История <select id="book-archive-select" aria-label="Архив дневника"><option value="personal">Мой дневник</option><option value="jessica-meir">Прежние записи / Jessica</option><option value="jack-hathaway">Прежние записи / Jack</option><option value="christina-koch">Прежние записи / Christina</option></select></label></div><div class="book-toolbar-actions"><button type="button" id="book-exit" title="Вернуться на мою главную"><span aria-hidden="true">←</span> Выйти из книги</button><button type="button" id="book-write">+ Запись</button><button type="button" id="book-search-open"><span aria-hidden="true">✧</span> NasaGPT</button></div></header>
     <div id="book-demo-banner" class="book-demo-banner" hidden>ПРИМЕР / записи придуманы и не сохраняются <button type="button" id="book-demo-exit">Моя история</button></div>
     <div class="book-stage" id="book-stage"><button type="button" id="book-cover" class="book-cover" aria-label="Открыть книгу наблюдений"><span class="cover-corner top"></span><span class="cover-kicker">MISSION HEALTH</span><img class="cover-nasa" src="assets/nasa-brand/nasa-insignia.png" alt="NASA"><strong>Личная<br>история</strong><span id="book-author">Мой дневник</span><span class="cover-rule"></span><span class="cover-caption">НАБЛЮДАТЬ · ЗАПОМИНАТЬ · ВОЗВРАЩАТЬСЯ</span><span class="cover-open">Открыть книгу ↗</span><span class="cover-corner bottom"></span></button><div id="book-spread" class="book-spread" tabindex="0" role="region" aria-label="Страницы личной истории" hidden></div></div>
     <nav class="book-navigation" aria-label="Листать книгу"><button type="button" id="book-prev" aria-label="Предыдущие страницы">← Назад</button><span id="book-position" role="status" aria-live="polite">Обложка</span><button type="button" id="book-next" aria-label="Следующие страницы">Далее →</button></nav>
@@ -78,6 +78,13 @@
     clearTimeout(turnTimer);const old=$b('book-spread').querySelector(direction>0?'.book-page:last-child':'.book-page:first-child')?.cloneNode(true);B.index=index;draw();if(old){old.classList.add('book-turn-leaf');if(direction<0)old.classList.add('previous');old.setAttribute('aria-hidden','true');$b('book-spread').append(old);turnTimer=setTimeout(()=>old.remove(),520);}
   }
   function openEditor(){editor.showModal();$b('book-entry-text').focus();}
+  function exitBook(){
+    const url=new URL(window.location.href);
+    if(url.searchParams.get('book')==='1'){url.searchParams.delete('book');window.history.replaceState(window.history.state,'',url);}
+    cancelSearch();if(search.open)search.close();if(editor.open)editor.close();
+    window.missionDesign.navigate('overview');window.scrollTo({top:0,behavior:'auto'});
+    const target=document.querySelector('.mission-self-profile .self-avatar')||document.querySelector('[data-mission-nav="diary"]');target?.focus({preventScroll:true});
+  }
   function status(text){$b('book-search-status').textContent=text}
   function embed(text){
     if(!worker){worker=new Worker('/book-vector-worker.js?v=20261029-book2',{type:'module'});worker.onmessage=event=>{const data=event.data;if(!job||data.id!==job.id)return;if(data.type==='progress')status('Загрузка EmbeddingGemma 2: '+Math.round(data.loaded/1e6)+' / '+Math.round(data.total/1e6)+' МБ. Тексты остаются на устройстве.');else if(data.type==='result'||data.type==='error'){const pending=job;job=null;clearTimeout(pending.timer);data.type==='result'?pending.resolve(tools.unit(data.vector)):pending.reject(new Error(data.reason||'embedding_unavailable'))}};worker.onerror=event=>{if(job){clearTimeout(job.timer);job.reject(new Error(event.message||'embedding_unavailable'));job=null}worker?.terminate();worker=null};}
@@ -128,7 +135,7 @@
   });
   $b('book-archive-select').addEventListener('change',render);
   $b('book-cover').addEventListener('click',()=>turn(1));$b('book-next').addEventListener('click',()=>turn(1));$b('book-prev').addEventListener('click',()=>turn(-1));
-  $b('book-close-cover').addEventListener('click',()=>{B.cover=true;draw()});$b('book-write').addEventListener('click',openEditor);
+  $b('book-close-cover').addEventListener('click',()=>{B.cover=true;draw()});$b('book-write').addEventListener('click',openEditor);$b('book-exit').addEventListener('click',exitBook);
   $b('book-older').addEventListener('click',()=>void load(true));$b('book-editor-close').addEventListener('click',()=>editor.close());
   $b('book-search-open').addEventListener('click',()=>{search.showModal();$b('book-query').focus()});search.querySelector('[data-close-search]').addEventListener('click',()=>search.close());
   $b('book-search-stop').addEventListener('click',()=>{cancelSearch();status('Поиск остановлен. Записи сохранены.')});search.addEventListener('close',()=>{if(searching){cancelSearch();status('Поиск остановлен. Записи сохранены.')}});

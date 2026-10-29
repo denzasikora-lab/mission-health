@@ -16,7 +16,7 @@
       const cell=document.createElement('div'),name=document.createElement('span'),value=document.createElement('strong'),suffix=document.createElement('small');name.textContent=label;value.textContent=health.metrics[key]===null?'-':new Intl.NumberFormat('ru',{maximumFractionDigits:1}).format(health.metrics[key]);suffix.textContent=unit;value.append(suffix);cell.append(name,value);readings.append(cell);
     }
     const note=document.createElement('small');note.className='story-health-source';note.textContent=own?'Показания датчиков еще не подключены.':'Демонстрация / не медицинские данные астронавта';node.append(header,meta,readings);
-    if(own&&health.wellbeing){const report=document.createElement('p');report.className='story-health-meta';report.textContent='Самочувствие: '+health.wellbeing.score+' / 10 · самооценка';node.append(report);}
+    if(own&&health.wellbeing){const report=document.createElement('p'),scale=health.wellbeing.wellbeingScale===100?100:10;report.className='story-health-meta';report.textContent='Самочувствие: '+health.wellbeing.score+' / '+scale+' · самооценка';node.append(report);}
     node.append(note);
   }
   window.missionStoryHealth=Object.freeze({snapshot,render});

@@ -7,10 +7,10 @@
   const navigation = document.createElement('nav'); navigation.className = 'mission-nav'; navigation.lang = 'ru'; navigation.setAttribute('aria-label', 'Разделы Mission Health');
   const icons = {overview:'M3 10 12 3l9 7v11h-6v-7H9v7H3Z',observations:'M16 16 22 22M19 10a9 9 0 1 1-18 0 9 9 0 0 1 18 0',diary:'M3 4h6a4 4 0 0 1 3 2 4 4 0 0 1 3-2h6v16h-6a4 4 0 0 0-3 2 4 4 0 0 0-3-2H3Z M12 6v16',sources:'M3 5c0-5 18-5 18 0v14c0 5-18 5-18 0Zm0 0c0 5 18 5 18 0M3 12c0 5 18 5 18 0'};
   icons.chat='M4 3h16v13H8l-4 5Z M8 8h8M8 12h5';icons.favorites='m12 3 2.8 5.7 6.3.9-4.55 4.43 1.07 6.27L12 17.34l-5.62 2.96 1.07-6.27L2.9 9.6l6.3-.9Z';
-  navigation.innerHTML = [['overview','Домой'],['observations','Наблюдения'],['chat','Общий чат'],['diary','Дневник'],['favorites','Избранное'],['sources','Источники']].map(([key,label])=>`<button type="button" data-mission-nav="${key}" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[key]}"/></svg><span>${label}</span></button>`).join('');
+  navigation.innerHTML = [['overview','Домой'],['observations','Наблюдения'],['chat','Общий чат'],['diary','Дневник'],['sources','Источники']].map(([key,label])=>`<button type="button" data-mission-nav="${key}" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[key]}"/></svg><span>${label}</span></button>`).join('');
   profile.after(navigation);
   const switcher = document.createElement('details'); switcher.className = 'mission-profiles';
-  switcher.innerHTML = '<summary>Друзья</summary>';
+  switcher.hidden=true;switcher.setAttribute('aria-hidden','true');
   switcher.append(document.querySelector('.panel-heading'), document.getElementById('crew-list'));
   navigation.after(switcher);
   document.querySelector('.aside-note').textContent = 'Профили NASA. Показатели здоровья и дневники - демонстрация.';
@@ -37,7 +37,7 @@
   document.querySelector('.bottom-grid').before(audio);
   document.querySelector('.bottom-grid').classList.add('mission-observations');
   const brandMark=document.querySelector('.brand-mark');brandMark.removeAttribute('aria-hidden');
-  brandMark.innerHTML='<img src="assets/nasa-brand/nasa-worm-reference.png" alt="NASA" width="314" height="125">';
+  brandMark.innerHTML='<img class="nasa-header-light" src="assets/nasa-brand/nasa-header-light.png" alt="NASA" width="208" height="146"><img class="nasa-header-dark" src="assets/nasa-brand/nasa-header-dark.png" alt="NASA" width="238" height="154">';
   document.querySelector('.brand>span:last-child').textContent = 'MISSION HEALTH';
   const subtitle = document.createElement('span'); subtitle.className = 'mission-brand-caption'; subtitle.textContent = 'Независимое исследование'; document.querySelector('.brand').append(subtitle);
   const themeGroup = document.querySelector('.theme-control'); themeGroup.hidden=true;
@@ -47,7 +47,6 @@
   const date=document.createElement('time');date.className='mission-date';date.textContent=new Intl.DateTimeFormat('ru',{day:'numeric',month:'long',year:'numeric'}).format(new Date());date.dateTime=new Date().toISOString().slice(0,10);toolbar.prepend(date);
   const iconButton = document.createElement('button'); iconButton.type = 'button'; iconButton.className = 'mission-source-launch'; iconButton.setAttribute('aria-label','Открыть источники NASA'); iconButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></svg>';
   toolbar.insertBefore(iconButton,toolbar.querySelector('.log-launch'));
-  const model=document.createElement('section');model.className='mission-model panel glass';model.innerHTML='<h2><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="4"/><path d="M3 5v14c0 5 18 5 18 0V5M3 12c0 5 18 5 18 0"/></svg>Модель и данные</h2><p>EmbeddingGemma 2 <span>Фото / видео</span></p><p>AudioFM: ожидает весов</p><small>Сходство записей не определяет болезнь.</small>';right.append(model);
   const atom='<svg viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1"><ellipse cx="16" cy="16" rx="15" ry="6"/><ellipse cx="16" cy="16" rx="15" ry="6" transform="rotate(60 16 16)"/><ellipse cx="16" cy="16" rx="15" ry="6" transform="rotate(120 16 16)"/></g><circle cx="16" cy="16" r="2" fill="currentColor"/></svg>';
   assistantTitle.insertAdjacentHTML('afterbegin',atom);
   const chatTools=document.createElement('div');chatTools.className='mission-chat-tools';chatTools.innerHTML='<button type="button" data-chat-camera aria-label="Добавить фото в чат"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h4l2-3h6l2 3h4v14H3Z"/><circle cx="12" cy="13" r="4"/></svg></button><button type="button" data-chat-voice aria-label="Открыть микрофон"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="2" width="8" height="13" rx="4"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4m-4 0h8"/></svg></button>';document.querySelector('.composer-footer').append(chatTools);
