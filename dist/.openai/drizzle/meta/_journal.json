@@ -57,6 +57,13 @@
       "when": 1793293983940,
       "tag": "0007_wellbeing_chat_favorites",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1793297401755,
+      "tag": "0008_activity_events",
+      "breakpoints": true
     }
   ]
 }

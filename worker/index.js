@@ -122,6 +122,7 @@ async function addMessage(request,env,user,astronaut){
   const features=await capabilities(env);if(input.mode==='ask'&&!features.assistant)fail('assistant_unavailable',503);
   const row=existing||{id:input.id,owner_id:user,astronaut_id:astronaut,role:input.mode==='diary'?'note':'user',content:input.content.trim(),language:input.language,created_at:new Date().toISOString(),vector_status:'pending',references_json:'[]',attachments_json:JSON.stringify(attachmentIds),wellbeing_json:report?JSON.stringify(report):null};
   if(!existing)await db.prepare('INSERT INTO journal_messages (id,owner_id,astronaut_id,role,content,language,created_at,vector_status,references_json,attachments_json,wellbeing_json) VALUES (?,?,?,?,?,?,?,?,?,?,?)').bind(row.id,user,astronaut,row.role,row.content,row.language,row.created_at,'pending','[]',row.attachments_json,row.wellbeing_json).run();
+  if(!existing&&input.mode==='diary'&&typeof activityWrite==='function')await activityWrite(env,user,'diary_saved','Сохранил запись в дневнике / '+row.content.slice(0,90),'diary:'+row.id);
   let reply=null,replyError=null,assistantError=null;
   if(input.mode==='ask'){
     try{
@@ -158,6 +159,7 @@ export default {
       if(url.pathname==='/api/status'&&request.method==='GET')return json(await capabilities(env));
       if(url.pathname==='/api/location'&&request.method==='GET')return json({country:/^[A-Z]{2}$/.test(request.cf?.country||'')?request.cf.country:null});
       if(url.pathname==='/api/me'&&request.method==='GET')return json(await videoLogIdentity(request,user));
+      if(url.pathname==='/api/activity')return await activityRoute(request,env,user);
       if(url.pathname==='/api/chat')return await generalChatRoute(request,env,user,url);
       const favoritesMatch=url.pathname.match(/^\/api\/favorites(?:\/([a-f0-9-]{36}))?$/i);if(favoritesMatch)return await favoritesRoute(request,env,user,favoritesMatch[1],url);
       const trainingMatch=url.pathname.match(/^\/api\/astronauts\/([^/]+)\/training(?:\/([a-f0-9-]{36}))?$/i);if(trainingMatch&&astronautIds.has(trainingMatch[1]))return await trainingRoute(request,env,user,trainingMatch[1],trainingMatch[2]);

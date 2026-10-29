@@ -6,13 +6,18 @@
   const friendProfile=document.querySelector('.mission-rail>.profile');friendProfile.before(own);
   own.querySelector('button').addEventListener('click',()=>window.missionDesign.navigate('overview'));
   const home=make('section','mission-home');home.id='mission-home';
-  home.innerHTML='<section class="home-welcome panel glass"><span class="home-eyebrow">МОЯ ОРБИТА</span><h2></h2><p>Твое самочувствие, дневник и важные моменты.</p><div class="home-actions"><button type="button" data-home-video>Видеодневник</button><button type="button" data-home-audio>Аудиодневник</button><button type="button" data-home-book>Открыть книгу</button></div></section><div class="home-vitals" aria-label="Мои показатели"></div><section class="home-checkin"></section><section class="home-friends panel glass"><header><h2>Друзья</h2><small>Профили NASA / демо показателей</small></header><div></div></section>';
+  home.innerHTML='<section class="home-welcome panel glass"><span class="home-eyebrow">МОЯ ОРБИТА</span><h2></h2><p>Твое самочувствие, дневник и важные моменты.</p><div class="home-actions"><button type="button" data-home-video>Видеодневник</button><button type="button" data-home-audio>Аудиодневник</button><button type="button" data-home-book>Открыть книгу</button></div></section><section class="home-body-panel panel glass"><header><h2>Мои показатели</h2><small>Датчики не подключены</small></header><div class="home-vitals" aria-label="Мои показатели"><div class="home-human"><img src="assets/health-body.svg" alt="Схема тела человека"><span>Личный фон</span></div></div></section><section class="home-checkin"></section><section class="home-friends panel glass"><header><h2>Друзья</h2><small>Профили NASA / демо показателей</small></header><div></div></section>';
   document.querySelector('.mission-heading').after(home);
+  const friendBody=make('section','friend-body-panel panel glass'),friendMetrics=document.getElementById('metrics');
+  const friendHuman=make('div','home-human');friendHuman.innerHTML='<img src="assets/health-body.svg" alt="Схема тела человека">';
+  friendMetrics.before(friendBody);friendBody.append(friendMetrics,friendHuman);
+
   home.querySelector('.home-checkin').append(window.missionCheckin.widget());
-  for(const [key,label,unit]of [['hr','Пульс','уд/мин'],['spo2','SpO₂','%'],['temp','Температура','°C'],['wellbeing','Самочувствие','/ 10']]){
+  for(const [key,label,unit]of [['hr','Пульс','уд/мин'],['spo2','SpO₂','%'],['temp','Температура запястья','°C'],['wellbeing','Самочувствие','/ 10'],['sleep','Сон','ч'],['hrv','HRV','мс']]){
     const card=make('article','home-vital panel glass');card.dataset.homeMetric=key;
     card.append(make('span','',label),make('strong','','-'),make('small','',key==='wellbeing'?'Выбери оценку ниже':'Нет измерений'));home.querySelector('.home-vitals').append(card);
   }
+  const adaptation=make('section','home-adaptation panel glass');adaptation.innerHTML='<div><span class="home-eyebrow">NasaGPT / LoRA</span><h2>Адаптировать модель</h2><p>Подстроить локальную модель по накопленным записям дневника.</p></div><button type="button">Подготовить fine-tuning ↗</button>';home.append(adaptation);adaptation.querySelector('button').addEventListener('click',()=>window.missionTraining.openPersonal());
   for(const [index,person]of crew.entries()){
     const button=make('button','home-friend');button.type='button';button.dataset.visitFriend=index;
     const image=make('img');image.src=person.photo;image.alt='';button.append(image,make('strong','',person.name),make('small','','В гости ↗'));

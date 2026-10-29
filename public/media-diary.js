@@ -13,7 +13,7 @@
     if(!panels[mode]||dialog.open&&locked&&mode!==current)return;
     if(dialog.open&&mode===current)return;
     if(dialog.open)engines.get(current)?.leave();
-    current=mode;locked=false;render();
+    current=mode;locked=false;render();void window.missionActivity?.record('media_open',{mode});
     if(!dialog.open)dialog.showModal();
     for(const engine of engines.values())engine.prepare?.();
     engines.get(current)?.enter();

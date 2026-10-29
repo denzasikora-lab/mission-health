@@ -70,10 +70,11 @@
     const active = state.workspace === 'research' ? researchState.dataset === 'library' ? 'sources' : 'observations' : state.view === 'journal' ? 'diary' : ['chat','favorites'].includes(state.view)?state.view:'overview';
     if(active==='chat'||active==='favorites'){heading.querySelector('h1').textContent=active==='chat'?'NasaGPT':'Избранное';document.getElementById('mission-heading-description').textContent=active==='chat'?'Разговор с NasaGPT':'Важные записи и ответы в одном месте';document.querySelector('.mission-data-label').textContent='Личное';}
     navigation.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.missionNav===active&&!(active==='overview'&&state.visiting))));
-    window.missionHome?.render();
+    window.missionHome?.render();window.missionActivity?.render();
     themeGroup.querySelectorAll('[data-theme-choice]').forEach(button=>{button.setAttribute('aria-pressed',String(button.dataset.themeChoice===themeMode));if(button.dataset.themeChoice==='system'){button.setAttribute('aria-label','Системная тема');button.title='Системная тема';}});
   }
   function navigate(section) {
+    void window.missionActivity?.record('navigation',{target:section});
     state.visiting=false;
     researchStop(); state.workspace = section === 'observations' || section === 'sources' ? 'research' : 'crew';
     if (section === 'sources') researchState.dataset = 'library';

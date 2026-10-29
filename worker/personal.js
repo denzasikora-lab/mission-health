@@ -24,6 +24,7 @@ async function generalChatRoute(request,env,user,url){
   if(existing&&(existing.owner_id!==user||existing.role!=='user'||existing.content!==input.content.trim()))fail('id_conflict',409);
   const row=existing||{id:input.id,owner_id:user,role:'user',content:input.content.trim(),created_at:new Date().toISOString(),reply_to:null,wellbeing_json:report?JSON.stringify(report):null};
   if(!existing)await db.prepare('INSERT INTO general_chat_messages (id,owner_id,role,content,created_at,wellbeing_json) VALUES (?,?,?,?,?,?)').bind(row.id,user,row.role,row.content,row.created_at,row.wellbeing_json).run();
+  if(!existing&&typeof activityWrite==='function')await activityWrite(env,user,'chat_sent','Отправил сообщение NasaGPT / '+row.content.slice(0,90),'chat:'+row.id);
   let reply=await db.prepare('SELECT * FROM general_chat_messages WHERE owner_id=? AND reply_to=?').bind(user,row.id).first(),replyError=null;
   if(!reply){
     try{
@@ -42,7 +43,8 @@ async function favoritesRoute(request,env,user,id,url){
   const db=database(env);
   if(id){
     if(request.method!=='DELETE')fail('method_not_allowed',405);
-    await db.prepare('DELETE FROM personal_favorites WHERE id=? AND owner_id=?').bind(id,user).run();return json({removed:true});
+    const previous=await db.prepare('SELECT * FROM personal_favorites WHERE id=? AND owner_id=?').bind(id,user).first();
+    await db.prepare('DELETE FROM personal_favorites WHERE id=? AND owner_id=?').bind(id,user).run();if(previous&&typeof activityWrite==='function')await activityWrite(env,user,'favorite_removed','Убрал из избранного / '+previous.content.slice(0,80),'unfavorite:'+id);return json({removed:true});
   }
   if(request.method==='GET'){
     const cursor=personalCursor(url),filter=cursor?' AND (created_at<? OR (created_at=? AND id<?))':'';
@@ -56,5 +58,6 @@ async function favoritesRoute(request,env,user,id,url){
   if(!source)fail('not_found',404);
   await db.prepare('INSERT INTO personal_favorites (id,owner_id,source_type,source_id,profile_id,content,source_created_at,created_at,wellbeing_json) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(owner_id,source_type,source_id) DO NOTHING').bind(crypto.randomUUID(),user,input.sourceType,source.id,input.sourceType==='diary'?source.astronaut_id:null,source.content,source.created_at,new Date().toISOString(),source.wellbeing_json||null).run();
   const favorite=await db.prepare('SELECT * FROM personal_favorites WHERE owner_id=? AND source_type=? AND source_id=?').bind(user,input.sourceType,input.sourceId).first();
+  if(typeof activityWrite==='function')await activityWrite(env,user,'favorite_added','Добавил в избранное / '+favorite.content.slice(0,80),'favorite:'+favorite.id);
   return json({item:favoriteView(favorite)});
 }

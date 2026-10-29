@@ -38,5 +38,6 @@ async function trainingRoute(request,env,user,profile,id){
   // Сначала сохраняется идентификатор запуска, чтобы повтор запроса не создавал второе обучение.
   await db.prepare('INSERT INTO journal_training_jobs (id,owner_id,astronaut_id,status,example_count,progress_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)').bind(input.id,user,profile,'queued',results.length,progress,date,date).run();
   try{const accepted=await trainerRequest(env,'/jobs',{id:input.id,ownerId:user,profile,entries:results.map(row=>row.content)});if(accepted.id!==input.id)fail('trainer_unavailable',503)}catch(error){await db.prepare('UPDATE journal_training_jobs SET status=?,updated_at=? WHERE id=? AND owner_id=? AND astronaut_id=?').bind('unconfirmed',date,input.id,user,profile).run();throw error}
+  if(typeof activityWrite==='function')await activityWrite(env,user,'training_queued','Запустил fine-tuning / LoRA / '+results.length+' записей','training:'+input.id);
   return json({job:{id:input.id,status:'queued',examples:results.length,createdAt:date,updatedAt:date,progress:JSON.parse(progress)}},202);
 }

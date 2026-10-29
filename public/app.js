@@ -66,7 +66,7 @@ function renderLookup(){
 function render(){renderStatic();const person=crew[state.crew];renderCrew();renderMetrics(person);renderChart(person);renderAssessment(person);renderSources();renderLookup();window.journal?.onProfileChange();window.research?.render()}
 function closeLanguageMenu(returnFocus=false){$("language-menu").hidden=true;$("language-button").setAttribute("aria-expanded","false");if(returnFocus)$("language-button").focus()}
 function openLanguageMenu(focusItem=false){$("language-menu").hidden=false;$("language-button").setAttribute("aria-expanded","true");if(focusItem)document.querySelector(`[data-language="${state.language}"]`).focus()}
-$("crew-list").addEventListener("click",event=>{const button=event.target.closest("[data-crew]");if(button){state.crew=Number(button.dataset.crew);state.visiting=true;state.workspace='crew';state.view='health';render()}});
+$("crew-list").addEventListener("click",event=>{const button=event.target.closest("[data-crew]");if(button){state.crew=Number(button.dataset.crew);state.visiting=true;state.workspace='crew';state.view='health';render();void window.missionActivity?.record('friend_visit',{profile:crew[state.crew].id})}});
 $("metrics").addEventListener("click",event=>{const button=event.target.closest("[data-metric]");if(button){state.metric=button.dataset.metric;render()}});
 document.querySelectorAll("[data-period]").forEach(button=>button.addEventListener("click",()=>{state.period=button.dataset.period;renderChart(crew[state.crew])}));
 document.querySelectorAll("[data-theme-choice]").forEach(button=>button.addEventListener("click",()=>{state.theme=button.dataset.themeChoice;savePreference("mission-health-theme",state.theme);render()}));

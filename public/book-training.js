@@ -33,11 +33,13 @@
     const wasActive=active;active=value.visible;demo=value.demo;
     if(profile!==value.profile){version++;profile=value.profile;info=null;pendingId=null;loadedAt=0;clearTimeout(timer);dialog.close();get('training-consent').checked=false;}
     if(!active){clearTimeout(timer);return}if(!wasActive&&info){void load();return}if(!info&&Date.now()-loadedAt>3000)void load();else draw();
+  },openPersonal(){
+    window.missionTraining.render({visible:true,demo:false,profile:personalProfileId});dialog.showModal();get('training-start-status').textContent='';void load();void window.missionActivity?.record('training_review');
   }};
-  get('training-review').addEventListener('click',()=>{dialog.showModal();get('training-start-status').textContent='';void load()});get('training-close').addEventListener('click',()=>dialog.close());get('training-consent').addEventListener('change',draw);
+  get('training-review').addEventListener('click',()=>{dialog.showModal();get('training-start-status').textContent='';void load();void window.missionActivity?.record('training_review')});get('training-close').addEventListener('click',()=>dialog.close());get('training-consent').addEventListener('change',draw);
   get('training-start').addEventListener('click',async()=>{
     if(get('training-start').disabled)return;const current=version;busy=true;pendingId||=crypto.randomUUID();draw();get('training-start-status').textContent='Подготавливаю выборку и передаю локальному воркеру...';
-    try{const result=await journalApi('/api/astronauts/'+profile+'/training',{method:'POST',body:JSON.stringify({id:pendingId,confirm:true})});if(current!==version)return;info.jobs=[result.job];pendingId=null;dialog.close();draw();schedule();}
+    try{const result=await journalApi('/api/astronauts/'+profile+'/training',{method:'POST',body:JSON.stringify({id:pendingId,confirm:true})});if(current!==version)return;info.jobs=[result.job];void window.missionActivity?.refresh();pendingId=null;dialog.close();draw();schedule();}
     catch(error){if(current===version)get('training-start-status').textContent=error.message==='training_not_enough_data'?'Пока недостаточно подходящих записей.':'Не удалось подтвердить запуск. Проверь связь с локальным воркером.';}
     finally{if(current===version){busy=false;draw();void load()}}
   });

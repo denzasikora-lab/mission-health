@@ -20,7 +20,7 @@
   function choose(score){
     const value={score,at:Date.now()};selections.set(profile(),value);
     try{if(identity)localStorage.setItem(storageKey(),JSON.stringify(value));}catch{}
-    renderScores();window.dispatchEvent(new Event('mission-wellbeing-change'));
+    renderScores();window.dispatchEvent(new Event('mission-wellbeing-change'));void window.missionActivity?.record('wellbeing',{score});
   }
   function renderScores(){
     const chosen=selection();
@@ -64,7 +64,7 @@
       const old=favoriteFor(type,entry.id);
       if(old){await api('/api/favorites/'+old.id,{method:'DELETE'});favoriteItems=favoriteItems.filter(item=>item.id!==old.id);}
       else{const data=await api('/api/favorites',{method:'PUT',body:JSON.stringify({sourceType:type,sourceId:entry.id,profile:id})});favoriteItems=[data.item,...favoriteItems.filter(item=>item.id!==data.item.id)];}
-      renderViews();
+      renderViews();void window.missionActivity?.refresh();
     }catch{for(const view of views)view.status.textContent='Не удалось изменить избранное. Попробуй еще раз.';}
     finally{favoriteBusy.delete(key);updateStars();}
   }
@@ -109,7 +109,7 @@
     try{
       const result=await api(kind==='chat'?'/api/chat':'/api/astronauts/'+s.profile+'/messages',{method:'POST',body:JSON.stringify({...input,...(kind==='diary'?{mode:'diary',language:'ru',attachments:[]}:{} )})});
       for(const entry of [result.message,result.reply].filter(Boolean)){const index=s.messages.findIndex(item=>item.id===entry.id);if(index<0)s.messages.push(entry);else s.messages[index]=entry;}
-      s.draft='';s.pending=null;s.loaded=true;s.notice=kind==='diary'?'Запись сохранена в дневнике.':result.replyError?'NasaGPT пока не смог ответить. Попробуй повторить запрос.':'';
+      void window.missionActivity?.refresh();s.draft='';s.pending=null;s.loaded=true;s.notice=kind==='diary'?'Запись сохранена в дневнике.':result.replyError?'NasaGPT пока не смог ответить. Попробуй повторить запрос.':'';
       if(kind==='diary'){void window.missionBook?.refresh();void loadJournal();}
     }catch{s.notice='Не удалось завершить отправку. Текст сохранен здесь; можно повторить.';}
     finally{s.busy=false;renderViews();for(const view of views)if(view.kind===kind&&!view.host.hidden)view.list.scrollTop=view.list.scrollHeight;}
@@ -131,6 +131,7 @@
   }
   function setKind(view,kind,fetch=true){
     if(view.kind!==kind)view.status.textContent='';view.kind=kind;view.host.querySelector('.personal-section-title').textContent=kind==='diary'?'Твой дневник':kind==='chat'?'NasaGPT':'Избранное';
+    view.input.dataset.activityArea=kind==='diary'?'diary':'chat';
     view.host.querySelector('.personal-section-caption').textContent=kind==='diary'?'Личные наблюдения / отдельная история и поиск по смыслу':kind==='chat'?'Давай поговорим':'Важные записи и ответы';
     view.host.querySelector('[data-personal-search]').hidden=kind!=='diary';view.host.querySelector('.personal-send-hint').textContent=kind==='diary'?'Enter / сохранить · Shift+Enter / новая строка':'Enter / отправить · Shift+Enter / новая строка';view.form.hidden=kind==='favorites';
     renderViews();if(fetch){if(kind==='favorites'){if(!favoriteLoaded)void favorites();}else if(!store(kind).loaded)void load(kind);}
