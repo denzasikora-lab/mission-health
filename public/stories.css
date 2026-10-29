@@ -7,3 +7,5 @@
 
 .mission-rail>.stories-section{order:-1;border-top:0;margin:0 0 12px;padding:8px 0 12px}.mission-rail>.stories-section .stories-heading{display:none}.mission-rail>.stories-section .stories-row{align-items:start;justify-content:space-between;gap:8px}.mission-rail>.stories-section .story-person{width:calc((100% - 24px)/4);min-width:0}.mission-rail>.stories-section .story-ring{width:min(54px,100%);height:auto;aspect-ratio:1}.mission-rail>.stories-section .story-person>button:first-child{grid-template-rows:auto auto;gap:8px}.mission-rail>.stories-section .story-person strong{width:100%;max-width:100%;font-size:.53rem}.mission-rail>.stories-section .story-add{top:auto;bottom:calc(.73rem + 3px);right:max(0px,calc(50% - 30px));width:20px;height:20px;font-size:16px}
 @container mission (max-width:700px){.mission-rail>.stories-section .stories-row{justify-content:center;gap:14px}.mission-rail>.stories-section .story-person{width:68px}.mission-rail>.stories-section .story-ring{width:54px}.mission-rail>.stories-section .story-person strong{font-size:.56rem}}
+
+.story-ring.story-ring-empty{background:transparent;box-shadow:none}
