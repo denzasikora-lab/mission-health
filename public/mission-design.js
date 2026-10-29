@@ -36,8 +36,8 @@
   audio.innerHTML = '<h2>Медиадневник</h2><p>Мысли, ощущения и наблюдения за день</p><div class="mission-audio-body"><svg viewBox="0 0 290 60" aria-hidden="true">'+Array.from({length:65},(_,i)=>{const h=5+Math.abs(Math.sin(i*1.9)*Math.sin(i*.19))*42;return `<path d="M${i*4.4+3} ${30-h/2}v${h}"/>`}).join('')+'</svg><div><button type="button" data-open-voice>Аудио</button><button type="button" data-open-video-log>Видео</button></div></div>';
   document.querySelector('.bottom-grid').before(audio);
   document.querySelector('.bottom-grid').classList.add('mission-observations');
-  const medical = '<svg viewBox="0 0 70 70" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M35 14v50M28 26c-16 0-20-7-25-10 16 3 22-8 28-7m11 17c16 0 20-7 25-10-16 3-22-8-28-7M29 18c-11 4-15 3-20 2m20 3c-8 3-11 3-15 2m27-7c11 4 15 3 20 2m-20 3c8 3 11 3 15 2M30 31c-11 7 21 10 13 18-4 4-16 5-13 11m10-29c11 7-21 10-13 18 4 4 16 5 13 11"/><circle cx="35" cy="7" r="3" fill="currentColor"/></g></svg>';
-  document.querySelector('.brand-mark').innerHTML = medical;
+  const brandMark=document.querySelector('.brand-mark');brandMark.removeAttribute('aria-hidden');
+  brandMark.innerHTML='<img src="assets/nasa-brand/nasa-worm-reference.png" alt="NASA" width="314" height="125">';
   document.querySelector('.brand>span:last-child').textContent = 'MISSION HEALTH';
   const subtitle = document.createElement('span'); subtitle.className = 'mission-brand-caption'; subtitle.textContent = 'Независимое исследование'; document.querySelector('.brand').append(subtitle);
   const themeGroup = document.querySelector('.theme-control'); themeGroup.hidden=true;
