@@ -8,8 +8,8 @@
   const recordButton = document.getElementById('video-log-record');
   const download = document.getElementById('video-log-download');
   const backgroundChoice = document.getElementById('video-log-background');
-  const microphone = document.getElementById('video-log-sound');
   const notice = document.getElementById('video-log-notice');
+  const helmetZoom = document.getElementById('video-log-zoom');
   const researcher = document.getElementById('video-log-researcher');
   const firstName = document.getElementById('video-log-first-name');
   const lastName = document.getElementById('video-log-last-name');
@@ -17,16 +17,14 @@
   const locationName = document.getElementById('video-log-location');
   const background = new Image();
   background.src = '/assets/video-log-lab.png';
+  const orbitBackground=new Image();orbitBackground.src='/assets/video-log-orbit.png';
   let phase = 'idle', epoch = 0, stream, worker, workerReady = false, workerBusy = false;
   let portrait, frame = 0, lastDraw = 0, lastSegmentation = 0;
   let recorder, recordedStream, recordingStarted = 0, recordingTimer, cameraTimer, workerTimer;
   let clipUrl, clipDate, entry = 1, identity, identityPromise;
   const storageKey = suffix => 'mission-health-log-' + (identity?.researcherId || 'local') + '-' + suffix;
   function normalized(value) { return String(value || '').replaceAll('\u0451', '\u0435').replaceAll('\u0401', '\u0415').replace(/[\u2013\u2014]/g, '-'); }
-  function filmName(value) {
-    const parts = normalized(value).trim().split(/\s+/);
-    return (parts.length > 1 ? parts.at(-1) + ', ' + parts[0][0] + '.' : parts[0] || 'PARTICIPANT').toUpperCase();
-  }
+  function filmName(value) { return normalized(value).trim().replace(/\s+/g, ' ') || 'Участник'; }
   async function loadIdentity() {
     try {
       const response = await fetch('/api/me', { cache: 'no-store' });
@@ -35,7 +33,8 @@
       try {
         entry = Math.max(1, Number(localStorage.getItem(storageKey('entry'))) || 1);
         researcher.value = normalized(localStorage.getItem(storageKey('name')) || identity.name || '');
-        locationName.value = normalized(localStorage.getItem(storageKey('location')) || 'SCI MOD');
+        const savedLocation=normalized(localStorage.getItem(storageKey('location')) || 'HOUSTON, TX');
+        locationName.value=[...locationName.options].some(option=>option.value===savedLocation)?savedLocation:'HOUSTON, TX';
       } catch { researcher.value = normalized(identity.name || ''); }
       const parts = researcher.value.trim().split(/\s+/);
       firstName.value = parts.length > 1 ? parts.slice(0, -1).join(' ') : parts[0] || '';
@@ -60,14 +59,15 @@
     recordButton.querySelector('span').textContent = phase === 'recording' ? 'Остановить запись' : phase === 'finishing' ? 'Подготовка записи' : 'Начать запись';
     recordButton.setAttribute('aria-pressed', String(phase === 'recording'));
     backgroundChoice.disabled = phase === 'recording' || phase === 'finishing';
+    helmetZoom.disabled = backgroundChoice.disabled;
+    document.getElementById('video-log-zoom-label').hidden = backgroundChoice.value !== 'helmet';
     firstName.disabled = lastName.disabled = locationName.disabled = identityForm.querySelector('button').disabled = phase === 'recording' || phase === 'finishing';
-    microphone.disabled = Boolean(stream) || phase === 'requesting' || phase === 'finishing';
     download.hidden = !clipUrl || phase !== 'review';
     review.hidden = phase !== 'review';
   }
 
   function stopCamera() {
-    epoch++;
+    epoch++; window.missionSpeech?.stop('video');
     if (recorder?.state === 'recording') { phase = 'finishing'; recorder.stop(); }
     clearTimeout(cameraTimer); clearTimeout(workerTimer); clearInterval(recordingTimer);
     cameraTimer = workerTimer = recordingTimer = null;
@@ -84,7 +84,7 @@
   }
 
   function prepareBackground(attempt) {
-    if (worker || backgroundChoice.value !== 'lab') return;
+    if (worker || backgroundChoice.value === 'room') return;
     if (!window.Worker || !window.OffscreenCanvas || !window.createImageBitmap) {
       message('Этот браузер не поддерживает замену фона. Выбери «Моя комната», чтобы включить обычную камеру.', true); return;
     }
@@ -110,7 +110,7 @@
       else if (data.type === 'frame') {
         portrait?.close(); portrait = data.bitmap; workerBusy = false;
         if (recordButton.disabled && phase === 'live') {
-          message('Камера включена. Ты в кадре на фоне лаборатории. Можно начинать запись.'); renderControls();
+          message('Камера включена. Выбранный фон готов. Можно начинать запись.'); renderControls();
         }
       } else if (data.type === 'error') backgroundError();
     };
@@ -119,17 +119,18 @@
   }
 
   async function startCamera() {
-    stopCamera(); discardClip(); phase = 'requesting'; renderControls();
-    message('Разреши камеру' + (microphone.checked ? ' и микрофон' : '') + ' в браузере.');
+    stopCamera(); discardClip(); window.missionSpeech?.reset('video'); phase = 'requesting'; renderControls();
+    message('Разреши камеру и микрофон в браузере. Голос входит в запись.');
     const attempt = epoch;
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('unavailable');
       const incoming = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: microphone.checked ? { echoCancellation: true, noiseSuppression: true } : false
+        audio: { echoCancellation: true, noiseSuppression: true }
       });
       // Разрешение после закрытия или отмены не должно возобновлять камеру.
       if (attempt !== epoch || !dialog.open) { incoming.getTracks().forEach(track => track.stop()); return; }
+      if(!incoming.getAudioTracks().length){incoming.getTracks().forEach(track=>track.stop());throw new Error('audio_required');}
       stream = incoming; video.srcObject = incoming; await video.play();
       if (attempt !== epoch || !dialog.open) return;
       phase = 'live'; renderControls();
@@ -140,14 +141,14 @@
       cameraTimer = setTimeout(() => {
         stopCamera(); if (phase !== 'finishing') phase = 'idle'; renderControls(); message('Камера выключена после трех минут просмотра.');
       }, 180000);
-      if (backgroundChoice.value === 'lab') prepareBackground(attempt);
+      if (backgroundChoice.value !== 'room') prepareBackground(attempt);
       else message('Камера включена с твоим обычным фоном. Можно начинать запись.');
     } catch (error) {
       if (attempt !== epoch) return;
       stopCamera(); phase = 'idle'; renderControls();
       const errors = {
-        NotAllowedError: 'Доступ закрыт. Разреши камеру и микрофон для сайта или отключи звук перед повтором.',
-        NotFoundError: 'Камера или микрофон не найдены. Проверь устройства или попробуй запись без звука.',
+        NotAllowedError: 'Доступ закрыт. Разреши камеру и микрофон для сайта и повтори.',
+        NotFoundError: 'Камера или микрофон не найдены. Для записи нужны оба устройства.',
         NotReadableError: 'Устройство занято. Закрой другое приложение с камерой и повтори.'
       };
       message(errors[error.name] || 'Не удалось включить камеру. Повтори в Safari или Chrome.', true);
@@ -208,12 +209,12 @@
     context.fillStyle = cyan; context.font = 'bold 16px Arial, sans-serif';
     const name = filmName(researcher.value), id = identity?.researcherId || '--- --- ---';
     context.fillText('LOG ENTRY: ' + String(entry).padStart(2, '0'), 140, 604);
-    context.fillText('LOCATION: ' + normalized(locationName.value || 'SCI MOD').toUpperCase().slice(0, 22), 140, 618);
-    context.fillText('RESEARCHER: ' + name, 140, 632, 167); context.fillText('P.I.: ' + name, 140, 646, 167);
-    context.fillText('ID# ' + id, 312, 632); context.fillText('ID# ' + id, 312, 646);
+    context.fillText('LOCATION: ' + normalized(locationName.value || 'HOUSTON, TX'), 140, 618);
+    context.fillText('RESEARCHER: ' + name, 140, 632, 300); context.fillText('P.I.: ' + name, 140, 646, 300);
+    context.fillText('ID# ' + id, 450, 632); context.fillText('ID# ' + id, 450, 646);
     const clock = [date.getHours(), date.getMinutes(), date.getSeconds(), Math.floor(date.getMilliseconds() / 1000 * 24)].map(value => String(value).padStart(2, '0')).join(':');
     const calendar = [date.getMonth() + 1, date.getDate(), date.getFullYear()].map(value => String(value).padStart(2, '0')).join('/');
-    context.fillText('LST:  ' + clock, 450, 632); context.fillText('DATE: ' + calendar, 450, 646);
+    context.fillText('LST:  ' + clock, 720, 632); context.fillText('DATE: ' + calendar, 720, 646);
     context.restore();
   }
 
@@ -239,20 +240,24 @@
     if (time - lastDraw < 33 || phase === 'review') return;
     lastDraw = time;
     context.fillStyle = '#102027'; context.fillRect(0, 0, 1280, 720);
-    if (background.complete && background.naturalWidth) cover(background);
+    const helmet=backgroundChoice.value==='helmet';
+    const backdrop=backgroundChoice.value==='orbit'?orbitBackground:background;
+    if(helmet) window.missionHelmet.backdrop(context);
+    else if (backdrop.complete && backdrop.naturalWidth) cover(backdrop);
     if (stream && video.readyState >= 2) {
       if (backgroundChoice.value === 'room') cover(video, true);
       else {
-        if (portrait) cover(portrait, true);
+        if (portrait) { if(helmet)window.missionHelmet.portrait(context,portrait,Number(helmetZoom.value)||1.45);else cover(portrait, true); }
         if (workerReady && !workerBusy && time - lastSegmentation > 80) void sendFrame(time);
       }
     }
-    drawOverlay(time);
+    if(helmet) window.missionHelmet.hud(context,{time,active:phase==='live'||phase==='recording',recording:phase==='recording',seconds:phase==='recording'?Math.max(0,Math.floor((time-recordingStarted)/1000)):0,name:filmName(researcher.value),location:normalized(locationName.value||'HOUSTON, TX'),entry,audio:Boolean(stream?.getAudioTracks().some(track=>track.readyState!=='ended'&&track.enabled))});
+    else drawOverlay(time);
   }
 
   function startRecording() {
     if (phase === 'recording') { phase = 'finishing'; recorder.stop(); renderControls(); return; }
-    if (phase !== 'live' || backgroundChoice.value === 'lab' && !portrait) return;
+    if (phase !== 'live' || backgroundChoice.value !== 'room' && !portrait) return;
     updateSignature();
     if (!identity || !researcher.value.trim()) { message('Укажи имя и фамилию, чтобы подписать запись.', true); firstName.focus(); return; }
     if (!canvas.captureStream || !window.MediaRecorder) { message('Запись видео не поддерживается этим браузером. Попробуй Safari или Chrome.', true); return; }
@@ -270,6 +275,7 @@
       recording.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
       recording.onerror = () => { failed = true; stopCamera(); message('Не удалось завершить запись. Повтори после подключения камеры.', true); };
       recording.onstop = () => {
+        window.missionSpeech?.stop('video');
         recordedStream?.getTracks().forEach(track => track.stop()); recordedStream = null;
         stopCamera(); recorder = null;
         if (failed || !chunks.length) { phase = 'idle'; renderControls(); return; }
@@ -281,14 +287,15 @@
         phase = 'review'; renderControls(); message('Запись готова. Посмотри ее и скачай файл, чтобы сохранить.');
       };
       clipDate = new Date(); recordingStarted = performance.now(); phase = 'recording';
+      window.missionSpeech?.start('video', stream);
       recording.start(250); clearTimeout(cameraTimer);
       recordingTimer = setInterval(() => {
         if (performance.now() - recordingStarted >= 120000 && recording.state === 'recording') { phase = 'finishing'; recording.stop(); renderControls(); }
       }, 250);
-      renderControls(); message(audio ? 'Идет запись видео и голоса. Нажми «Остановить запись», когда закончишь.' : 'Идет запись видео без звука. Нажми «Остановить запись», когда закончишь.');
+      renderControls(); message('Идет запись видео и голоса. Нажми «Остановить запись», когда закончишь.');
     } catch {
       recordedStream?.getTracks().forEach(track => track.stop()); recordedStream = null; recorder = null;
-      phase = 'live'; renderControls(); message('Не удалось начать запись. Повтори подключение камеры.', true);
+      window.missionSpeech?.stop('video');phase = 'live'; renderControls(); message('Не удалось начать запись. Повтори подключение камеры.', true);
     }
   }
 
@@ -313,7 +320,7 @@
   recordButton.addEventListener('click', startRecording);
   backgroundChoice.addEventListener('change', () => {
     portrait?.close(); portrait = null;
-    if (stream && backgroundChoice.value === 'lab') prepareBackground(epoch);
+    if (stream && backgroundChoice.value !== 'room') prepareBackground(epoch);
     if (backgroundChoice.value === 'room') { clearTimeout(workerTimer); workerTimer = null; worker?.terminate(); worker = null; workerReady = workerBusy = false; if (stream) message('В кадре твоя комната.'); }
     renderControls();
   });
@@ -342,5 +349,7 @@
     } else if (dialog.open && !frame) frame = requestAnimationFrame(animate);
   });
   window.addEventListener('pagehide', () => { stopCamera(); discardClip(); });
-  if (new URLSearchParams(location.search).get('log') === '1') open();
+  const query=new URLSearchParams(location.search);
+  if(['lab','orbit','helmet','room'].includes(query.get('background')))backgroundChoice.value=query.get('background');
+  if (query.get('log') === '1') open();
 })();

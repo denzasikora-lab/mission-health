@@ -9,3 +9,7 @@
 .log-identity{gap:14px}.log-identity label{display:grid;gap:7px;flex:1;min-width:150px;max-width:340px;letter-spacing:.06em;font-size:.65rem}.log-identity input{box-sizing:border-box;border:1px solid #315359;border-radius:6px;background:#0e2025;color:#d3edf0;padding:10px;width:100%;font:14px sans-serif;letter-spacing:0}.log-identity input:disabled{opacity:.6}.log-identity input:focus-visible{outline:2px solid #66e8ee;outline-offset:3px}
 @media(max-width:430px){.topbar{flex-wrap:wrap}.topbar .toolbar{width:100%;justify-content:space-between}}
 .log-identity .log-name-save{align-self:end;min-height:39px;border:1px solid #3e7377;border-radius:6px;padding:10px 14px;background:#153a3f;color:#d3edf0;font-size:.75rem}.log-identity .log-name-save:disabled{opacity:.5}
+
+.log-sound-default{font-size:.72rem;color:#94b8bc}.log-identity select{max-width:100%;min-width:0;border:1px solid #315359;background:#102126;color:#d3edf0;border-radius:6px;padding:10px;font:inherit;font-size:.74rem}.log-identity label:has(#video-log-location){flex:2;min-width:260px}@media(max-width:620px){.log-identity label:has(#video-log-location){min-width:100%}}
+
+.log-options label[hidden]{display:none}.log-options #video-log-zoom{width:130px;height:20px;accent-color:#79e9ff}

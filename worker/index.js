@@ -14,7 +14,7 @@ async function videoLogIdentity(request,user){
   return {name:name.trim().slice(0,100),researcherId:digits.match(/.{3}/g).join(' ')};
 }
 function memoryConfigured(env){return Boolean(env.MEMORY_URL&&(env.MEMORY_API_KEY||env.LOCAL_PREVIEW==='1'))}
-function languageModelConfigured(env){return Boolean(env.LLM_API_KEY&&env.LLM_BASE_URL&&env.LLM_MODEL)}
+function languageModelConfigured(env){return env.AIR_GAP!=='1'&&Boolean(env.LLM_API_KEY&&env.LLM_BASE_URL&&env.LLM_MODEL)}
 async function memoryRequest(env,path,body){
   if(!memoryConfigured(env))fail('memory_unavailable',503);
   const response=await fetch(env.MEMORY_URL.replace(/\/$/,'')+path,{method:body?'POST':'GET',headers:{'content-type':'application/json','authorization':'Bearer '+(env.MEMORY_API_KEY||'')},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(90000)});
@@ -141,6 +141,8 @@ export default {
     try{
       const user=owner(request,env);
       if(request.method!=='GET'&&((request.headers.get('origin')&&request.headers.get('origin')!==url.origin)||request.headers.get('sec-fetch-site')==='cross-site'))fail('forbidden',403);
+      if(url.pathname==='/api/transcriptions/config')return await speechRoute(request,env,true);
+      if(url.pathname==='/api/transcriptions')return await speechRoute(request,env);
       if(url.pathname==='/api/status'&&request.method==='GET')return json(await capabilities(env));
       if(url.pathname==='/api/location'&&request.method==='GET')return json({country:/^[A-Z]{2}$/.test(request.cf?.country||'')?request.cf.country:null});
       if(url.pathname==='/api/me'&&request.method==='GET')return json(await videoLogIdentity(request,user));

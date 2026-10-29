@@ -13,7 +13,7 @@
   let width = 0, height = 0, lastReadout = 0;
 
   function stopSignal() {
-    sequence++;
+    sequence++; window.missionSpeech?.stop('voice');
     const previousStream = stream;
     stream = null;
     previousStream?.getTracks().forEach(track => track.stop());
@@ -58,7 +58,7 @@
       const incoming = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
       // Позднее разрешение не должно включать микрофон после отмены или закрытия окна.
       if (attempt !== sequence || !dialog.open) { incoming.getTracks().forEach(track => track.stop()); return; }
-      stream = incoming;
+      stream = incoming; window.missionSpeech?.start('voice', incoming);
       await resume;
       if (attempt !== sequence || !dialog.open) return;
       if (engine.state !== 'running') throw new Error('audio_suspended');
