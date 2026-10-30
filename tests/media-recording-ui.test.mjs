@@ -7,19 +7,20 @@ const source=await readFile(new URL('../public/video-log.js',import.meta.url),'u
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
 const deferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;});return{promise,resolve};};
 class Element{
-  constructor(){this.dataset={};this.attributes={};this.children=[];this.style={};this.events=new Map();this.value='';this.hidden=false;this.disabled=false;this.textContent='';}
+  constructor(){this.dataset={};this.attributes={};this.children=[];this.style={};this.events=new Map();this.value='';this.hidden=false;this.disabled=false;this.textContent='';this.classList={add(){}};}
   append(...children){this.children.push(...children);}
   setAttribute(key,value){this.attributes[key]=String(value);}
   removeAttribute(key){delete this.attributes[key];}
   addEventListener(key,callback){this.events.set(key,callback);}
   emit(key,event={}){this.events.get(key)?.(event);}
+  focus(){}
   pause(){}
   load(){}
   async play(){}
 }
 function track(kind){return{kind,readyState:'live',enabled:true,stopped:false,stop(){this.stopped=true;this.readyState='ended';},clone(){return track(kind);},addEventListener(){},getSettings(){return{};}};}
 function media(){const tracks=[track('video'),track('audio')];return{tracks,getTracks:()=>tracks,getAudioTracks:()=>tracks.filter(t=>t.kind==='audio'),getVideoTracks:()=>tracks.filter(t=>t.kind==='video'),addTrack(t){tracks.push(t);}};}
-function fixture({background='room',permission,profile,unsupported=false}={}){
+function fixture({background='room',permission,profile,unsupported=false,analysisBusy=false}={}){
   const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);};
   node('media-diary-dialog').open=true;node('video-log-background').value=background;
   node('video-log-canvas').getContext=()=>({});
@@ -40,7 +41,7 @@ function fixture({background='room',permission,profile,unsupported=false}={}){
   }
   const document={hidden:false,getElementById:node,querySelectorAll:()=>[],addEventListener(){}};
   const incoming=media(),storage=new Map();
-  const window={MediaStream:CloneStream,missionMedia:{busy:()=>false,meter:()=>({prepare(){},attach(){},stop(){}}),submit:(...args)=>submissions.push(args)},MediaRecorder:Recorder,Worker:BackgroundWorker,OffscreenCanvas:class{},createImageBitmap(){},addEventListener(){},missionDiary:{register(_mode,value){engine=value;},lock(_mode,value){locks.push(value);},open(){}},missionSpeech:{stop(){},reset(){},start(){}},missionAppearance:{stop(){},start(){},setIdentity(){}}};
+  const window={MediaStream:CloneStream,missionMedia:{busy:()=>analysisBusy,meter:()=>({prepare(){},attach(){},stop(){}}),submit:(...args)=>submissions.push(args)},MediaRecorder:Recorder,Worker:BackgroundWorker,OffscreenCanvas:class{},createImageBitmap(){},addEventListener(){},missionDiary:{register(_mode,value){engine=value;},lock(_mode,value){locks.push(value);},open(){}},missionSpeech:{stop(){},reset(){},start(){}},missionAppearance:{stop(){},start(){},setIdentity(){}}};
   class ClipURL extends URL{static createObjectURL(){return 'blob:recorded-clip';}static revokeObjectURL(){}}
   vm.runInNewContext(source,{document,window,Image:class{},MediaStream:CloneStream,Worker:BackgroundWorker,MediaRecorder:Recorder,Blob,URL:ClipURL,URLSearchParams,location:{search:''},Intl,Date,performance:{now:()=>clock},navigator:{mediaDevices:{getUserMedia(options){requests.push(options);return permission?.promise||Promise.resolve(incoming);}}},fetch:()=>profile?.promise||Promise.resolve({ok:true,json:async()=>({researcherId:'local-test',name:'Тестовый участник'})}),localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)},setTimeout:()=>++timer,clearTimeout(){},setInterval:callback=>{intervals.set(++timer,callback);return timer;},clearInterval:id=>intervals.delete(id),requestAnimationFrame:()=>1,cancelAnimationFrame(){}});
   engine.enter();
@@ -78,7 +79,7 @@ test('Отсутствие подходящего кодека дает ошиб
 });
 
 const voiceSource=await readFile(new URL('../public/voice.js',import.meta.url),'utf8');
-function voiceFixture({permission,resume,unsupported=false}={}){
+function voiceFixture({permission,resume,unsupported=false,analysisBusy=false}={}){
   const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);};
   const label=new Element();node('voice-mic').querySelector=()=>label;
   node('voice-stage').getBoundingClientRect=()=>({width:400,height:180});node('voice-canvas').getContext=()=>({setTransform(){}});
@@ -100,13 +101,13 @@ function voiceFixture({permission,resume,unsupported=false}={}){
   }
   class ClipURL extends URL{static createObjectURL(){return 'blob:audio-clip';}static revokeObjectURL(){}}
   const document={hidden:false,getElementById:node,querySelectorAll:()=>[],addEventListener(){}};
-  const window={missionMedia:{busy:()=>false,submit:(...args)=>submissions.push(args)},AudioContext:AudioEngine,MediaRecorder:Recorder,devicePixelRatio:1,addEventListener:(name,handler)=>windowEvents.set(name,handler),missionDiary:{register(_mode,value){engine=value;},lock(_mode,value){locks.push(value);},open(){}},missionSpeech:{stop(){},start(){}}};
+  const window={missionMedia:{busy:()=>analysisBusy,submit:(...args)=>submissions.push(args)},AudioContext:AudioEngine,MediaRecorder:Recorder,devicePixelRatio:1,addEventListener:(name,handler)=>windowEvents.set(name,handler),missionDiary:{register(_mode,value){engine=value;},lock(_mode,value){locks.push(value);},open(){}},missionSpeech:{stop(){},start(){}}};
   vm.runInNewContext(voiceSource,{window,document,MediaRecorder:Recorder,Blob,URL:ClipURL,URLSearchParams,Date,location:{search:''},matchMedia:()=>({matches:false}),localStorage:{getItem(){return null;},setItem(){}},performance:{now:()=>1000},navigator:{mediaDevices:{getUserMedia:()=>permission?.promise||Promise.resolve(incoming)}},setTimeout:callback=>{timers.set(++timer,callback);return timer;},clearTimeout:id=>timers.delete(id),requestAnimationFrame:()=>1,cancelAnimationFrame(){},ResizeObserver:class{observe(){}}});
   engine.enter();
   return{node,label,incoming,recorders,engines,locks,submissions,engine,start:async()=>{node('voice-mic').emit('click');await settle();},expire(){for(const callback of [...timers.values()])callback();}};
 }
 
-test('Аудио сразу записывает микрофон и блокирует переключение режима',async()=>{
+test('Аудио сразу записывает микрофон и отмечает активную запись',async()=>{
   const f=voiceFixture();await f.start();assert.equal(f.recorders.length,1);assert.equal(f.recorders[0].state,'recording');assert.equal(f.recorders[0].stream.getVideoTracks().length,0);assert.equal(f.node('voice-mic').dataset.recording,'true');assert.equal(f.node('voice-source').textContent,'ЗАПИСЬ АУДИО');assert.equal(f.locks.at(-1),true);
 });
 test('Повторное нажатие Аудио передает запись в анализ без плеера',async()=>{
@@ -126,14 +127,43 @@ test('Лимит аудиозаписи завершает ролик и осв�
 });
 
 const analysisSource=await readFile(new URL('../public/media-analysis.js',import.meta.url),'utf8');
-function analysisFixture({failFirst=false}={}){
-  const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);},calls=[],locks=[],frames=new Map();let index=0;const engines=[];
+function analysisFixture({failFirst=false,analysis,request}={}){
+  const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);},calls=[],locks=[],frames=new Map();let index=0,ids=0;const engines=[];
   class AudioEngine{constructor(){this.state='running';engines.push(this);}resume(){return Promise.resolve();}close(){this.state='closed';return Promise.resolve();}createMediaStreamSource(){return{connect(){},disconnect(){}};}createAnalyser(){return{fftSize:2048,disconnect(){},getFloatTimeDomainData(samples){samples.fill(.1);}};}}
-  const window={AudioContext:AudioEngine,missionDiary:{lock:(...args)=>locks.push(args)},missionSpeech:{finish:async()=>'Распознанная речь'},missionCheckin:{current:()=>({score:74,wellbeingScale:100})}};
-  vm.runInNewContext(analysisSource,{window,document:{getElementById:node,querySelector:node,createElement:()=>new Element()},crypto:{randomUUID:()=>identifierForClient},FormData,Blob,AbortSignal,URL,performance,Float32Array,setTimeout,clearTimeout,requestAnimationFrame:callback=>{frames.set(++index,callback);return index;},cancelAnimationFrame:id=>frames.delete(id),fetch:async(_url,options)=>{calls.push(options.body);return failFirst&&calls.length===1?Response.json({saved:true,status:'pending'},{status:503}):Response.json({status:'analyzed',analysis:'Ответ модели'});}});
-  return{api:window.missionMedia,node,calls,locks,frames,engines};
+  const window={missionVoiceAnalysis:analysis?{analyze:analysis,transcript(){}}:undefined,AudioContext:AudioEngine,missionDiary:{lock:(...args)=>locks.push(args)},missionSpeech:{finish:async()=>'Распознанная речь'},missionCheckin:{current:()=>({score:74,wellbeingScale:100})}};
+  vm.runInNewContext(analysisSource,{window,document:{getElementById:node,querySelector:node,createElement:()=>new Element()},crypto:{randomUUID:()=>ids++?'ad511184-9b59-4529-9ffa-'+String(ids).padStart(12,'0'):identifierForClient},FormData,Blob,AbortSignal,URL,performance,Float32Array,setTimeout,clearTimeout,requestAnimationFrame:callback=>{frames.set(++index,callback);return index;},cancelAnimationFrame:id=>frames.delete(id),fetch:async(_url,options)=>{calls.push(options.body);if(request)return request(options.body);return failFirst&&calls.length===1?Response.json({saved:true,status:'pending'},{status:503}):Response.json({status:'analyzed',analysis:'Ответ модели'});}});
+  return{api:window.missionMedia,node,calls,locks,frames,engines,window};
 }
 const identifierForClient='ad511184-9b59-4529-9ffa-69cfe258c81e';
 test('Готовая аудиозапись автоматически отправляется с речью и самооценкой',async()=>{const f=analysisFixture();await f.api.submit('audio',new Blob(['audio']),2);assert.equal(f.calls.length,1);assert.equal(f.calls[0].get('kind'),'audio');assert.equal(f.calls[0].get('transcript'),'Распознанная речь');assert.equal(JSON.parse(f.calls[0].get('wellbeing')).score,74);assert.equal(f.api.busy('audio'),false);});
-test('Ошибка анализа сохраняет повтор с тем же идентификатором',async()=>{const f=analysisFixture({failFirst:true});await f.api.submit('audio',new Blob(['audio']),2);const root=f.node('#voice-dialog').children[0];assert.match(root.children[0].textContent,/Запись сохранена/);assert.equal(root.children[2].hidden,false);root.children[2].emit('click');await settle();assert.equal(f.calls.length,2);assert.equal(f.calls[0].get('id'),f.calls[1].get('id'));assert.equal(root.children[1].textContent,'Ответ модели');});
+test('Ошибка анализа сохраняет повтор с тем же идентификатором',async()=>{const f=analysisFixture({failFirst:true});await f.api.submit('audio',new Blob(['audio']),2);const root=f.node('#voice-dialog').children[0].children[0];assert.match(root.children[1].textContent,/Запись сохранена/);assert.equal(root.children[3].hidden,false);root.children[3].emit('click');await settle();assert.equal(f.calls.length,2);assert.equal(f.calls[0].get('id'),f.calls[1].get('id'));assert.equal(root.children[2].textContent,'Ответ модели');});
 test('Индикатор видео вычисляет уровень из сигнала и сбрасывается после отключения',()=>{const f=analysisFixture(),meter=f.api.meter('video-log');meter.prepare();meter.attach(media());[...f.frames.values()][0](200);assert.equal(f.node('video-log-level').textContent,'-20 dBFS');assert.ok(parseFloat(f.node('video-log-level-fill').style.width)>0);meter.stop();assert.equal(f.node('video-log-level').textContent,'-');assert.equal(f.node('video-log-level-fill').style.width,'0%');assert.equal(f.engines[0].state,'closed');});
+
+
+test('Незавершенный анализ не блокирует новую аудио и видеозапись',async()=>{
+  for(const create of [fixture,voiceFixture]){const f=create({analysisBusy:true}),key=create===fixture?'video-log-camera':'voice-mic';assert.equal(f.node(key).disabled,false);await f.start();assert.equal(f.recorders.length,1);assert.equal(f.recorders[0].state,'recording');}
+});
+test('Долгая загрузка модели оставляет кнопки доступными и сохраняет следующие записи в очереди',async()=>{
+  const wait=deferred(),seen=[],f=analysisFixture({analysis:async(_kind,blob)=>{seen.push(await blob.text());if(seen.length===1)await wait.promise;return null;}});
+  const first=f.api.submit('audio',new Blob(['первая']),2);await settle();const second=f.api.submit('audio',new Blob(['вторая']),3);await settle();
+  assert.equal(f.api.busy('audio'),true);assert.equal(f.node('voice-mic').disabled,false);assert.equal(f.node('video-log-camera').disabled,false);assert.equal(f.locks.length,0);assert.deepEqual(seen,['первая']);
+  assert.match(f.node('#voice-dialog').children[0].children[1].children[1].textContent,/В очереди/);
+  wait.resolve();await Promise.all([first,second]);assert.deepEqual(seen,['первая','вторая']);assert.equal(f.calls.length,2);assert.notEqual(f.calls[0].get('id'),f.calls[1].get('id'));assert.equal(await f.calls[0].get('file').text(),'первая');assert.equal(await f.calls[1].get('file').text(),'вторая');assert.equal(f.api.busy('audio'),false);
+});
+test('Завершение старого запроса не меняет состояние кнопки новой активной записи',async()=>{
+  const wait=deferred(),f=analysisFixture({request:async()=>{await wait.promise;return Response.json({status:'analyzed',analysis:'Готово'});}}),pending=f.api.submit('audio',new Blob(['звук']),2);await settle();f.node('voice-mic').disabled=true;wait.resolve();await pending;assert.equal(f.node('voice-mic').disabled,true);assert.equal(f.locks.length,0);
+});
+const diarySource=await readFile(new URL('../public/media-diary.js',import.meta.url),'utf8');
+function diaryFixture(){
+  const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);},tabs=['video','audio'].map(kind=>{const b=new Element();b.dataset.diaryMode=kind;return b;});
+  const dialog=node('media-diary-dialog');dialog.open=false;dialog.querySelectorAll=()=>tabs;dialog.querySelector=()=>node('analysis-caption');dialog.showModal=()=>{dialog.open=true;};dialog.close=()=>{dialog.open=false;dialog.emit('close');};
+  node('video-log-background').closest=()=>null;node('voice-dialog').querySelector=()=>null;
+  let api;const sandbox={window:{missionActivity:{record(){}},},document:{getElementById:node,querySelectorAll:()=>[]},MutationObserver:class{observe(){}}};vm.runInNewContext(diarySource,sandbox);api=sandbox.window.missionDiary;return{api,node,tabs,dialog};
+}
+test('Можно переключаться между Видео и Аудио при записи и обработке, прежний поток останавливается',()=>{
+  const f=diaryFixture(),stops=[];for(const kind of ['audio','video'])f.api.register(kind,{enter(){},leave(){stops.push(kind);}});f.api.open('audio');f.api.lock('audio',true);
+  assert.ok(f.tabs.every(tab=>!tab.disabled));f.tabs[0].emit('click');assert.equal(f.dialog.dataset.mode,'video');assert.deepEqual(stops,['audio']);f.api.lock('audio',true);assert.ok(f.tabs.every(tab=>!tab.disabled));f.tabs[1].emit('click');assert.equal(f.dialog.dataset.mode,'audio');assert.deepEqual(stops,['audio','video']);
+});
+test('Клавиатура переключает вкладку даже при активной записи',()=>{const f=diaryFixture();f.api.open('audio');f.api.lock('audio',true);f.tabs[1].emit('keydown',{key:'ArrowLeft',preventDefault(){}});assert.equal(f.dialog.dataset.mode,'video');assert.equal(f.tabs[0].disabled,false);});
+
+test('Новая запись не подменяет расшифровку старой записи',async()=>{const speech=await readFile(new URL('../public/speech.js',import.meta.url),'utf8'),part=speech.slice(speech.indexOf('  async function finish('),speech.indexOf('  window.missionSpeech=')),state={version:1,processing:true,queue:[],transcript:'Старый голос'},context={states:new Map([['voice',state]]),stop(){},Date,setTimeout(callback){state.version++;state.processing=false;state.transcript='Новый голос';callback();}};vm.runInNewContext(part+'globalThis.finish=finish;',context);assert.equal(await context.finish('voice'),'');});

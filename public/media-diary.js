@@ -17,30 +17,30 @@
     const syncLabel=()=>{const label=button.textContent.trim();button.title=label;button.setAttribute('aria-label',label);button.dataset.compactLabel=id==='voice-mic'?'Аудио':compactLabels[label]||label;};
     syncLabel();new MutationObserver(syncLabel).observe(button,{childList:true,subtree:true,characterData:true});
   }
-  let current='video',locked=false;
+  let current='video';
   function render(){
     dialog.dataset.mode=current;
     for(const [mode,panel]of Object.entries(panels))panel.hidden=mode!==current;
-    for(const button of buttons){const selected=button.dataset.diaryMode===current;button.setAttribute('aria-selected',String(selected));button.tabIndex=selected?0:-1;button.disabled=locked&&!selected;}
+    for(const button of buttons){const selected=button.dataset.diaryMode===current;button.setAttribute('aria-selected',String(selected));button.tabIndex=selected?0:-1;button.disabled=false;}
     dialog.querySelector('[data-diary-video-analysis]').hidden=current!=='video';
   }
   function open(mode='video'){
-    if(!panels[mode]||dialog.open&&locked&&mode!==current)return;
+    if(!panels[mode])return;
     if(dialog.open&&mode===current)return;
     if(dialog.open)engines.get(current)?.leave();
-    current=mode;locked=false;render();void window.missionActivity?.record('media_open',{mode});
+    current=mode;dialog.dataset.recording='false';render();void window.missionActivity?.record('media_open',{mode});
     if(!dialog.open)dialog.showModal();
     for(const engine of engines.values())engine.prepare?.();
     engines.get(current)?.enter();
   }
   function register(mode,engine){engines.set(mode,engine);if(dialog.open){engine.prepare?.();if(current===mode)engine.enter();}}
-  function lock(mode,value){if(current===mode){locked=value;render();}}
-  dialog.addEventListener('close',()=>{engines.get(current)?.leave();locked=false;render();});
+  function lock(mode,value){if(current===mode)dialog.dataset.recording=String(value);}
+  dialog.addEventListener('close',()=>{engines.get(current)?.leave();dialog.dataset.recording='false';render();});
   document.getElementById('diary-close').addEventListener('click',()=>dialog.close());
   for(const button of buttons){
     button.addEventListener('click',()=>open(button.dataset.diaryMode));
     button.addEventListener('keydown',event=>{
-      if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)||locked)return;
+      if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
       event.preventDefault();const next=event.key==='Home'?'video':event.key==='End'?'audio':current==='audio'?'video':'audio';
       open(next);buttons.find(node=>node.dataset.diaryMode===next).focus();
     });

@@ -53,7 +53,7 @@
   function renderStatus(message = '', error = false) {
     const active = source === 'mic', waiting = source === 'requesting';
     micButton.querySelector('span').textContent = active ? 'Остановить аудиозапись' : waiting ? 'Отменить подключение' : finalizing ? 'Подготовка записи' : 'Начать аудиозапись';
-    micButton.disabled = finalizing || window.missionMedia.busy('audio');
+    micButton.disabled = finalizing;
     micButton.setAttribute('aria-pressed', String(active));
     micButton.dataset.recording = String(active && recorder?.state === 'recording');
     window.missionDiary.lock('audio', active || finalizing);

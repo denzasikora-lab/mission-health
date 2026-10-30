@@ -35,7 +35,8 @@ async function mediaAnalysisRoute(request,env,user){
   const stored=previous?await env.PHOTOS.get(key):null;
   if(previous){let ref;try{ref=JSON.parse(previous.references_json)[0];}catch{}if(ref?.digest!==digest||ref?.kind!==kind)fail('id_conflict',409);}
   if(stored&&stored.customMetadata?.digest!==digest)fail('id_conflict',409);
-  const created=previous?.created_at||new Date().toISOString(),reference={type:'media',id,kind,duration,createdAt:created,digest};
+  const captured=form.get('createdAt'),captureTime=captured?Date.parse(captured):NaN;if(captured&&(!Number.isFinite(captureTime)||captureTime>Date.now()+300000||captureTime<Date.now()-7*86400000))fail('invalid_input',400);
+  const created=previous?.created_at||(Number.isFinite(captureTime)?new Date(captureTime).toISOString():new Date().toISOString()),reference={type:'media',id,kind,duration,createdAt:created,digest};
   if(!previous){
     await db.prepare('INSERT OR IGNORE INTO journal_messages (id,owner_id,astronaut_id,role,content,language,created_at,vector_status,references_json,attachments_json,assistant_source,wellbeing_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,user,'personal','user',(kind==='video'?'Видеозапись':'Аудиозапись')+' для анализа / '+Math.round(duration)+' с','ru',created,'pending',JSON.stringify([reference]),'[]','media-upload',report?JSON.stringify(report):null).run();
     const reserved=await db.prepare('SELECT * FROM journal_messages WHERE id=?').bind(id).first();

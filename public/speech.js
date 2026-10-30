@@ -75,7 +75,7 @@
     }
   }
   createState('voice');createState('video');
-  async function finish(id){stop(id);const state=states.get(id),until=Date.now()+15000;while(state&&(state.processing||state.queue.length)&&Date.now()<until)await new Promise(resolve=>setTimeout(resolve,100));return state&&!state.processing&&!state.queue.length&&!state.error?state.transcript:'';}
+  async function finish(id){stop(id);const state=states.get(id),version=state?.version,until=Date.now()+15000;while(state&&state.version===version&&(state.processing||state.queue.length)&&Date.now()<until)await new Promise(resolve=>setTimeout(resolve,100));return state&&state.version===version&&!state.processing&&!state.queue.length&&!state.error?state.transcript:'';}
   window.missionSpeech={start,stop,reset,finish,transcript:id=>states.get(id)?.transcript||''};
   fetch('/api/transcriptions/config',{cache:'no-store'}).then(response=>response.ok?response.json():Promise.reject()).then(value=>{config=value;if(config.airGap){mode='local';for(const state of states.values())cancelRequests(state);}for(const state of states.values()){render(state);state.status=state.active&&available()?'Речь распознается автоматически.':idle();}}).catch(()=>{for(const state of states.values()){state.status='Не удалось загрузить настройки распознавания.';render(state);}});
   window.addEventListener('pagehide',()=>{for(const state of states.values())reset(state.id);});

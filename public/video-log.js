@@ -56,7 +56,7 @@
     const active = phase === 'live' || phase === 'recording';
     canvas.setAttribute('aria-label', backgroundChoice.value === 'room' ? 'Исходная камера без фона и надписей' : 'Камера видеодневника с выбранным оформлением');
     cameraButton.textContent = phase === 'requesting' ? 'Отменить подключение' : phase === 'recording' ? 'Остановить запись' : phase === 'finishing' ? 'Подготовка записи' : active ? 'Выключить камеру' : 'Включить камеру';
-    cameraButton.disabled = phase === 'finishing' || window.missionMedia.busy('video');
+    cameraButton.disabled = phase === 'finishing';
     cameraButton.setAttribute('aria-pressed', String(active));
     cameraButton.dataset.recording = String(phase === 'recording');
     backgroundChoice.disabled = phase === 'recording' || phase === 'finishing';
@@ -242,11 +242,8 @@
     lastDraw = time;
     context.fillStyle = backgroundChoice.value === 'room' ? '#000' : '#102027'; context.fillRect(0, 0, 1280, 720);
     if (backgroundChoice.value === 'room') {
-      // Исходный кадр без замены фона, зеркалирования, обрезки и надписей.
-      if (stream && video.readyState >= 2) {
-        const scale = Math.min(canvas.width / video.videoWidth, canvas.height / video.videoHeight);
-        context.drawImage(video, (canvas.width - video.videoWidth * scale) / 2, (canvas.height - video.videoHeight * scale) / 2, video.videoWidth * scale, video.videoHeight * scale);
-      }
+      // Предпросмотр заполняет область, в анализ уходит исходная дорожка камеры.
+      if (stream && video.readyState >= 2) cover(video);
       return;
     }
     const helmet=backgroundChoice.value==='helmet';
