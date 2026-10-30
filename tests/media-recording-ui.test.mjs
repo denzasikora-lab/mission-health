@@ -14,6 +14,7 @@ class Element{
   addEventListener(key,callback){this.events.set(key,callback);}
   emit(key,event={}){this.events.get(key)?.(event);}
   focus(){}
+  scrollIntoView(){this.scrolled=true;}
   pause(){}
   load(){}
   async play(){}
@@ -174,15 +175,21 @@ test('Завершение старого запроса не меняет со�
 });
 const diarySource=await readFile(new URL('../public/media-diary.js',import.meta.url),'utf8');
 function diaryFixture(){
-  const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);},tabs=['video','audio'].map(kind=>{const b=new Element();b.dataset.diaryMode=kind;return b;});
-  const dialog=node('media-diary-dialog');dialog.open=false;dialog.querySelectorAll=()=>tabs;dialog.querySelector=()=>node('analysis-caption');dialog.showModal=()=>{dialog.open=true;};dialog.close=()=>{dialog.open=false;dialog.emit('close');};
+  const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);};
+  const dialog=node('media-diary-dialog');dialog.open=false;dialog.querySelectorAll=()=>[];dialog.querySelector=()=>node('analysis-caption');dialog.showModal=()=>{dialog.open=true;};dialog.close=()=>{dialog.open=false;dialog.emit('close');};
   node('video-log-background').closest=()=>null;node('voice-dialog').querySelector=()=>null;
-  let api;const sandbox={window:{missionActivity:{record(){}},},document:{getElementById:node,querySelectorAll:()=>[]},MutationObserver:class{observe(){}}};vm.runInNewContext(diarySource,sandbox);api=sandbox.window.missionDiary;return{api,node,tabs,dialog};
+  let api;const sandbox={window:{missionActivity:{record(){}},},document:{getElementById:node,querySelectorAll:()=>[]},MutationObserver:class{observe(){}}};vm.runInNewContext(diarySource,sandbox);api=sandbox.window.missionDiary;return{api,node,dialog};
 }
-test('Можно переключаться между Видео и Аудио при записи и обработке, прежний поток останавливается',()=>{
-  const f=diaryFixture(),stops=[];for(const kind of ['audio','video'])f.api.register(kind,{enter(){},leave(){stops.push(kind);}});f.api.open('audio');f.api.lock('audio',true);
-  assert.ok(f.tabs.every(tab=>!tab.disabled));f.tabs[0].emit('click');assert.equal(f.dialog.dataset.mode,'video');assert.deepEqual(stops,['audio']);f.api.lock('audio',true);assert.ok(f.tabs.every(tab=>!tab.disabled));f.tabs[1].emit('click');assert.equal(f.dialog.dataset.mode,'audio');assert.deepEqual(stops,['audio','video']);
+test('Дневник одновременно показывает Видео и Аудио без переключателя',()=>{
+  const f=diaryFixture(),starts=[],stops=[];for(const kind of ['audio','video'])f.api.register(kind,{enter(){starts.push(kind);},leave(){stops.push(kind);}});
+  f.api.open();assert.equal(f.dialog.dataset.mode,'combined');assert.equal(f.node('video-log-dialog').hidden,false);assert.equal(f.node('voice-dialog').hidden,false);assert.deepEqual(starts,['audio','video']);
+  f.api.lock('video',true);f.api.open('audio');assert.equal(f.node('voice-dialog').scrolled,true);assert.deepEqual(starts,['audio','video']);assert.deepEqual(stops,[]);assert.equal(f.dialog.dataset.recording,'true');
 });
-test('Клавиатура переключает вкладку даже при активной записи',()=>{const f=diaryFixture();f.api.open('audio');f.api.lock('audio',true);f.tabs[1].emit('keydown',{key:'ArrowLeft',preventDefault(){}});assert.equal(f.dialog.dataset.mode,'video');assert.equal(f.tabs[0].disabled,false);});
+test('Остановка одного формата сохраняет состояние записи другого',()=>{
+  const f=diaryFixture();f.api.open();f.api.lock('video',true);f.api.lock('audio',true);f.api.lock('audio',false);assert.equal(f.dialog.dataset.recording,'true');f.api.lock('video',false);assert.equal(f.dialog.dataset.recording,'false');
+});
+test('Закрытие общего дневника освобождает оба формата записи',()=>{
+  const f=diaryFixture(),stops=[];for(const kind of ['audio','video'])f.api.register(kind,{enter(){},leave(){stops.push(kind);}});f.api.open('audio');f.api.lock('video',true);f.api.lock('audio',true);f.dialog.close();assert.deepEqual(stops,['audio','video']);assert.equal(f.dialog.dataset.recording,'false');assert.equal(f.dialog.open,false);
+});
 
 test('Новая запись не подменяет расшифровку старой записи',async()=>{const speech=await readFile(new URL('../public/speech.js',import.meta.url),'utf8'),part=speech.slice(speech.indexOf('  async function finish('),speech.indexOf('  window.missionSpeech=')),state={version:1,processing:true,queue:[],transcript:'Старый голос'},context={states:new Map([['voice',state]]),stop(){},Date,setTimeout(callback){state.version++;state.processing=false;state.transcript='Новый голос';callback();}};vm.runInNewContext(part+'globalThis.finish=finish;',context);assert.equal(await context.finish('voice'),'');});
