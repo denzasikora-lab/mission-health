@@ -83,3 +83,17 @@ export const personalFavorites=sqliteTable('personal_favorites',{
 export const activityEvents=sqliteTable('activity_events',{id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),kind:text('kind').notNull(),summary:text('summary').notNull(),createdAt:text('created_at').notNull()},table=>[index('activity_owner_time').on(table.ownerId,table.createdAt,table.id)]);
 
 export const actiwatchImports=sqliteTable('actiwatch_imports',{id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),digest:text('digest').notNull(),filename:text('filename').notNull(),objectKey:text('object_key').notNull(),summary:text('summary_json').notNull(),recordedEnd:text('recorded_end').notNull(),diaryMessageId:text('diary_message_id').notNull(),createdAt:text('created_at').notNull()},table=>[uniqueIndex('actiwatch_owner_digest').on(table.ownerId,table.digest),index('actiwatch_owner_end').on(table.ownerId,table.recordedEnd,table.createdAt)]);
+
+export const personalTasks=sqliteTable('personal_tasks',{
+  id:text('id').primaryKey(),
+  ownerId:text('owner_id').notNull(),
+  sourceMessageId:text('source_message_id').notNull(),
+  ordinal:integer('ordinal').notNull(),
+  title:text('title').notNull(),
+  dueDate:text('due_date').notNull(),
+  dueAt:text('due_at'),
+  timeZone:text('time_zone').notNull(),
+  status:text('status').notNull().default('planned'),
+  createdAt:text('created_at').notNull(),
+  updatedAt:text('updated_at').notNull()
+},table=>[uniqueIndex('tasks_owner_source_ordinal').on(table.ownerId,table.sourceMessageId,table.ordinal),index('tasks_owner_due').on(table.ownerId,table.status,table.dueDate,table.dueAt)]);

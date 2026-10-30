@@ -175,6 +175,7 @@ export default {
       const actiwatchMatch=url.pathname.match(/^\/api\/actiwatch(?:\/([a-f0-9-]{36}))?$/i);if(actiwatchMatch)return await actiwatchRoute(request,env,user,actiwatchMatch[1]);
       if(url.pathname==='/api/activity')return await activityRoute(request,env,user);
       if(url.pathname==='/api/compose')return await composeRoute(request,env);
+      const tasksMatch=url.pathname.match(/^\/api\/tasks(?:\/([a-f0-9-]{36}))?$/i);if(tasksMatch)return await tasksRoute(request,env,user,tasksMatch[1]);
       if(url.pathname==='/api/chat')return await generalChatRoute(request,env,user,url);
       const favoritesMatch=url.pathname.match(/^\/api\/favorites(?:\/([a-f0-9-]{36}))?$/i);if(favoritesMatch)return await favoritesRoute(request,env,user,favoritesMatch[1],url);
       const trainingMatch=url.pathname.match(/^\/api\/astronauts\/([^/]+)\/training(?:\/([a-f0-9-]{36}))?$/i);if(trainingMatch&&astronautIds.has(trainingMatch[1]))return await trainingRoute(request,env,user,trainingMatch[1],trainingMatch[2]);

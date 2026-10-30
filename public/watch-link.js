@@ -8,17 +8,17 @@
     {key:'hr',point:[87,128],side:'left',lane:0},
     {key:'temp',point:[22,224],side:'left',lane:1},
     {key:'sleep',point:[84,40],side:'left',lane:2},
-    {key:'spo2',point:[148,245],side:'right',lane:0},
+    {key:'spo2',point:[153,262],side:'right',lane:0},
     {key:'wellbeing',point:[84,40],side:'right',lane:1},
     {key:'hrv',point:[87,128],side:'right',lane:2},
     {key:'steps',point:[105,403],side:'bottom',lane:0},
-    {key:'activity',point:[147.5,223],side:'bottom',lane:1},
+    {key:'activity',point:[149,231],side:'bottom',lane:1},
     {key:'light',point:[115,95],side:'bottom',lane:2}
   ];
   const target=panel.querySelector('[data-home-metric=activity]');
   if(!target)return;
   const watch=document.createElement('button');watch.type='button';watch.className='home-body-watch';watch.setAttribute('aria-label','Посмотреть движение / Actiwatch');watch.title='Actiwatch';
-  watch.innerHTML='<svg viewBox="0 0 32 40" aria-hidden="true"><rect x="10" y="1" width="12" height="38" rx="4"/><rect x="3" y="10" width="26" height="20" rx="7"/><path d="m8 21 4-4 4 7 3-5h5"/></svg>';figure.append(watch);
+  watch.innerHTML='<svg viewBox="0 0 20 34" aria-hidden="true"><path class="watch-band" d="M6 1h8l1 10v12l-1 10H6L5 23V11Z"/><rect class="watch-case" x="2" y="9" width="16" height="16" rx="4"/><rect class="watch-screen" x="4.5" y="12" width="11" height="10" rx="2"/><path class="watch-pulse" d="m6 18 2-2 2 3 2-3h2"/></svg>';figure.append(watch);
   const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.classList.add('body-connections');svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');
   const connections=definitions.flatMap(definition=>{
     const card=panel.querySelector('[data-home-metric='+definition.key+']');if(!card)return [];
@@ -34,7 +34,7 @@
     if(home.hidden||!area.width||!img.height){svg.setAttribute('hidden','');watch.hidden=true;return;}
     const scale=Math.min(img.width/170,img.height/450),originX=img.left+(img.width-170*scale)/2,originY=img.top+(img.height-450*scale)/2;
     const point=([x,y])=>[originX+x*scale-area.left,originY+y*scale-area.top];
-    const wrist=point([147.5,223]);watch.hidden=false;watch.style.left=wrist[0]+area.left-human.left+'px';watch.style.top=wrist[1]+area.top-human.top+'px';
+    const wrist=point([149,231]);watch.hidden=false;watch.style.left=wrist[0]+area.left-human.left+'px';watch.style.top=wrist[1]+area.top-human.top+'px';
     const rectangles=new Map(connections.map(connection=>[connection.key,connection.card.getBoundingClientRect()]));
     const top=connections.filter(connection=>connection.side==='top').map(connection=>rectangles.get(connection.key));
     const middle=connections.filter(connection=>['left','right'].includes(connection.side)).map(connection=>rectangles.get(connection.key));

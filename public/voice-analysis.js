@@ -1,0 +1,33 @@
+(() => {
+  const tones={neutral:'Нейтральная',happy:'Радостная',sad:'Грустная',angry:'Раздраженная',tense:'Напряженная'},panels=new Map();
+  function element(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;}
+  for(const kind of ['audio','video']){
+    const host=document.querySelector(kind==='audio'?'#voice-dialog':'#video-log-dialog .log-capture'),root=element('section','voice-analysis-panel');root.dataset.voiceAnalysis=kind;
+    const heading=element('header'),title=element('h3','',kind==='audio'?'Анализ аудио':'Анализ голоса и видео'),status=element('span','voice-analysis-state','Ожидание записи');status.setAttribute('role','status');heading.append(title,status);
+    const metrics=element('div','voice-analysis-metrics');for(const [key,label]of [['level','Средний уровень'],['pauses','Тихие участки'],['clipping','Перегрузка'],['tone','Окраска голоса']]){const item=element('div');item.dataset.voiceFeature=key;item.append(element('span','',label),element('strong','','-'));metrics.append(item);}
+    const speech=element('details','voice-analysis-speech'),summary=element('summary','','Распознанная речь / Whisper'),transcript=element('p','','Речь появится после записи.');speech.append(summary,transcript);
+    const model=element('p','voice-analysis-model','EmbeddingGemma 2 / аудио'+(kind==='video'?' и кадры':'')),hint=element('small','voice-analysis-hint','Окраска: сходство с описаниями голоса, не диагноз.'),details=element('details','voice-analysis-method');details.innerHTML='<summary>Модели анализа</summary><p>EmbeddingGemma 2 строит вектор исходного звука и сравнивает его с описаниями интонации. Число сходства не является вероятностью эмоции. Whisper распознает речь. NasaGPT использует эти наблюдения для анализа. AudioFM пока не подключен: нужны опубликованные веса или API.</p><a href="https://huggingface.co/onnx-community/embeddinggemma-2-ONNX" target="_blank" rel="noopener">https://huggingface.co/onnx-community/embeddinggemma-2-ONNX</a>';
+    root.append(heading,metrics,model,hint,speech,details);host.append(root);panels.set(kind,{root,status,model,transcript});
+  }
+  function value(kind,key,text){panels.get(kind).root.querySelector('[data-voice-feature='+key+'] strong').textContent=text;}
+  async function decode(blob){
+    const Engine=window.AudioContext||window.webkitAudioContext;if(!Engine)throw new Error('decode_unavailable');const engine=new Engine();
+    try{const buffer=await engine.decodeAudioData(await blob.arrayBuffer()),count=Math.min(buffer.length,Math.ceil(buffer.sampleRate*125)),mono=new Float32Array(count);for(let channel=0;channel<buffer.numberOfChannels;channel++){const data=buffer.getChannelData(channel);for(let i=0;i<count;i++)mono[i]+=data[i]/buffer.numberOfChannels;}
+      const length=Math.floor(count*16000/buffer.sampleRate),offline=new OfflineAudioContext(1,length,16000),source=offline.createBufferSource(),input=offline.createBuffer(1,count,buffer.sampleRate);input.copyToChannel(mono,0);source.buffer=input;source.connect(offline.destination);source.start();return new Float32Array((await offline.startRendering()).getChannelData(0));
+    }finally{await engine.close();}
+  }
+  function acoustic(audio){let energy=0,clipped=0,quiet=0,blocks=0;for(let at=0;at<audio.length;at+=320){let power=0,n=Math.min(320,audio.length-at);for(let i=at;i<at+n;i++){const x=audio[i];power+=x*x;if(Math.abs(x)>=.99)clipped++;}energy+=power;blocks++;if(Math.sqrt(power/n)<.01)quiet++;}return{level:Math.max(-120,20*Math.log10(Math.max(1e-6,Math.sqrt(energy/audio.length)))),quiet:quiet/blocks,clipping:clipped/audio.length,seconds:audio.length/16000};}
+  async function embedding(kind,audio,frames){
+    const panel=panels.get(kind),worker=new Worker('/media-embedding-worker.js?v=20261030-audio1',{type:'module'}),id=crypto.randomUUID();
+    try{return await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(new Error('model_timeout')),240000);worker.onerror=()=>{clearTimeout(timeout);reject(new Error('model_unavailable'));};worker.onmessage=event=>{const message=event.data;if(message.id!==id)return;if(message.type==='progress'){panel.model.textContent='EmbeddingGemma 2 / загрузка '+Math.round(message.loaded/1048576)+' МБ'+(message.total?' из '+Math.round(message.total/1048576):'');}else if(message.type==='encoding'){panel.model.textContent='EmbeddingGemma 2 / звук '+message.part+' из '+message.parts;}else if(message.type==='result'){clearTimeout(timeout);resolve(message.result);}else if(message.type==='error'){clearTimeout(timeout);reject(new Error(message.reason));}};worker.postMessage({id,audio,frames});});}finally{worker.terminate();}
+  }
+  async function analyze(kind,blob,frames=[]){
+    const panel=panels.get(kind);panel.status.textContent='Анализирую сигнал';for(const key of ['level','pauses','clipping','tone'])value(kind,key,'-');panel.transcript.textContent='Распознавание речи...';let audio,metrics;
+    try{audio=await decode(blob);metrics=acoustic(audio);value(kind,'level',Math.round(metrics.level)+' dBFS');value(kind,'pauses',Math.round(metrics.quiet*100)+'%');value(kind,'clipping',(metrics.clipping*100).toFixed(1)+'%');}catch{panel.status.textContent='Звук не декодирован';panel.model.textContent='Аудиоэмбеддинг недоступен';return null;}
+    if(metrics.level<-60){panel.status.textContent='Слишком тихая запись';panel.model.textContent='EmbeddingGemma 2 / недостаточно звука';if(!frames.length)return{acoustic:metrics};audio=null;}
+    try{const result=await embedding(kind,audio,frames);panel.status.textContent='Сигнал проанализирован';panel.model.textContent='EmbeddingGemma 2 / '+(result.audioVector?'аудио 768d':'')+(result.videoVector?' / кадры 768d':'');const top=result.tone[0];value(kind,'tone',top?tones[top.label]+' / '+top.similarity.toFixed(2):'-');return{acoustic:metrics,...result};}
+    catch{panel.status.textContent='Сигнал измерен';panel.model.textContent='EmbeddingGemma 2 не загрузилась / нейроанализ недоступен';return{acoustic:metrics};}
+  }
+  function transcript(kind,text){panels.get(kind).transcript.textContent=text||'Разборчивая речь не обнаружена.';}
+  window.missionVoiceAnalysis={analyze,transcript};
+})();

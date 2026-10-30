@@ -5,11 +5,11 @@ import {readFile,readdir} from 'node:fs/promises';
 import {DatabaseSync} from 'node:sqlite';
 import {webcrypto} from 'node:crypto';
 const root=new URL('../',import.meta.url);
-const source=(await Promise.all(['activity','personal','photos','stories','speech','training','book','index'].map(name=>readFile(new URL('worker/'+name+'.js',root),'utf8')))).join('\n').replace('export default','globalThis.app =');
+const source=(await Promise.all(['activity','scheduler','personal','photos','stories','speech','training','book','index'].map(name=>readFile(new URL('worker/'+name+'.js',root),'utf8')))).join('\n').replace('export default','globalThis.app =');
 const migrations=await Promise.all((await readdir(new URL('drizzle/',root))).filter(name=>name.endsWith('.sql')).sort().map(name=>readFile(new URL('drizzle/'+name,root),'utf8')));
 const model='embeddinggemma-2:daa72c51243991dfcaf9f9137d2c573d8f7790c0:q4:text:256:v1';
 function fixture(options={}){
-  const sql=new DatabaseSync(':memory:');for(const migration of options.beforeHundred?migrations.slice(0,-1):migrations)sql.exec(migration);
+  const sql=new DatabaseSync(':memory:');for(const migration of options.beforeHundred?migrations.slice(0,10):migrations)sql.exec(migration);
   const out=[],DB={prepare(query){
     const statement=sql.prepare(query);
     return {bind(...values){return {first:async()=>statement.get(...values)||null,all:async()=>({results:statement.all(...values)}),run:async()=>statement.run(...values)};}};
@@ -24,7 +24,7 @@ function fixture(options={}){
     return {status:response.status,body:await response.json()};
   };
   const note=async(score=70,profile='jessica-meir',owner='owner-a',content='После тренировки усталость стала меньше.')=>run('/api/astronauts/'+profile+'/messages',{owner,method:'POST',body:{id:webcrypto.randomUUID(),content,language:'ru',mode:'diary',attachments:[],wellbeing:score===null?null:{score,wellbeingScale:100}}});
-  return {sql,out,run,note,migrateHundred:()=>sql.exec(migrations.at(-1)),validateHealth:scope.validatedStoryHealth,provider:(code,text)=>{status=code;if(text)answer=text;}};
+  return {sql,out,run,note,migrateHundred:()=>sql.exec(migrations[10]),validateHealth:scope.validatedStoryHealth,provider:(code,text)=>{status=code;if(text)answer=text;}};
 }
 test('Самооценка сохраняется у заметки, возвращается в книге и имеет серверные подпись и время',async()=>{const f=fixture(),saved=await f.note();assert.equal(saved.status,201);const report=saved.body.message.wellbeing;assert.equal(report.score,70);assert.equal(report.wellbeingScale,100);assert.equal(report.label,'Хорошо');assert.equal(report.source,'self_report');assert.ok(Number.isFinite(Date.parse(report.recordedAt)));const book=await f.run('/api/astronauts/jessica-meir/book');assert.deepEqual(book.body.entries[0].wellbeing,report);assert.equal(f.out.length,0);});
 test('Несуществующие и дробные оценки не сохраняются, отсутствие оценки не выдумывается',async()=>{const f=fixture();for(const score of [0,101,3.5,'80',null]){if(score===null){const saved=await f.note(null);assert.equal(saved.status,201);assert.equal(saved.body.message.wellbeing,undefined);}else assert.equal((await f.note(score)).status,400);}assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM journal_messages').get().n,1);});

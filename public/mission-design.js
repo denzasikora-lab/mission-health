@@ -6,15 +6,16 @@
   const profile = document.querySelector('.profile'); rail.prepend(profile);
   const navigation = document.createElement('nav'); navigation.className = 'mission-nav'; navigation.lang = 'ru'; navigation.setAttribute('aria-label', 'Разделы Mission Health');
   const icons = {overview:'M3 10 12 3l9 7v11h-6v-7H9v7H3Z',observations:'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z M3 12h4l2-3 4 6 2-3h6',diary:'M3 4h6a4 4 0 0 1 3 2 4 4 0 0 1 3-2h6v16h-6a4 4 0 0 0-3 2 4 4 0 0 0-3-2H3Z M12 6v16',sources:'M3 5c0-5 18-5 18 0v14c0 5-18 5-18 0Zm0 0c0 5 18 5 18 0M3 12c0 5 18 5 18 0'};
+  icons.archive=icons.diary;icons.diary='M3 5h13v14H3Z M16 10l6-4v12l-6-4 M8 9v6m-3-3h6';
   icons.chat='M4 3h16v13H8l-4 5Z M8 8h8M8 12h5';icons.favorites='m12 3 2.8 5.7 6.3.9-4.55 4.43 1.07 6.27L12 17.34l-5.62 2.96 1.07-6.27L2.9 9.6l6.3-.9Z';
-  navigation.innerHTML = [['observations','Здоровье'],['diary','Дневник'],['sources','Исследования']].map(([key,label])=>`<button type="button" data-mission-nav="${key}" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[key]}"/></svg><span>${label}</span></button>`).join('');
+  navigation.innerHTML = [['observations','Здоровье'],['diary','Дневник'],['archive','Архив'],['sources','Исследования']].map(([key,label])=>`<button type="button" data-mission-nav="${key}" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[key]}"/></svg><span>${label}</span></button>`).join('');
   profile.after(navigation);
   const switcher = document.createElement('details'); switcher.className = 'mission-profiles';
   switcher.hidden=true;switcher.setAttribute('aria-hidden','true');
   switcher.append(document.querySelector('.panel-heading'), document.getElementById('crew-list'));
   navigation.after(switcher);
   document.querySelector('.aside-note').textContent = 'Профили NASA. Показатели здоровья и дневники - демонстрация.';
-  const anatomy = document.createElement('section'); anatomy.className='mission-anatomy'; anatomy.setAttribute('aria-label','Схема показателей профиля'); anatomy.innerHTML='<img src="assets/health-body.svg" alt="Иллюстрация тела человека, без медицинской диагностики"><div>'+[['hr','Пульс'],['spo2','SpO₂'],['temp','Темп.'],['fatigue','Тонус']].map(([key,label])=>`<button type="button" data-body-metric="${key}"><span>${label}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${metricIcons[key]}"/></svg></button>`).join('')+'</div>'; rail.append(anatomy);
+  const anatomy = document.createElement('section'); anatomy.className='mission-anatomy'; anatomy.setAttribute('aria-label','Схема показателей профиля'); anatomy.innerHTML='<img src="assets/health-body.svg?v=20261030-illustrated1" alt="Иллюстрация тела человека, без медицинской диагностики"><div>'+[['hr','Пульс'],['spo2','SpO₂'],['temp','Темп.'],['fatigue','Тонус']].map(([key,label])=>`<button type="button" data-body-metric="${key}"><span>${label}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${metricIcons[key]}"/></svg></button>`).join('')+'</div>'; rail.append(anatomy);
   const oldResearch = document.getElementById('research-workspace'), oldCrew = document.getElementById('crew-workspace');
   const heading = document.createElement('header'); heading.className = 'mission-heading'; heading.lang = 'ru';
   heading.innerHTML = '<div><p class="mission-kicker">ЛИЧНЫЙ ФОН / НАБЛЮДЕНИЯ / ДНЕВНИК</p><h1 id="mission-heading-title">Состояние и наблюдения</h1><p id="mission-heading-description">Ключевые показатели на сегодня</p></div><span class="mission-data-label">Демо-данные</span>';
@@ -71,21 +72,22 @@
     document.querySelector('.mission-data-label').textContent = state.workspace === 'research' ? 'Исходные данные' : 'Демо-данные';
     window.missionBook?.render();
     window.missionConversations?.render(state.view);
-    const active = state.workspace === 'research' ? researchState.dataset === 'library' ? 'sources' : 'observations' : state.view === 'journal' ? 'diary' : ['chat','favorites'].includes(state.view)?state.view:'overview';
+    const active = state.workspace === 'research' ? researchState.dataset === 'library' ? 'sources' : 'observations' : state.view === 'journal' ? 'archive' : ['chat','favorites'].includes(state.view)?state.view:'overview';
     if(active==='chat'||active==='favorites'){heading.querySelector('h1').textContent=active==='chat'?'NasaGPT':'Избранное';document.getElementById('mission-heading-description').textContent=active==='chat'?'Разговор с NasaGPT':'Важные записи и ответы в одном месте';document.querySelector('.mission-data-label').textContent='Личное';}
     navigation.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.missionNav===active&&!(active==='overview'&&state.visiting))));
     window.missionHome?.render();window.missionActivity?.render();
     themeGroup.querySelectorAll('[data-theme-choice]').forEach(button=>{button.setAttribute('aria-pressed',String(button.dataset.themeChoice===themeMode));if(button.dataset.themeChoice==='system'){button.setAttribute('aria-label','Системная тема');button.title='Системная тема';}});
   }
   function navigate(section) {
+    if(section==='diary'){window.missionDiary.open();return;}
     void window.missionActivity?.record('navigation',{target:section});
     state.visiting=false;
     researchStop(); state.workspace = section === 'observations' || section === 'sources' ? 'research' : 'crew';
     if (section === 'sources') researchState.dataset = 'library';
     else if (section === 'observations' && researchState.dataset === 'library') researchState.dataset = 'nasa';
-    state.view = section === 'diary' ? 'journal' : ['chat','favorites'].includes(section)?section:'health';
+    state.view = section === 'archive' ? 'journal' : ['chat','favorites'].includes(section)?section:'health';
     window.research.render(); renderJournal(); render();
-    if (section === 'diary') { void loadJournal();window.missionBook?.refresh(); document.getElementById('mission-book')?.scrollIntoView({behavior:'smooth',block:'start'}); }
+    if (section === 'archive') { void loadJournal();window.missionBook?.refresh(); document.getElementById('mission-book')?.scrollIntoView({behavior:'smooth',block:'start'}); }
   }
   navigation.addEventListener('click',event=>{const button=event.target.closest('[data-mission-nav]');if(button)navigate(button.dataset.missionNav)});
   iconButton.addEventListener('click',()=>navigate('sources'));

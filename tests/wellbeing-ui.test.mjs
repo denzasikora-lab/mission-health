@@ -78,14 +78,14 @@ test('Сториз сохраняет новую шкалу, а архивная
     const host=new Node();f.window.missionStoryHealth.render(host,{...snapshot,wellbeing});assert.ok(host.children.some(child=>child.textContent===expected));
   }
 });
-test('В окне записи доступны только NasaGPT и Избранное, клавиатура не открывает дневник',()=>{
+test('В окне записи доступны NasaGPT, Избранное и Запланировано, клавиатура переключает вкладки',()=>{
   const calls=[],compact=new Node(),sandbox={modalKind:'chat',compact,modalView:{},setKind:(_view,kind)=>calls.push(kind),create:(_tag,_class,text)=>{const node=new Node();node.textContent=text;return node;}};
   const start=source.indexOf("  const tabs=create('div','personal-tabs')"),end=source.indexOf('  checkin.append(tabs);',start);
   assert.ok(start>=0&&end>start);vm.runInNewContext(source.slice(start,end)+'globalThis.actualTabs=tabs;',sandbox);
-  const tabs=sandbox.actualTabs;assert.deepEqual(Array.from(tabs.children,node=>node.textContent),['NasaGPT','Избранное']);
+  const tabs=sandbox.actualTabs;assert.deepEqual(Array.from(tabs.children,node=>node.textContent),['NasaGPT','Избранное','Запланировано']);
   assert.equal(tabs.children[0].attributes['aria-selected'],'true');assert.equal(sandbox.modalKind,'chat');
-  tabs.children[0].events.keydown({key:'ArrowLeft',preventDefault(){}});assert.equal(sandbox.modalKind,'favorites');assert.equal(tabs.children[1].focused,true);assert.equal(compact.attributes['aria-labelledby'],'media-personal-tab-favorites');
-  tabs.children[1].events.keydown({key:'Home',preventDefault(){}});assert.equal(sandbox.modalKind,'chat');assert.deepEqual(calls,['favorites','chat']);
+  tabs.children[0].events.keydown({key:'ArrowLeft',preventDefault(){}});assert.equal(sandbox.modalKind,'scheduler');assert.equal(tabs.children[2].focused,true);assert.equal(compact.attributes['aria-labelledby'],'media-personal-tab-scheduler');
+  tabs.children[1].events.keydown({key:'Home',preventDefault(){}});assert.equal(sandbox.modalKind,'chat');assert.deepEqual(calls,['scheduler','chat']);
 });
 test('Избранное открывается внутри чата и возвращает несохраненный текст без перехода к книге',async()=>{
   const f=fixture(),host=new Node(),changes=[];f.api.store('chat').draft='Текст останется в чате';

@@ -8,7 +8,7 @@ async function activityRoute(request,env,user){
   }
   if(request.method!=='POST')fail('method_not_allowed',405);
   const input=await personalInput(request);if(!input||typeof input.id!=='string'||!/^[a-f0-9-]{36}$/i.test(input.id))fail('invalid_input',400);
-  const sections={overview:'Домой',observations:'Наблюдения',chat:'NasaGPT',diary:'Дневник',favorites:'Избранное',sources:'Источники'};
+  const sections={overview:'Домой',observations:'Здоровье',chat:'NasaGPT',diary:'Дневник',archive:'Архив',favorites:'Избранное',sources:'Исследования'};
   const people={'jessica-meir':'Jessica Meir','jack-hathaway':'Jack Hathaway','christina-koch':'Christina Koch'};
   const areas={chat:'NasaGPT',diary:'дневнике',caption:'подписи сториз'};
   let summary;

@@ -2,10 +2,10 @@
   const make=(tag,cls,text)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;};
   const friendProfile=document.querySelector('.mission-rail>.profile');
   const home=make('section','mission-home');home.id='mission-home';
-  home.innerHTML='<section class="home-body-panel panel glass"><header><h2>Мои показатели</h2><small>Симуляция</small></header><div class="home-vitals" aria-label="Мои показатели"><div class="home-human"><img src="assets/health-body.svg" alt="Схема тела человека"><span>Демонстрация</span></div></div></section><section class="home-checkin"></section>';
+  home.innerHTML='<section class="home-body-panel panel glass"><header><h2>Мои показатели</h2></header><div class="home-vitals" aria-label="Мои показатели"><div class="home-human"><img src="assets/health-body.svg?v=20261030-illustrated1" alt="Схема тела человека"></div></div></section><section class="home-checkin"></section>';
   document.querySelector('.mission-heading').after(home);
   const friendBody=make('section','friend-body-panel panel glass'),friendMetrics=document.getElementById('metrics');
-  const friendHuman=make('div','home-human');friendHuman.innerHTML='<img src="assets/health-body.svg" alt="Схема тела человека">';
+  const friendHuman=make('div','home-human');friendHuman.innerHTML='<img src="assets/health-body.svg?v=20261030-illustrated1" alt="Схема тела человека">';
   friendMetrics.before(friendBody);friendBody.append(friendMetrics,friendHuman);
 
   home.querySelector('.home-checkin').append(window.missionCheckin.widget());

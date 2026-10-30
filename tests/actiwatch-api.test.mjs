@@ -7,7 +7,7 @@ import {webcrypto, createHash} from 'node:crypto';
 
 const root = new URL('../', import.meta.url);
 const source = (await Promise.all([
-  'public/actiwatch-core.js', 'worker/activity.js', 'worker/personal.js',
+  'public/actiwatch-core.js', 'worker/activity.js', 'worker/scheduler.js', 'worker/personal.js',
   'worker/photos.js', 'worker/stories.js', 'worker/book.js',
   'worker/actiwatch.js', 'worker/index.js'
 ].map(path => readFile(new URL(path, root), 'utf8')))).join('\n').replace('export default', 'globalThis.app =');

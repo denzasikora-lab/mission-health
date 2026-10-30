@@ -29,3 +29,7 @@ html[data-theme=light] .home-human img{filter:brightness(.48) saturate(.8);opaci
 body[data-home=true] .mission-content .layout{grid-template-columns:minmax(0,1fr)}body[data-home=true] .mission-content .insight-column{display:none}
 
 .home-instrument{color:inherit;text-decoration:none}.home-instrument:hover,.home-instrument:focus-visible{text-decoration:underline;color:var(--accent)}
+
+.home-body-watch{width:30px;height:36px;transform:translate(-50%,-50%) rotate(-12deg);filter:none}.home-body-watch svg{width:15px;height:25px;stroke-width:1}.home-body-watch .watch-band{fill:#315f50;stroke:#9bd4ad}.home-body-watch .watch-case{fill:#a2c5ab;stroke:#def2d6}.home-body-watch .watch-screen{fill:#112c25;stroke:#376c53;stroke-width:.6}.home-body-watch .watch-pulse{fill:none;stroke:#9debaf;stroke-width:1.1}.home-body-watch:hover{filter:brightness(1.2)}
+
+html[data-theme=light] .home-human img{filter:saturate(.8);opacity:1}

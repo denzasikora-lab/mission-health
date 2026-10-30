@@ -19,20 +19,22 @@
   }
   async function submit(kind,blob,duration){
     const state=states.get(kind);if(state.busy)return;
-    state.payload={id:crypto.randomUUID(),kind,blob,duration,frames:null,transcript:''};state.answer.textContent='';state.root.hidden=false;await send(state);
+    state.payload={id:crypto.randomUUID(),kind,blob,duration,frames:null,features:undefined,transcript:''};state.answer.textContent='';state.root.hidden=false;await send(state);
   }
   async function send(state){
     if(state.busy||!state.payload)return;state.busy=true;state.retry.hidden=true;button(state.kind).disabled=true;window.missionDiary.lock(state.kind,true);
     try{
       const item=state.payload;state.status.textContent='Подготавливаю запись для анализа...';
       if(item.kind==='video'&&!item.frames)item.frames=await frames(item.blob,item.duration);
+      if(item.features===undefined)item.features=await window.missionVoiceAnalysis?.analyze(item.kind,item.blob,item.frames||[]);
       if(!item.transcript)item.transcript=await window.missionSpeech?.finish?.(item.kind==='audio'?'voice':'video')||'';
-      const form=new FormData();for(const key of ['id','kind','duration','transcript'])form.set(key,String(item[key]));form.set('file',item.blob,'recording.'+(item.blob.type.includes('mp4')?'mp4':'webm'));for(const frame of item.frames||[])form.append('frame',frame,'frame.jpg');
+      window.missionVoiceAnalysis?.transcript(item.kind,item.transcript);
+      const form=new FormData();if(item.features)form.set('features',JSON.stringify(item.features));for(const key of ['id','kind','duration','transcript'])form.set(key,String(item[key]));form.set('file',item.blob,'recording.'+(item.blob.type.includes('mp4')?'mp4':'webm'));for(const frame of item.frames||[])form.append('frame',frame,'frame.jpg');
       const report=window.missionCheckin?.current();if(report)form.set('wellbeing',JSON.stringify(report));
       state.status.textContent='NasaGPT анализирует запись...';
       const response=await fetch('/api/media-analysis',{method:'POST',body:form,signal:AbortSignal.timeout(150000)}),result=await response.json();
       if(!response.ok||result.status!=='analyzed')throw Object.assign(new Error(result.error||'media_analysis_unavailable'),{saved:result.saved});
-      state.status.textContent='Анализ сохранен в личном дневнике';state.answer.textContent=result.analysis;state.payload=null;
+      state.status.textContent='Анализ сохранен в личном дневнике';state.answer.textContent=result.analysis;window.missionVoiceAnalysis?.transcript(item.kind,result.transcript||item.transcript);state.payload=null;
       void window.missionBook?.refresh();void window.missionActivity?.refresh();
     }catch(error){state.status.textContent=error.saved?'Запись сохранена. Анализ пока недоступен.':'Не удалось отправить запись на анализ.';state.retry.hidden=false;}
     finally{state.busy=false;button(state.kind).disabled=false;window.missionDiary.lock(state.kind,false);}
