@@ -8,7 +8,7 @@
   const icons = {overview:'M3 10 12 3l9 7v11h-6v-7H9v7H3Z',observations:'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z M3 12h4l2-3 4 6 2-3h6',diary:'M3 4h6a4 4 0 0 1 3 2 4 4 0 0 1 3-2h6v16h-6a4 4 0 0 0-3 2 4 4 0 0 0-3-2H3Z M12 6v16',sources:'M3 5c0-5 18-5 18 0v14c0 5-18 5-18 0Zm0 0c0 5 18 5 18 0M3 12c0 5 18 5 18 0'};
   icons.archive=icons.diary;icons.diary='M3 5h13v14H3Z M16 10l6-4v12l-6-4 M8 9v6m-3-3h6';
   icons.chat='M4 3h16v13H8l-4 5Z M8 8h8M8 12h5';icons.favorites='m12 3 2.8 5.7 6.3.9-4.55 4.43 1.07 6.27L12 17.34l-5.62 2.96 1.07-6.27L2.9 9.6l6.3-.9Z';
-  navigation.innerHTML = [['observations','Здоровье'],['diary','Дневник'],['archive','Архив'],['sources','Исследования']].map(([key,label])=>`<button type="button" data-mission-nav="${key}" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[key]}"/></svg><span>${label}</span></button>`).join('');
+  navigation.innerHTML = [['overview','Главная'],['observations','Здоровье'],['diary','Дневник'],['archive','Архив'],['sources','Исследования']].map(([key,label])=>`<button type="button" data-mission-nav="${key}" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[key]}"/></svg><span>${label}</span></button>`).join('');
   profile.after(navigation);
   const switcher = document.createElement('details'); switcher.className = 'mission-profiles';
   switcher.hidden=true;switcher.setAttribute('aria-hidden','true');
@@ -49,6 +49,7 @@
   homeLaunch.removeAttribute('data-open-media-diary');homeLaunch.id='mission-home-button';homeLaunch.setAttribute('aria-label','Домой');homeLaunch.title='Домой';
   homeLaunch.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="'+icons.overview+'"/></svg>';oldLaunch.replaceWith(homeLaunch);
   homeLaunch.addEventListener('click',()=>navigate('overview'));
+  document.querySelector('.brand').addEventListener('click',event=>{if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;event.preventDefault();navigate('overview');window.scrollTo({top:0,behavior:'auto'});});
 
   const date=document.createElement('time');date.className='mission-date';date.textContent=new Intl.DateTimeFormat('ru',{day:'numeric',month:'long',year:'numeric'}).format(new Date());date.dateTime=new Date().toISOString().slice(0,10);toolbar.prepend(date);
   const iconButton = document.createElement('button'); iconButton.type = 'button'; iconButton.className = 'mission-source-launch'; iconButton.setAttribute('aria-label','Открыть исследования NASA'); iconButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></svg>';
