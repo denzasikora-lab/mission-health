@@ -147,11 +147,11 @@
     view.host.querySelector('[data-personal-search]').hidden=kind!=='diary';view.host.querySelector('.personal-send-hint').textContent=kind==='diary'?'Enter / сохранить · Shift+Enter / новая строка':'Enter / отправить · Shift+Enter / новая строка';view.form.hidden=kind==='favorites';
     renderViews();window.missionCompose?.refresh(view.input);if(fetch){if(kind==='favorites'){if(!favoriteLoaded)void favorites();}else if(!store(kind).loaded)void load(kind);}
   }
-  const checkin=create('section','media-checkin');checkin.append(slider());
+  const checkin=create('section','media-checkin');
   const tabs=create('div','personal-tabs');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Личные разделы');
   for(const [kind,title] of [['chat','NasaGPT'],['favorites','Избранное']]){const b=create('button','',title);b.type='button';b.id='media-personal-tab-'+kind;b.dataset.personalTab=kind;b.setAttribute('role','tab');b.setAttribute('aria-controls','media-personal-conversation');b.setAttribute('aria-selected',String(kind==='chat'));b.tabIndex=kind==='chat'?0:-1;b.addEventListener('click',()=>{modalKind=kind;for(const tab of tabs.children){tab.setAttribute('aria-selected',String(tab===b));tab.tabIndex=tab===b?0:-1;}compact.setAttribute('aria-labelledby',b.id);setKind(modalView,kind);});b.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const list=[...tabs.children],i=list.indexOf(b),next=event.key==='Home'?0:event.key==='End'?list.length-1:(i+(event.key==='ArrowRight'?1:list.length-1))%list.length;list[next].click();list[next].focus();});tabs.append(b);}
   checkin.append(tabs);const compact=create('div','');compact.id='media-personal-conversation';compact.setAttribute('role','tabpanel');compact.setAttribute('aria-labelledby','media-personal-tab-chat');checkin.append(compact);modal.querySelector('.log-identity').before(checkin);const modalView=panel(compact,'chat');
-  const main=create('section','personal-workspace panel glass');main.id='personal-workspace';main.hidden=true;const mainCheckin=slider();main.append(mainCheckin);const mainHost=create('div','');main.append(mainHost);document.querySelector('.main-column').append(main);const mainView=panel(mainHost,'chat',{favoriteShortcut:true,onKindChange:kind=>{mainKind=kind;mainCheckin.hidden=kind==='favorites';}});
+  const main=create('section','personal-workspace panel glass');main.id='personal-workspace';main.hidden=true;const mainHost=create('div','');main.append(mainHost);document.querySelector('.main-column').append(main);const mainView=panel(mainHost,'chat',{favoriteShortcut:true,onKindChange:kind=>{mainKind=kind;}});
   const sidebar=create('section','nasagpt-sidebar panel glass');sidebar.id='nasagpt-sidebar';
   const legacy=document.getElementById('journal-view');legacy.classList.add('legacy-journal-archive');legacy.before(sidebar);const sidebarView=panel(sidebar,'chat',{favoriteShortcut:true});
   const mediaTools=create('div','nasagpt-media-tools');
@@ -160,7 +160,7 @@
   }
   sidebarView.form.querySelector('footer').prepend(mediaTools);
   function render(section=state.view){
-    const active=state.workspace==='crew'&&(section==='chat'||section==='favorites');main.hidden=!active;document.body.dataset.personalSection=active?section:'';mainCheckin.hidden=section==='favorites';
+    const active=state.workspace==='crew'&&(section==='chat'||section==='favorites');main.hidden=!active;document.body.dataset.personalSection=active?section:'';
     if(profileSeen!==profile()){profileSeen=profile();restoreScore();if(modal.open){const s=store(modalKind);if(modalKind!=='favorites'&&!s.loaded)void load(modalKind);}}
     if(active)setKind(mainView,section==='favorites'?'favorites':mainKind);renderScores();renderViews();
   }
