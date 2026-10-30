@@ -20,10 +20,14 @@ class Element{
 }
 function track(kind){return{kind,readyState:'live',enabled:true,stopped:false,stop(){this.stopped=true;this.readyState='ended';},clone(){return track(kind);},addEventListener(){},getSettings(){return{};}};}
 function media(){const tracks=[track('video'),track('audio')];return{tracks,getTracks:()=>tracks,getAudioTracks:()=>tracks.filter(t=>t.kind==='audio'),getVideoTracks:()=>tracks.filter(t=>t.kind==='video'),addTrack(t){tracks.push(t);}};}
-function fixture({background='room',permission,profile,unsupported=false,analysisBusy=false}={}){
+function fixture({background='room',permission,profile,unsupported=false,analysisBusy=false,bitmapFailure=false}={}){
   const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);};
   node('media-diary-dialog').open=true;node('video-log-background').value=background;
-  node('video-log-canvas').getContext=()=>({});
+  const drawing=[],bitmaps=[],timeouts=new Map();let animation;
+  const context=new Proxy({drawImage:(...args)=>drawing.push(args),createLinearGradient:()=>({addColorStop(){}})},{get:(target,key)=>target[key]||(()=>{})});
+  node('video-log-canvas').getContext=()=>context;
+  Object.assign(node('video-log-canvas'),{width:1280,height:720});
+  Object.assign(node('video-log-input'),{readyState:2,videoWidth:1280,videoHeight:720});
   const captured=[],recorders=[],workers=[],requests=[],locks=[],submissions=[],intervals=new Map();let timer=0,clock=0,engine;
   node('video-log-canvas').captureStream=()=>{const stream=media();stream.tracks.splice(1);captured.push(stream);return stream;};
   class CloneStream{constructor(tracks){this.tracks=tracks;captured.push(this);}getTracks(){return this.tracks;}getAudioTracks(){return this.tracks.filter(t=>t.kind==='audio');}}
@@ -35,26 +39,26 @@ function fixture({background='room',permission,profile,unsupported=false,analysi
   }
   class BackgroundWorker{
     constructor(){workers.push(this);}
-    postMessage(){}
+    postMessage(data){(this.messages||=[]).push(data);}
     terminate(){this.terminated=true;}
     emit(data){this.onmessage?.({data});}
   }
-  const document={hidden:false,getElementById:node,querySelectorAll:()=>[],addEventListener(){}};
+  const document={hidden:false,getElementById:node,createElement:()=>({getContext:()=>context}),querySelectorAll:()=>[],addEventListener(){}};
   const incoming=media(),storage=new Map();
   const window={MediaStream:CloneStream,missionMedia:{busy:()=>analysisBusy,meter:()=>({prepare(){},attach(){},stop(){}}),submit:(...args)=>submissions.push(args)},MediaRecorder:Recorder,Worker:BackgroundWorker,OffscreenCanvas:class{},createImageBitmap(){},addEventListener(){},missionDiary:{register(_mode,value){engine=value;},lock(_mode,value){locks.push(value);},open(){}},missionSpeech:{stop(){},reset(){},start(){}},missionAppearance:{stop(){},start(){},setIdentity(){}}};
   class ClipURL extends URL{static createObjectURL(){return 'blob:recorded-clip';}static revokeObjectURL(){}}
-  vm.runInNewContext(source,{document,window,Image:class{},MediaStream:CloneStream,Worker:BackgroundWorker,MediaRecorder:Recorder,Blob,URL:ClipURL,URLSearchParams,location:{search:''},Intl,Date,performance:{now:()=>clock},navigator:{mediaDevices:{getUserMedia(options){requests.push(options);return permission?.promise||Promise.resolve(incoming);}}},fetch:()=>profile?.promise||Promise.resolve({ok:true,json:async()=>({researcherId:'local-test',name:'Тестовый участник'})}),localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)},setTimeout:()=>++timer,clearTimeout(){},setInterval:callback=>{intervals.set(++timer,callback);return timer;},clearInterval:id=>intervals.delete(id),requestAnimationFrame:()=>1,cancelAnimationFrame(){}});
+  vm.runInNewContext(source,{document,window,createImageBitmap:async input=>{bitmaps.push(input);if(bitmapFailure)throw new Error('unsupported_video_bitmap');return{close(){}};},Image:class{},MediaStream:CloneStream,Worker:BackgroundWorker,MediaRecorder:Recorder,Blob,URL:ClipURL,URLSearchParams,location:{search:''},Intl,Date,performance:{now:()=>clock},navigator:{mediaDevices:{getUserMedia(options){requests.push(options);return permission?.promise||Promise.resolve(incoming);}}},fetch:()=>profile?.promise||Promise.resolve({ok:true,json:async()=>({researcherId:'local-test',name:'Тестовый участник'})}),localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)},setTimeout:(callback,delay)=>{timeouts.set(++timer,{callback,at:clock+delay});return timer;},clearTimeout:id=>timeouts.delete(id),setInterval:callback=>{intervals.set(++timer,callback);return timer;},clearInterval:id=>intervals.delete(id),requestAnimationFrame:callback=>{animation=callback;return 1;},cancelAnimationFrame(){}});
   engine.enter();
-  return{node,incoming,captured,recorders,workers,requests,locks,submissions,engine,start:async()=>{node('video-log-camera').emit('click');await settle();},advance(ms){clock+=ms;for(const callback of [...intervals.values()])callback();}};
+  return{node,incoming,captured,recorders,workers,requests,locks,submissions,engine,bitmaps,drawing,start:async()=>{node('video-log-camera').emit('click');await settle();},draw(time=100){animation(time);},advance(ms){clock+=ms;for(const callback of [...intervals.values()])callback();for(const [id,t] of [...timeouts])if(t.at<=clock){timeouts.delete(id);t.callback();}}};
 }
 
 test('Камера сразу начинает запись с клонированной дорожкой голоса',async()=>{
   const f=fixture();await f.start();assert.equal(f.recorders.length,1);assert.equal(f.recorders[0].state,'recording');assert.equal(f.recorders[0].stream.getAudioTracks().length,1);assert.notEqual(f.recorders[0].stream.getAudioTracks()[0],f.incoming.getAudioTracks()[0]);assert.equal(f.node('video-log-camera').textContent,'Остановить запись');assert.equal(f.node('video-log-background').disabled,true);assert.equal(f.locks.at(-1),true);
 });
-test('Обработка оформления запускает запись по первому готовому кадру ровно один раз',async()=>{
-  const f=fixture({background:'lab'});await f.start();assert.equal(f.recorders.length,0);
-  const worker=f.workers[0];worker.emit({type:'ready'});assert.equal(f.recorders.length,0);
-  worker.emit({type:'frame',bitmap:{close(){}}});worker.emit({type:'frame',bitmap:{close(){}}});assert.equal(f.recorders.length,1);assert.equal(f.recorders[0].starts,1);
+test('Камера видна и записывается до готовности оформления без повторного запуска',async()=>{
+  const f=fixture({background:'lab'});await f.start();assert.equal(f.recorders.length,1);assert.equal(f.node('video-log-screen').dataset.preview,'camera');
+  const worker=f.workers[0];worker.emit({type:'ready'});assert.equal(f.node('video-log-screen').dataset.preview,'camera');
+  worker.emit({type:'frame',bitmap:{close(){}}});worker.emit({type:'frame',bitmap:{close(){}}});assert.equal(f.node('video-log-screen').dataset.preview,'background');assert.equal(f.recorders.length,1);assert.equal(f.recorders[0].starts,1);
 });
 test('Отмена до разрешения камеры останавливает запоздавший поток без записи',async()=>{
   const permission=deferred(),f=fixture({permission});await f.start();f.node('video-log-camera').emit('click');permission.resolve(f.incoming);await settle();assert.equal(f.recorders.length,0);assert.ok(f.incoming.getTracks().every(t=>t.stopped));assert.equal(f.node('video-log-camera').attributes['aria-pressed'],'false');
@@ -66,10 +70,25 @@ test('Та же кнопка останавливает запись и пере
   const f=fixture();await f.start();f.node('video-log-camera').emit('click');await settle();assert.equal(f.recorders[0].state,'inactive');assert.ok(f.incoming.getTracks().every(t=>t.stopped));assert.ok(f.captured[0].getTracks().every(t=>t.stopped));assert.equal(f.submissions.length,1);assert.equal(f.submissions[0][0],'video');assert.ok(f.submissions[0][1] instanceof Blob);assert.equal(f.node('video-log-camera').textContent,'Включить камеру');assert.equal(f.locks.at(-1),false);
 });
 test('Закрытие окна во время подготовки не позволяет позднему кадру начать запись',async()=>{
-  const f=fixture({background:'lab'});await f.start();const worker=f.workers[0];f.node('media-diary-dialog').open=false;f.engine.leave();const bitmap={closed:false,close(){this.closed=true;}};worker.emit({type:'frame',bitmap});assert.equal(f.recorders.length,0);assert.equal(bitmap.closed,true);assert.ok(f.incoming.getTracks().every(t=>t.stopped));
+  const f=fixture({background:'lab'});await f.start();const worker=f.workers[0];f.node('media-diary-dialog').open=false;f.engine.leave();const bitmap={closed:false,close(){this.closed=true;}};worker.emit({type:'frame',bitmap});await settle();assert.equal(f.recorders.length,1);assert.equal(f.recorders[0].state,'inactive');assert.equal(f.node('video-log-screen').dataset.preview,'idle');assert.equal(bitmap.closed,true);assert.ok(f.incoming.getTracks().every(t=>t.stopped));
 });
-test('После ошибки оформления выбор обычной камеры начинает запись',async()=>{
-  const f=fixture({background:'lab'});await f.start();f.workers[0].emit({type:'error'});assert.equal(f.recorders.length,0);f.node('video-log-background').value='room';f.node('video-log-background').emit('change');assert.equal(f.recorders.length,1);
+test('Ошибка оформления оставляет камеру видимой и не прерывает запись',async()=>{
+  const f=fixture({background:'lab'});await f.start();f.workers[0].emit({type:'error'});assert.equal(f.node('video-log-screen').dataset.preview,'camera');assert.equal(f.recorders[0].state,'recording');assert.ok(f.incoming.getTracks().every(t=>!t.stopped));assert.equal(f.submissions.length,0);assert.match(f.node('video-log-notice').textContent,/Запись продолжается/);
+});
+test('Зависшая загрузка оформления сохраняет живое видео и запись',async()=>{
+  const f=fixture({background:'lab'});await f.start();f.advance(45000);assert.equal(f.workers[0].terminated,true);assert.equal(f.node('video-log-screen').dataset.preview,'camera');assert.equal(f.recorders[0].state,'recording');
+});
+test('Пустая маска не прячет человека и следующий корректный кадр возвращает фон',async()=>{
+  const f=fixture({background:'lab'});await f.start();const worker=f.workers[0];worker.emit({type:'frame',bitmap:{close(){}}});const empty={closed:false,close(){this.closed=true;}};worker.emit({type:'frame',hasPerson:false,bitmap:empty});assert.equal(empty.closed,true);assert.equal(f.node('video-log-screen').dataset.preview,'camera');worker.emit({type:'frame',hasPerson:true,bitmap:{close(){}}});assert.equal(f.node('video-log-screen').dataset.preview,'background');assert.equal(f.recorders.length,1);
+});
+test('Кадр для обработчика создается из промежуточного canvas вместо video',async()=>{
+  const f=fixture({background:'lab'});await f.start();f.workers[0].emit({type:'ready'});f.draw();await settle();assert.equal(f.bitmaps.length,1);assert.notEqual(f.bitmaps[0],f.node('video-log-input'));assert.equal(f.bitmaps[0].width,640);assert.equal(f.workers[0].messages.at(-1).type,'frame');
+});
+test('Ошибка преобразования кадра не выключает камеру и запись',async()=>{
+  const f=fixture({background:'lab',bitmapFailure:true});await f.start();f.workers[0].emit({type:'ready'});f.draw();await settle();assert.equal(f.workers[0].terminated,true);assert.equal(f.node('video-log-screen').dataset.preview,'camera');assert.equal(f.recorders[0].state,'recording');
+});
+test('Зависший кадр освобождает обработчик и возвращает исходную камеру',async()=>{
+  const f=fixture({background:'lab'});await f.start();f.workers[0].emit({type:'ready'});f.workers[0].emit({type:'frame',bitmap:{close(){}}});f.draw();await settle();f.advance(5000);assert.equal(f.workers[0].terminated,true);assert.equal(f.node('video-log-screen').dataset.preview,'camera');assert.equal(f.recorders[0].state,'recording');
 });
 test('Лимит двух минут отправляет автоматическую запись на анализ',async()=>{
   const f=fixture();await f.start();f.advance(120000);await settle();assert.equal(f.recorders[0].state,'inactive');assert.equal(f.submissions.length,1);assert.equal(f.submissions[0][2],120);assert.ok(f.incoming.getTracks().every(t=>t.stopped));

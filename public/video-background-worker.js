@@ -5,7 +5,7 @@ self.onmessage = async event => {
   const { type, bitmap, timestamp } = event.data;
   try {
     if (type === 'init') {
-      const files = await Vision.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.0/wasm');
+      const files = { wasmLoaderPath: '/camera-engine/vision_wasm_nosimd_internal.js', wasmBinaryPath: '/camera-engine/vision_wasm_nosimd_internal.wasm?v=20261029-gzip2' };
       segmenter = await Vision.ImageSegmenter.createFromOptions(files, {
         baseOptions: { modelAssetPath: '/camera-engine/selfie-landscape.tflite', delegate: 'CPU' },
         runningMode: 'VIDEO', outputCategoryMask: false, outputConfidenceMasks: true
@@ -25,7 +25,9 @@ self.onmessage = async event => {
         }
         const image = maskContext.createImageData(mask.width, mask.height);
         // Мягкая граница сохраняет волосы и сглаживает край портрета.
+        let personPixels = 0;
         for (let pixel = 0; pixel < values.length; pixel++) {
+          if (values[pixel] >= .5) personPixels++;
           const confidence = Math.max(0, Math.min(1, (values[pixel] - .25) / .55));
           const offset = pixel * 4;
           image.data[offset] = image.data[offset + 1] = image.data[offset + 2] = 255;
@@ -39,7 +41,8 @@ self.onmessage = async event => {
         portraitContext.drawImage(maskCanvas, 0, 0, 640, 360);
         portraitContext.globalCompositeOperation = 'source-over';
         const cutout = portrait.transferToImageBitmap();
-        self.postMessage({ type: 'frame', bitmap: cutout }, [cutout]);
+        // Пустая маска не должна скрывать человека за виртуальным фоном.
+        self.postMessage({ type: 'frame', bitmap: cutout, hasPerson: personPixels / values.length >= .005 }, [cutout]);
       });
     }
   } catch (error) {

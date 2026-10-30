@@ -25,3 +25,5 @@ body[data-display=phone] .media-diary[open][data-mode]{display:block;grid-templa
 .media-analysis-job{padding:10px 0;border-bottom:1px solid #37626444}.media-analysis-job:last-child{border-bottom:0}.media-analysis-job>header{font-size:.62rem;color:#8eaaa3}.media-analysis-job>p{margin:6px 0;font-size:.67rem}
 
 .media-diary .log-screen canvas{position:absolute;inset:0;object-fit:cover}
+
+.media-diary .log-screen video{position:absolute;inset:0;object-fit:cover;transform:scaleX(-1);z-index:0}.media-diary .log-screen canvas{z-index:1}.media-diary .log-screen[data-preview=camera] video{z-index:2}.media-diary .log-screen[data-preview=idle] video{visibility:hidden}

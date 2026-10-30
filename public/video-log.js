@@ -3,8 +3,12 @@
   const panel = document.getElementById('video-log-dialog');
   const visible = () => dialog.open && !panel.hidden;
   const canvas = document.getElementById('video-log-canvas');
+  const screen = document.getElementById('video-log-screen');
   const context = canvas.getContext('2d');
   const video = document.getElementById('video-log-input');
+  const segmentationInput = document.createElement('canvas');
+  segmentationInput.width = 640; segmentationInput.height = 360;
+  const segmentationContext = segmentationInput.getContext('2d');
   const cameraButton = document.getElementById('video-log-camera');
   const backgroundChoice = document.getElementById('video-log-background');
   const notice = document.getElementById('video-log-notice');
@@ -52,9 +56,14 @@
   }
 
   function message(value, error = false) { notice.textContent = value; notice.dataset.error = String(error); }
+  function renderPreview() {
+    // Живое видео видно сразу, пока нет надежной маски человека.
+    screen.dataset.preview = !stream ? 'idle' : backgroundChoice.value === 'room' || !portrait ? 'camera' : 'background';
+    canvas.setAttribute('aria-label', screen.dataset.preview === 'camera' ? 'Исходная камера без замены фона' : 'Камера видеодневника с выбранным оформлением');
+  }
   function renderControls() {
+    renderPreview();
     const active = phase === 'live' || phase === 'recording';
-    canvas.setAttribute('aria-label', backgroundChoice.value === 'room' ? 'Исходная камера без фона и надписей' : 'Камера видеодневника с выбранным оформлением');
     cameraButton.textContent = phase === 'requesting' ? 'Отменить подключение' : phase === 'recording' ? 'Остановить запись' : phase === 'finishing' ? 'Подготовка записи' : active ? 'Выключить камеру' : 'Включить камеру';
     cameraButton.disabled = phase === 'finishing';
     cameraButton.setAttribute('aria-pressed', String(active));
@@ -76,38 +85,42 @@
     video.pause(); video.srcObject = null;
     worker?.terminate(); worker = null; workerReady = workerBusy = false;
     portrait?.close(); portrait = null;
+    renderPreview();
+  }
+
+  function backgroundError(attempt, activeWorker = worker) {
+    if (attempt !== epoch || worker !== activeWorker) return;
+    clearTimeout(workerTimer); workerTimer = null;
+    activeWorker?.terminate(); worker = null; workerReady = workerBusy = false;
+    portrait?.close(); portrait = null; renderPreview();
+    message('Фон недоступен. Камера работает без замены фона.' + (phase === 'recording' ? ' Запись продолжается.' : ''));
   }
 
   function prepareBackground(attempt) {
     if (worker || backgroundChoice.value === 'room') return;
     if (!window.Worker || !window.OffscreenCanvas || !window.createImageBitmap) {
-      message('Этот браузер не поддерживает замену фона. Выбери «Обычная камера», чтобы включить обычную камеру.', true); return;
+      message('Камера работает без замены фона: обработка фона недоступна в этом браузере.'); return;
     }
-    message('Загружаю обработчик фона. Кадры остаются на устройстве.');
-    worker = new Worker('/video-background-worker.js?v=20261028-log1');
+    message((phase === 'recording' ? 'Идет запись. ' : '') + 'Обрабатываю фон на устройстве.');
+    worker = new Worker('/video-background-worker.js?v=20261030-camera-preview1');
     const activeWorker = worker;
     workerTimer = setTimeout(() => {
-      if (worker === activeWorker && !workerReady) backgroundError();
+      if (worker === activeWorker && !workerReady) backgroundError(attempt, activeWorker);
     }, 45000);
-    function backgroundError() {
-      clearTimeout(workerTimer); workerTimer = null;
-      if (attempt !== epoch) return;
-      activeWorker.terminate(); if (worker === activeWorker) worker = null;
-      workerReady = workerBusy = false; portrait?.close(); portrait = null;
-      if (recorder?.state === 'recording') stopCamera();
-      message('Фон не удалось обработать. Повтори подключение или выбери «Обычная камера» для обычной камеры.', true);
-      renderControls();
-    }
     worker.onmessage = event => {
       const data = event.data;
       if (attempt !== epoch || worker !== activeWorker) { data.bitmap?.close(); return; }
       if (data.type === 'ready') { clearTimeout(workerTimer); workerTimer = null; workerReady = true; }
       else if (data.type === 'frame') {
-        portrait?.close(); portrait = data.bitmap; workerBusy = false;
-        if (phase === 'live') void recordWhenReady(attempt);
-      } else if (data.type === 'error') backgroundError();
+        clearTimeout(workerTimer); workerTimer = null;
+        const hadPortrait = Boolean(portrait);
+        portrait?.close(); portrait = data.hasPerson === false ? null : data.bitmap; workerBusy = false;
+        if (!portrait) data.bitmap?.close();
+        renderPreview();
+        if (portrait && !hadPortrait && phase === 'recording') message('Идет запись видео и голоса. Нажми «Остановить запись», когда закончишь.');
+      } else if (data.type === 'error') backgroundError(attempt, activeWorker);
     };
-    worker.onerror = backgroundError;
+    worker.onerror = () => backgroundError(attempt, activeWorker);
     worker.postMessage({ type: 'init' });
   }
 
@@ -130,7 +143,7 @@
       // Разрешение после закрытия или отмены не должно возобновлять камеру.
       if (attempt !== epoch || !visible()) { incoming.getTracks().forEach(track => track.stop()); return; }
       if(!incoming.getAudioTracks().length){incoming.getTracks().forEach(track=>track.stop());throw new Error('audio_required');}
-      stream = incoming; video.srcObject = incoming; await video.play();
+      stream = incoming; video.srcObject = incoming; renderPreview(); await video.play();
       if (attempt !== epoch || !visible()) return;
       phase = 'live'; microphoneMeter.attach(incoming); renderControls();
       void window.missionSpeech?.start('video', stream);
@@ -142,8 +155,10 @@
       cameraTimer = setTimeout(() => {
         stopCamera(); if (phase !== 'finishing') phase = 'idle'; renderControls(); message('Камера выключена после трех минут просмотра.');
       }, 180000);
-      if (backgroundChoice.value !== 'room') prepareBackground(attempt);
-      else void recordWhenReady(attempt);
+      void recordWhenReady(attempt);
+      if (backgroundChoice.value !== 'room') {
+        try { prepareBackground(attempt); } catch { backgroundError(attempt); }
+      }
     } catch (error) {
       if (attempt !== epoch) return;
       stopCamera(); phase = 'idle'; renderControls();
@@ -222,17 +237,14 @@
   async function sendFrame(time) {
     const attempt = epoch, activeWorker = worker;
     workerBusy = true; lastSegmentation = time;
+    workerTimer = setTimeout(() => backgroundError(attempt, activeWorker), 5000);
     try {
-      const bitmap = await createImageBitmap(video, { resizeWidth: 640, resizeHeight: 360 });
+      // Промежуточный canvas работает и в Safari без преобразования video в bitmap.
+      segmentationContext.drawImage(video, 0, 0, 640, 360);
+      const bitmap = await createImageBitmap(segmentationInput);
       if (attempt !== epoch || worker !== activeWorker || !visible()) { bitmap.close(); return; }
       activeWorker.postMessage({ type: 'frame', bitmap, timestamp: time }, [bitmap]);
-    } catch {
-      if (attempt === epoch) {
-        workerBusy = false;
-        if (recorder?.state === 'recording') stopCamera();
-        message('Кадры камеры недоступны. Переподключи камеру или выбери обычный фон.', true); renderControls();
-      }
-    }
+    } catch { backgroundError(attempt, activeWorker); }
   }
 
   function animate(time) {
@@ -261,14 +273,14 @@
   }
 
   function recordWhenReady(attempt) {
-    if (attempt !== epoch || phase !== 'live' || autoRecordAttempt === attempt || backgroundChoice.value !== 'room' && !portrait) return;
+    if (attempt !== epoch || phase !== 'live' || autoRecordAttempt === attempt) return;
     autoRecordAttempt = attempt;
-    // Готовое оформление запускает запись один раз для текущего подключения.
+    // Запись исходных дорожек не зависит от готовности оформления.
     startRecording();
   }
 
   function startRecording() {
-    if (phase !== 'live' || backgroundChoice.value !== 'room' && !portrait) return;
+    if (phase !== 'live') return;
     updateSignature();
     if (!identity || !researcher.value.trim()) { message('Не удалось прочитать имя профиля. Обнови страницу после входа в аккаунт.', true); return; }
     if (!window.MediaStream || !window.MediaRecorder) { message('Запись видео не поддерживается этим браузером. Попробуй Safari или Chrome.', true); return; }
