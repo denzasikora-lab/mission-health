@@ -6,6 +6,8 @@
 @container mission (max-width:1000px){
   .shell .topbar{margin-inline:0;padding-inline:var(--mission-grid-inset);flex-wrap:wrap}
   .shell .topbar .brand{flex-basis:100%;width:100%}
+  .shell .topbar .mission-brand-caption{display:block;grid-column:2}
+  .shell .topbar .brand-mark{grid-row:1/3}
   .shell .topbar .toolbar{flex-basis:100%;width:100%;margin:0;padding:0;border:0}
   .shell .mission-frame{display:block}
   .shell .mission-frame .mission-rail{display:flex;flex-direction:column;min-height:0;padding-inline:var(--mission-grid-inset);gap:9px}
