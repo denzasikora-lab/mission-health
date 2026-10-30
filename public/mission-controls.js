@@ -1,5 +1,15 @@
 (() => {
   const toolbar=document.querySelector('.toolbar');
+  const country=document.createElement('label');country.className='mission-tool mission-country-control';
+  const shape=document.createElement('span');shape.className='mission-country-shape';shape.setAttribute('aria-hidden','true');
+  const countryChoice=document.createElement('select');countryChoice.setAttribute('aria-label','Страна');country.append(shape,countryChoice);
+  toolbar.insertBefore(country,document.getElementById('mission-theme-toggle'));
+  let countryCode='';try{countryCode=localStorage.getItem('mission-health-country')||'';}catch{}
+  if(!/^[A-Z]{2}$/.test(countryCode)){const zone=Intl.DateTimeFormat().resolvedOptions().timeZone;countryCode=zone==='Europe/Istanbul'?'TR':{ru:'RU',en:'GB',ur:'PK'}[state.language]||'RU';}
+  function renderCountry(){shape.style.maskImage='url("assets/country-outlines/'+countryCode.toLowerCase()+'.svg")';shape.style.webkitMaskImage=shape.style.maskImage;country.title=new Intl.DisplayNames(['ru'],{type:'region'}).of(countryCode)||countryCode;countryChoice.title=country.title;countryChoice.value=countryCode;}
+  const initial=document.createElement('option');initial.value=countryCode;initial.textContent=countryCode;countryChoice.append(initial);renderCountry();
+  fetch('/data/country-codes.json').then(response=>response.json()).then(codes=>{const names=new Intl.DisplayNames(['ru'],{type:'region'});countryChoice.replaceChildren();for(const code of codes.sort((a,b)=>(names.of(a)||a).localeCompare(names.of(b)||b,'ru'))){const option=document.createElement('option');option.value=code;option.textContent=names.of(code)||code;countryChoice.append(option);}renderCountry();}).catch(()=>{});
+  countryChoice.addEventListener('change',()=>{countryCode=countryChoice.value;savePreference('mission-health-country',countryCode);renderCountry();});
   const monitor='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>';
   const devices=document.createElement('div');devices.className='mission-popover-control';
   devices.innerHTML='<button type="button" id="mission-device-button" class="mission-tool" aria-label="Вид экрана" aria-haspopup="menu" aria-expanded="false">'+monitor+'</button><div class="mission-popover" id="mission-device-menu" role="menu" aria-label="Вид экрана" hidden><h2>Вид экрана</h2>'+[['desktop','Компьютер'],['tablet','Планшет'],['duo','iPhone Duo'],['phone','Телефон']].map(([key,label])=>`<button type="button" role="menuitemradio" data-display-mode="${key}" aria-checked="false"><span>${label}</span><i aria-hidden="true">✓</i></button>`).join('')+'</div>';

@@ -23,12 +23,12 @@ function speechMedia(bytes){
   if(ascii(0,3)==='ID3'||bytes[0]===0xff&&(bytes[1]&0xe0)===0xe0)return ['audio/mpeg','mp3'];
   return null;
 }
-async function speechRoute(request,env,isConfig=false){
+async function speechRoute(request,env,isConfig=false,options={}){
   const settings=speechSettings(env);
   if(isConfig){if(request.method!=='GET')fail('method_not_allowed',405);return json({api:settings.cloud,local:settings.local,airGap:settings.airGap,cloudModel:env.SPEECH_MODEL||'openai/whisper-1',localModel:settings.local?(env.LOCAL_SPEECH_MODEL||'local'):'not_connected'});}
   if(request.method!=='POST')fail('method_not_allowed',405);
   if(!request.headers.get('content-type')?.startsWith('multipart/form-data;'))fail('invalid_input',400);
-  const maxBytes=8*1024*1024;if(Number(request.headers.get('content-length')||0)>maxBytes+65536)fail('speech_too_large',413);
+  const maxBytes=options.maxBytes||8*1024*1024;if(Number(request.headers.get('content-length')||0)>maxBytes+65536)fail('speech_too_large',413);
   const input=await request.formData(),mode=input.get('mode'),file=input.get('file');
   if(!['api','local'].includes(mode)||!file||typeof file==='string'||typeof file.arrayBuffer!=='function')fail('invalid_input',400);
   if(mode==='api'&&settings.airGap)fail('speech_air_gap',403);

@@ -5,9 +5,7 @@
   const canvas = document.getElementById('video-log-canvas');
   const context = canvas.getContext('2d');
   const video = document.getElementById('video-log-input');
-  const review = document.getElementById('video-log-review');
   const cameraButton = document.getElementById('video-log-camera');
-  const download = document.getElementById('video-log-download');
   const backgroundChoice = document.getElementById('video-log-background');
   const notice = document.getElementById('video-log-notice');
   const helmetZoom = document.getElementById('video-log-zoom');
@@ -22,7 +20,8 @@
   let phase = 'idle', epoch = 0, stream, worker, workerReady = false, workerBusy = false;
   let portrait, frame = 0, lastDraw = 0, lastSegmentation = 0;
   let recorder, recordedStream, recordingStarted = 0, recordingTimer, cameraTimer, workerTimer, autoRecordAttempt = -1;
-  let clipUrl, clipDate, entry = 1, identity, identityPromise, nameDirty = false, ownProfileChange = false;
+  let entry = 1, identity, identityPromise, nameDirty = false, ownProfileChange = false;
+  const microphoneMeter = window.missionMedia.meter('video-log');
   const earthStation = () => locationName.dataset.station || 'HOUSTON / JOHNSON';
   const storageKey = suffix => 'mission-health-log-' + (identity?.researcherId || 'local') + '-' + suffix;
   function normalized(value) { return String(value || '').replaceAll('\u0451', '\u0435').replaceAll('\u0401', '\u0415').replace(/[\u2013\u2014]/g, '-'); }
@@ -56,8 +55,8 @@
   function renderControls() {
     const active = phase === 'live' || phase === 'recording';
     canvas.setAttribute('aria-label', backgroundChoice.value === 'room' ? 'Исходная камера без фона и надписей' : 'Камера видеодневника с выбранным оформлением');
-    cameraButton.textContent = phase === 'requesting' ? 'Отменить подключение' : phase === 'recording' ? 'Остановить запись' : phase === 'finishing' ? 'Подготовка записи' : active ? 'Выключить камеру' : clipUrl ? 'Новая запись' : 'Включить камеру';
-    cameraButton.disabled = phase === 'finishing';
+    cameraButton.textContent = phase === 'requesting' ? 'Отменить подключение' : phase === 'recording' ? 'Остановить запись' : phase === 'finishing' ? 'Подготовка записи' : active ? 'Выключить камеру' : 'Включить камеру';
+    cameraButton.disabled = phase === 'finishing' || window.missionMedia.busy('video');
     cameraButton.setAttribute('aria-pressed', String(active));
     cameraButton.dataset.recording = String(phase === 'recording');
     backgroundChoice.disabled = phase === 'recording' || phase === 'finishing';
@@ -65,12 +64,10 @@
     document.getElementById('video-log-zoom-label').hidden = backgroundChoice.value !== 'helmet';
     firstName.disabled = lastName.disabled = phase === 'recording' || phase === 'finishing';
     window.missionDiary.lock('video', phase === 'recording' || phase === 'finishing');
-    download.hidden = !clipUrl || phase !== 'review';
-    review.hidden = phase !== 'review';
   }
 
   function stopCamera() {
-    epoch++; window.missionSpeech?.stop('video');
+    epoch++; window.missionSpeech?.stop('video'); microphoneMeter.stop();
     window.missionAppearance?.stop();
     if (recorder?.state === 'recording') { phase = 'finishing'; recorder.stop(); }
     clearTimeout(cameraTimer); clearTimeout(workerTimer); clearInterval(recordingTimer);
@@ -79,12 +76,6 @@
     video.pause(); video.srcObject = null;
     worker?.terminate(); worker = null; workerReady = workerBusy = false;
     portrait?.close(); portrait = null;
-  }
-
-  function discardClip() {
-    review.pause(); review.removeAttribute('src'); review.load();
-    if (clipUrl) URL.revokeObjectURL(clipUrl);
-    clipUrl = null; download.removeAttribute('href');
   }
 
   function prepareBackground(attempt) {
@@ -121,14 +112,14 @@
   }
 
   async function startCamera() {
-    stopCamera(); discardClip(); window.missionSpeech?.reset('video'); phase = 'requesting'; renderControls();
+    stopCamera(); microphoneMeter.prepare(); window.missionSpeech?.reset('video'); phase = 'requesting'; renderControls();
     message('Разреши камеру и микрофон в браузере. Голос входит в запись.');
     const attempt = epoch;
     try {
       await (identityPromise ||= loadIdentity());
       if (attempt !== epoch || !visible()) return;
       if (!identity || !researcher.value.trim()) {
-        phase = 'idle'; renderControls();
+        stopCamera(); phase = 'idle'; renderControls();
         message('Не удалось прочитать имя профиля. Обнови страницу после входа в аккаунт.', true); return;
       }
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('unavailable');
@@ -141,7 +132,7 @@
       if(!incoming.getAudioTracks().length){incoming.getTracks().forEach(track=>track.stop());throw new Error('audio_required');}
       stream = incoming; video.srcObject = incoming; await video.play();
       if (attempt !== epoch || !visible()) return;
-      phase = 'live'; renderControls();
+      phase = 'live'; microphoneMeter.attach(incoming); renderControls();
       void window.missionSpeech?.start('video', stream);
       window.missionAppearance?.start(video,incoming.getVideoTracks?.()[0]?.getSettings?.());
       incoming.getTracks().forEach(track => track.addEventListener('ended', () => {
@@ -247,7 +238,7 @@
   function animate(time) {
     if (!visible() || document.hidden) { frame = 0; return; }
     frame = requestAnimationFrame(animate);
-    if (time - lastDraw < 33 || phase === 'review') return;
+    if (time - lastDraw < 33) return;
     lastDraw = time;
     context.fillStyle = backgroundChoice.value === 'room' ? '#000' : '#102027'; context.fillRect(0, 0, 1280, 720);
     if (backgroundChoice.value === 'room') {
@@ -283,16 +274,15 @@
     if (phase !== 'live' || backgroundChoice.value !== 'room' && !portrait) return;
     updateSignature();
     if (!identity || !researcher.value.trim()) { message('Не удалось прочитать имя профиля. Обнови страницу после входа в аккаунт.', true); return; }
-    if (!canvas.captureStream || !window.MediaRecorder) { message('Запись видео не поддерживается этим браузером. Попробуй Safari или Chrome.', true); return; }
+    if (!window.MediaStream || !window.MediaRecorder) { message('Запись видео не поддерживается этим браузером. Попробуй Safari или Chrome.', true); return; }
     const audio = stream.getAudioTracks().length > 0;
     const types = audio ? ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/webm;codecs=vp8,opus', 'video/mp4', 'video/webm'] : ['video/mp4;codecs=avc1.42E01E', 'video/webm;codecs=vp8', 'video/mp4', 'video/webm'];
     const mimeType = types.find(type => MediaRecorder.isTypeSupported(type));
     if (!mimeType) { message('Подходящий формат записи не найден. Попробуй другой браузер.', true); return; }
     const chunks = [];
     try {
-      recordedStream = canvas.captureStream(24);
-      stream.getAudioTracks().forEach(track => recordedStream.addTrack(track.clone()));
-      recorder = new MediaRecorder(recordedStream, { mimeType, videoBitsPerSecond: 2400000, audioBitsPerSecond: 96000 });
+      recordedStream = new MediaStream(stream.getTracks().map(track => track.clone()));
+      recorder = new MediaRecorder(recordedStream, { mimeType, videoBitsPerSecond: 900000, audioBitsPerSecond: 96000 });
       const recording = recorder;
       let failed = false;
       recording.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
@@ -303,13 +293,13 @@
         stopCamera(); recorder = null;
         if (failed || !chunks.length) { phase = 'idle'; renderControls(); return; }
         const blob = new Blob(chunks, { type: recording.mimeType });
-        clipUrl = URL.createObjectURL(blob); review.src = clipUrl;
-        download.href = clipUrl; download.download = 'mission-health-log-' + String(entry).padStart(3, '0') + (blob.type.includes('mp4') ? '.mp4' : '.webm');
+        const duration = Math.max(.1,(performance.now()-recordingStarted)/1000);
         entry++;
         try { localStorage.setItem(storageKey('entry'), String(entry)); } catch {}
-        phase = 'review'; renderControls(); message('Запись готова. Посмотри ее и скачай файл, чтобы сохранить.');
+        phase = 'idle'; renderControls(); message('Запись передана на анализ.');
+        void window.missionMedia.submit('video',blob,duration);
       };
-      clipDate = new Date(); recordingStarted = performance.now(); phase = 'recording';
+      recordingStarted = performance.now(); phase = 'recording';
       recording.start(250); clearTimeout(cameraTimer);
       recordingTimer = setInterval(() => {
         if (performance.now() - recordingStarted >= 120000 && recording.state === 'recording') { phase = 'finishing'; recording.stop(); renderControls(); }
@@ -323,12 +313,12 @@
 
   function prepare() { identityPromise ||= loadIdentity(); }
   function enter() {
-    prepare(); if (clipUrl) phase = 'review'; renderControls();
+    prepare(); renderControls();
     if (!frame) frame = requestAnimationFrame(animate);
   }
   function leave() {
-    stopCamera(); review.pause(); cancelAnimationFrame(frame); frame = 0;
-    if (phase !== 'finishing') phase = clipUrl ? 'review' : 'idle'; renderControls();
+    stopCamera(); cancelAnimationFrame(frame); frame = 0;
+    if (phase !== 'finishing') phase = 'idle'; renderControls();
   }
   function open() { window.missionDiary.open('video'); }
   window.missionDiary.register('video', {enter, leave, prepare});
@@ -364,11 +354,11 @@
   });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-      stopCamera(); review.pause(); cancelAnimationFrame(frame); frame = 0;
-      if (phase !== 'finishing') phase = clipUrl ? 'review' : 'idle'; renderControls(); message('');
+      stopCamera(); cancelAnimationFrame(frame); frame = 0;
+      if (phase !== 'finishing') phase = 'idle'; renderControls(); message('');
     } else if (visible() && !frame) frame = requestAnimationFrame(animate);
   });
-  window.addEventListener('pagehide', () => { stopCamera(); discardClip(); });
+  window.addEventListener('pagehide', stopCamera);
   const query=new URLSearchParams(location.search);
   if(['lab','orbit','helmet','room'].includes(query.get('background')))backgroundChoice.value=query.get('background');
   if (query.get('log') === '1') open();

@@ -18,3 +18,5 @@ body[data-display=phone] .media-diary[open][data-mode]{display:block;grid-templa
 .media-diary .diary-voice-choice{grid-column:1;grid-row:1}.media-diary #voice-mic{grid-column:2;grid-row:1;width:100%}.media-diary #voice-mic[data-recording=true]{background:#5a2625;border-color:#a05448;color:#ffded2}.media-diary .voice-recording-result{display:grid;gap:6px;margin:8px 0}.media-diary .voice-recording-result[hidden]{display:none}.media-diary .voice-recording-result audio{width:100%;height:34px}.media-diary .voice-recording-result .log-download{justify-self:start;min-height:30px;padding:5px 10px;font-size:.65rem}
 
 .media-diary .log-controls,.media-diary .voice-actions{column-gap:8px}
+
+.media-analysis-result{border-top:1px solid #27424b;margin-top:12px;padding-top:8px;font-size:.7rem;line-height:1.6}.media-analysis-result[hidden]{display:none}.media-analysis-result p{color:#87b5bd;margin:0 0 6px}.media-analysis-answer{white-space:pre-wrap}.media-analysis-result button{padding:6px 10px;border:1px solid #315359;border-radius:7px;background:#102126;color:#d3edf0;font:inherit}.media-analysis-result button[hidden]{display:none}

@@ -6,9 +6,6 @@
   const canvas = document.getElementById('voice-canvas');
   const context = canvas.getContext('2d');
   const micButton = document.getElementById('voice-mic');
-  const recordingResult = document.getElementById('voice-recording-result');
-  const review = document.getElementById('voice-review');
-  const download = document.getElementById('voice-download');
   const styleChoice = document.getElementById('voice-style');
   const notice = document.getElementById('voice-notice');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -16,7 +13,7 @@
   try { const savedStyle=localStorage.getItem('mission-health-voice-style'); if(['silo','particles','wave'].includes(savedStyle))style=savedStyle; } catch {}
   if(styleChoice)styleChoice.value=style;
   let stream, audioContext, audioSource, analyser, samples, frequencies;
-  let recorder, clipUrl, recordingTimer, finalizing = false;
+  let recorder, recordingTimer, finalizing = false;
   let startedAt = 0, previousFrame = 0, level = 0, decibels = -90;
   let width = 0, height = 0, lastReadout = 0;
 
@@ -34,27 +31,20 @@
     source = finalizing ? 'finishing' : 'idle'; startedAt = 0; level = 0; decibels = -90;
   }
 
-  function discardRecording() {
-    review.pause(); review.removeAttribute('src'); review.load();
-    if (clipUrl) URL.revokeObjectURL(clipUrl);
-    clipUrl = null; download.removeAttribute('href'); recordingResult.hidden = true;
-  }
-
   function startRecording(incoming) {
     const mimeType = ['audio/webm;codecs=opus','audio/mp4','audio/ogg;codecs=opus','audio/webm'].find(type => MediaRecorder.isTypeSupported(type));
     if (!mimeType) throw new Error('recording_unsupported');
     const chunks = [], recording = new MediaRecorder(incoming, {mimeType,audioBitsPerSecond:96000});
     let failed = false;
+    const began = performance.now();
     recorder = recording;
     recording.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
     recording.onerror = () => { failed = true; finalizing = true; stopSignal(); renderStatus('Не удалось завершить аудиозапись.', true); };
     recording.onstop = () => {
       recorder = null; finalizing = false; stopSignal();
       if (failed || !chunks.length) { renderStatus('Аудиозапись не сохранена. Попробуй еще раз.', true); return; }
-      const blob = new Blob(chunks, {type:recording.mimeType}); clipUrl = URL.createObjectURL(blob);
-      review.src = clipUrl; download.href = clipUrl;
-      download.download = 'mission-health-audio-' + new Date().toISOString().replace(/[:.]/g,'-') + (blob.type.includes('mp4')?'.m4a':blob.type.includes('ogg')?'.ogg':'.webm');
-      recordingResult.hidden = false; renderStatus('Аудиозапись готова. Можно прослушать и скачать.');
+      const blob = new Blob(chunks, {type:recording.mimeType}),duration=Math.max(.1,(performance.now()-began)/1000);
+      renderStatus('Запись передана на анализ.');void window.missionMedia.submit('audio',blob,duration);
     };
     recording.start(250);
     recordingTimer = setTimeout(() => { stopSignal(); renderStatus('Подготавливаю аудиозапись.'); }, 120000);
@@ -63,7 +53,7 @@
   function renderStatus(message = '', error = false) {
     const active = source === 'mic', waiting = source === 'requesting';
     micButton.querySelector('span').textContent = active ? 'Остановить аудиозапись' : waiting ? 'Отменить подключение' : finalizing ? 'Подготовка записи' : 'Начать аудиозапись';
-    micButton.disabled = finalizing;
+    micButton.disabled = finalizing || window.missionMedia.busy('audio');
     micButton.setAttribute('aria-pressed', String(active));
     micButton.dataset.recording = String(active && recorder?.state === 'recording');
     window.missionDiary.lock('audio', active || finalizing);
@@ -81,7 +71,7 @@
 
   async function startMicrophone() {
     if (finalizing) return;
-    stopSignal(); discardRecording();
+    stopSignal();
     if (!navigator.mediaDevices?.getUserMedia || !(window.AudioContext || window.webkitAudioContext)) {
       renderStatus('Этот браузер не поддерживает микрофон. Открой сайт в Safari или Chrome по HTTPS.', true);
       return;
@@ -275,7 +265,7 @@
     resize(); renderStatus();
     if (!frame) frame = requestAnimationFrame(animate);
   }
-  function leave() { stopSignal(); review.pause(); cancelAnimationFrame(frame); frame = 0; renderStatus(); }
+  function leave() { stopSignal(); cancelAnimationFrame(frame); frame = 0; renderStatus(); }
   function open() { window.missionDiary.open('audio'); }
   window.missionDiary.register('audio', {enter, leave});
   document.querySelectorAll('[data-open-voice]').forEach(button => button.addEventListener('click', open));
@@ -295,7 +285,7 @@
       renderStatus();
     } else if (visible() && !frame) frame = requestAnimationFrame(animate);
   });
-  window.addEventListener('pagehide', () => { stopSignal(); discardRecording(); });
+  window.addEventListener('pagehide', () => { stopSignal(); });
   new ResizeObserver(resize).observe(stage);
   if (new URLSearchParams(location.search).get('voice') === '1') open();
 })();

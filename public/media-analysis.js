@@ -1,0 +1,49 @@
+(() => {
+  const states=new Map();
+  for(const kind of ['audio','video']){
+    const host=document.querySelector(kind==='audio'?'#voice-dialog':'#video-log-dialog .log-capture'),root=document.createElement('section');root.className='media-analysis-result';root.hidden=true;
+    const status=document.createElement('p'),answer=document.createElement('div'),retry=document.createElement('button');status.setAttribute('role','status');answer.className='media-analysis-answer';retry.type='button';retry.textContent='Повторить анализ';retry.hidden=true;root.append(status,answer,retry);host.append(root);
+    const state={kind,root,status,answer,retry,busy:false,payload:null};states.set(kind,state);retry.addEventListener('click',()=>void send(state));
+  }
+  function button(kind){return document.getElementById(kind==='audio'?'voice-mic':'video-log-camera');}
+  async function frames(blob,duration){
+    const input=document.createElement('video'),url=URL.createObjectURL(blob);input.muted=true;input.playsInline=true;input.preload='auto';
+    const wait=event=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>{clean();reject(new Error('media_frames_missing'));},15000);function clean(){clearTimeout(timer);input.removeEventListener(event,done);input.removeEventListener('error',fail);}function done(){clean();resolve();}function fail(){clean();reject(new Error('media_frames_missing'));}input.addEventListener(event,done,{once:true});input.addEventListener('error',fail,{once:true});});
+    try{
+      const loaded=wait('loadeddata');input.src=url;input.load();await loaded;
+      const length=Number.isFinite(input.duration)?Math.min(duration,input.duration):duration,canvas=document.createElement('canvas'),scale=Math.min(1,640/input.videoWidth);canvas.width=Math.round(input.videoWidth*scale);canvas.height=Math.round(input.videoHeight*scale);const context=canvas.getContext('2d'),result=[];
+      if(!canvas.width||!canvas.height)throw new Error('media_frames_missing');
+      for(const fraction of [.05,.5,.95]){const at=Math.max(.001,Math.min(length-.02,length*fraction));if(Math.abs(input.currentTime-at)>.01){const sought=wait('seeked');input.currentTime=at;await sought;}context.drawImage(input,0,0,canvas.width,canvas.height);const frame=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.8));if(!frame)throw new Error('media_frames_missing');result.push(frame);}
+      return result;
+    }finally{input.pause();input.removeAttribute('src');input.load();URL.revokeObjectURL(url);}
+  }
+  async function submit(kind,blob,duration){
+    const state=states.get(kind);if(state.busy)return;
+    state.payload={id:crypto.randomUUID(),kind,blob,duration,frames:null,transcript:''};state.answer.textContent='';state.root.hidden=false;await send(state);
+  }
+  async function send(state){
+    if(state.busy||!state.payload)return;state.busy=true;state.retry.hidden=true;button(state.kind).disabled=true;window.missionDiary.lock(state.kind,true);
+    try{
+      const item=state.payload;state.status.textContent='Подготавливаю запись для анализа...';
+      if(item.kind==='video'&&!item.frames)item.frames=await frames(item.blob,item.duration);
+      if(!item.transcript)item.transcript=await window.missionSpeech?.finish?.(item.kind==='audio'?'voice':'video')||'';
+      const form=new FormData();for(const key of ['id','kind','duration','transcript'])form.set(key,String(item[key]));form.set('file',item.blob,'recording.'+(item.blob.type.includes('mp4')?'mp4':'webm'));for(const frame of item.frames||[])form.append('frame',frame,'frame.jpg');
+      const report=window.missionCheckin?.current();if(report)form.set('wellbeing',JSON.stringify(report));
+      state.status.textContent='NasaGPT анализирует запись...';
+      const response=await fetch('/api/media-analysis',{method:'POST',body:form,signal:AbortSignal.timeout(150000)}),result=await response.json();
+      if(!response.ok||result.status!=='analyzed')throw Object.assign(new Error(result.error||'media_analysis_unavailable'),{saved:result.saved});
+      state.status.textContent='Анализ сохранен в личном дневнике';state.answer.textContent=result.analysis;state.payload=null;
+      void window.missionBook?.refresh();void window.missionActivity?.refresh();
+    }catch(error){state.status.textContent=error.saved?'Запись сохранена. Анализ пока недоступен.':'Не удалось отправить запись на анализ.';state.retry.hidden=false;}
+    finally{state.busy=false;button(state.kind).disabled=false;window.missionDiary.lock(state.kind,false);}
+  }
+  function meter(prefix){
+    const value=document.getElementById(prefix+'-level'),fill=document.getElementById(prefix+'-level-fill'),name=document.getElementById(prefix+'-input-name');let engine,input,analyser,samples,frame=0,last=0,generation=0;
+    function reset(){value.textContent='-';fill.style.width='0%';name.textContent='Не выбран';}
+    function stop(){generation++;cancelAnimationFrame(frame);frame=0;try{input?.disconnect();analyser?.disconnect();}catch{}if(engine&&engine.state!=='closed')void engine.close().catch(()=>{});engine=input=analyser=samples=null;reset();}
+    function prepare(){stop();const Engine=window.AudioContext||window.webkitAudioContext;if(!Engine)return;try{engine=new Engine();void engine.resume().catch(()=>{});}catch{engine=null;}}
+    function attach(stream){if(!engine)return;try{input=engine.createMediaStreamSource(stream);analyser=engine.createAnalyser();analyser.fftSize=2048;samples=new Float32Array(analyser.fftSize);input.connect(analyser);name.textContent='Микрофон';const current=generation;function tick(time){if(current!==generation)return;frame=requestAnimationFrame(tick);if(time-last<100)return;last=time;if(engine.state!=='running'){reset();return;}analyser.getFloatTimeDomainData(samples);const rms=Math.sqrt(samples.reduce((sum,v)=>sum+v*v,0)/samples.length),db=Math.max(-90,20*Math.log10(Math.max(rms,.000001)));value.textContent=Math.round(db)+' dBFS';fill.style.width=Math.min(100,Math.max(0,(db+65)/65*100))+'%';}frame=requestAnimationFrame(tick);}catch{reset();}}
+    return{prepare,attach,stop};
+  }
+  window.missionMedia={submit,busy:kind=>states.get(kind)?.busy||false,meter};
+})();

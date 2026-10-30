@@ -166,6 +166,7 @@ export default {
     try{
       const user=owner(request,env);
       if(request.method!=='GET'&&((request.headers.get('origin')&&request.headers.get('origin')!==url.origin)||request.headers.get('sec-fetch-site')==='cross-site'))fail('forbidden',403);
+      if(url.pathname==='/api/media-analysis')return await mediaAnalysisRoute(request,env,user);
       if(url.pathname==='/api/transcriptions/config')return await speechRoute(request,env,true);
       if(url.pathname==='/api/transcriptions')return await speechRoute(request,env);
       if(url.pathname==='/api/status'&&request.method==='GET')return json(await capabilities(env));

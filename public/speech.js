@@ -1,5 +1,5 @@
 (() => {
-  const states=new Map(),environmentLabel=Math.random()<.5?'Cloud':'On prem';
+  const states=new Map();
   let config={api:false,local:false,airGap:false},mode='api';
   const labels={speech_air_gap:'Cloud отключен в режиме air gap.',speech_local_not_connected:'Локальная модель еще не подключена. Звук не отправляется в облако.',speech_api_not_configured:'Cloud / распознавание не настроено на сервере.',speech_upstream_error:'Сервис распознавания временно недоступен.',speech_local_unavailable:'Локальный адаптер не ответил. В облако звук не отправляется.',speech_too_large:'Фрагмент звука превышает допустимый размер.',speech_invalid_audio:'Формат звука не поддерживается.'};
   function available(){return mode==='local'?config.local:config.api&&!config.airGap;}
@@ -7,6 +7,7 @@
   function createState(id){const state={id,transcript:'',status:idle(),version:0,queue:[],tracks:[],active:false,captureVersion:0};states.set(id,state);render(state);}
   function render(state){
     const badge=document.querySelector('[data-speech-environment="'+state.id+'"]')||document.querySelector('[data-speech-environment="diary"]');if(!badge)return;
+    const environmentLabel=mode==='local'||config.airGap?'On prem':'Cloud';
     badge.querySelector('span').textContent=environmentLabel;
     badge.querySelector('svg').innerHTML=environmentLabel==='On prem'?'<rect x="4" y="3" width="16" height="7" rx="2"/><rect x="4" y="14" width="16" height="7" rx="2"/><path d="M7 6.5h.01M7 17.5h.01"/>':'<path d="M7 18h11a4 4 0 0 0 .5-8 6 6 0 0 0-11.6-1.5A5 5 0 0 0 7 18Z"/>';
     badge.setAttribute('aria-label','Метка интерфейса: '+environmentLabel);
@@ -74,7 +75,8 @@
     }
   }
   createState('voice');createState('video');
-  window.missionSpeech={start,stop,reset,transcript:id=>states.get(id)?.transcript||''};
+  async function finish(id){stop(id);const state=states.get(id),until=Date.now()+15000;while(state&&(state.processing||state.queue.length)&&Date.now()<until)await new Promise(resolve=>setTimeout(resolve,100));return state&&!state.processing&&!state.queue.length&&!state.error?state.transcript:'';}
+  window.missionSpeech={start,stop,reset,finish,transcript:id=>states.get(id)?.transcript||''};
   fetch('/api/transcriptions/config',{cache:'no-store'}).then(response=>response.ok?response.json():Promise.reject()).then(value=>{config=value;if(config.airGap){mode='local';for(const state of states.values())cancelRequests(state);}for(const state of states.values()){render(state);state.status=state.active&&available()?'Речь распознается автоматически.':idle();}}).catch(()=>{for(const state of states.values()){state.status='Не удалось загрузить настройки распознавания.';render(state);}});
   window.addEventListener('pagehide',()=>{for(const state of states.values())reset(state.id);});
 })();
