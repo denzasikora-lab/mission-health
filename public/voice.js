@@ -6,7 +6,9 @@
   const canvas = document.getElementById('voice-canvas');
   const context = canvas.getContext('2d');
   const micButton = document.getElementById('voice-mic');
-  const demoButton = document.getElementById('voice-demo');
+  const recordingResult = document.getElementById('voice-recording-result');
+  const review = document.getElementById('voice-review');
+  const download = document.getElementById('voice-download');
   const styleChoice = document.getElementById('voice-style');
   const notice = document.getElementById('voice-notice');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -14,11 +16,14 @@
   try { const savedStyle=localStorage.getItem('mission-health-voice-style'); if(['silo','particles','wave'].includes(savedStyle))style=savedStyle; } catch {}
   if(styleChoice)styleChoice.value=style;
   let stream, audioContext, audioSource, analyser, samples, frequencies;
+  let recorder, clipUrl, recordingTimer, finalizing = false;
   let startedAt = 0, previousFrame = 0, level = 0, decibels = -90;
   let width = 0, height = 0, lastReadout = 0;
 
   function stopSignal() {
     sequence++; window.missionSpeech?.stop('voice');
+    clearTimeout(recordingTimer); recordingTimer = null;
+    if (recorder?.state === 'recording') { finalizing = true; recorder.stop(); }
     const previousStream = stream;
     stream = null;
     previousStream?.getTracks().forEach(track => track.stop());
@@ -26,33 +31,62 @@
     const previousContext = audioContext;
     audioContext = audioSource = analyser = samples = frequencies = null;
     if (previousContext && previousContext.state !== 'closed') void previousContext.close().catch(() => {});
-    source = 'idle'; startedAt = 0; level = 0; decibels = -90;
+    source = finalizing ? 'finishing' : 'idle'; startedAt = 0; level = 0; decibels = -90;
+  }
+
+  function discardRecording() {
+    review.pause(); review.removeAttribute('src'); review.load();
+    if (clipUrl) URL.revokeObjectURL(clipUrl);
+    clipUrl = null; download.removeAttribute('href'); recordingResult.hidden = true;
+  }
+
+  function startRecording(incoming) {
+    const mimeType = ['audio/webm;codecs=opus','audio/mp4','audio/ogg;codecs=opus','audio/webm'].find(type => MediaRecorder.isTypeSupported(type));
+    if (!mimeType) throw new Error('recording_unsupported');
+    const chunks = [], recording = new MediaRecorder(incoming, {mimeType,audioBitsPerSecond:96000});
+    let failed = false;
+    recorder = recording;
+    recording.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
+    recording.onerror = () => { failed = true; finalizing = true; stopSignal(); renderStatus('Не удалось завершить аудиозапись.', true); };
+    recording.onstop = () => {
+      recorder = null; finalizing = false; stopSignal();
+      if (failed || !chunks.length) { renderStatus('Аудиозапись не сохранена. Попробуй еще раз.', true); return; }
+      const blob = new Blob(chunks, {type:recording.mimeType}); clipUrl = URL.createObjectURL(blob);
+      review.src = clipUrl; download.href = clipUrl;
+      download.download = 'mission-health-audio-' + new Date().toISOString().replace(/[:.]/g,'-') + (blob.type.includes('mp4')?'.m4a':blob.type.includes('ogg')?'.ogg':'.webm');
+      recordingResult.hidden = false; renderStatus('Аудиозапись готова. Можно прослушать и скачать.');
+    };
+    recording.start(250);
+    recordingTimer = setTimeout(() => { stopSignal(); renderStatus('Подготавливаю аудиозапись.'); }, 120000);
   }
 
   function renderStatus(message = '', error = false) {
     const active = source === 'mic', waiting = source === 'requesting';
-    micButton.querySelector('span').textContent = active ? 'Выключить микрофон' : waiting ? 'Отменить подключение' : 'Включить микрофон';
+    micButton.querySelector('span').textContent = active ? 'Остановить аудиозапись' : waiting ? 'Отменить подключение' : finalizing ? 'Подготовка записи' : 'Начать аудиозапись';
+    micButton.disabled = finalizing;
     micButton.setAttribute('aria-pressed', String(active));
-    demoButton.textContent = source === 'demo' ? 'Остановить демо' : 'Посмотреть демо';
-    demoButton.setAttribute('aria-pressed', String(source === 'demo'));
+    micButton.dataset.recording = String(active && recorder?.state === 'recording');
+    window.missionDiary.lock('audio', active || finalizing);
     stage.dataset.source = source;
     stage.dataset.style = style;
-    document.getElementById('voice-source').textContent = active ? 'МИКРОФОН / ЖИВОЙ СИГНАЛ' : source === 'demo' ? 'ДЕМО / ИСКУССТВЕННЫЙ СИГНАЛ' : waiting ? 'ПОДКЛЮЧЕНИЕ МИКРОФОНА' : 'ОЖИДАНИЕ';
-    document.getElementById('voice-stage-hint').textContent = active ? 'Волна реагирует на твой голос' : source === 'demo' ? 'Пример движения без микрофона' : waiting ? 'Разреши микрофон в браузере' : 'Включи микрофон или посмотри демо';
-    document.getElementById('voice-input-name').textContent = active ? 'Микрофон' : source === 'demo' ? 'Демонстрация' : 'Не выбран';
-    notice.textContent = message || (active ? 'Слушаю. Говори в обычном темпе.' : source === 'demo' ? 'Искусственный сигнал. Включи микрофон, чтобы увидеть свой голос.' : waiting ? 'Ожидаю разрешение на доступ к микрофону.' : 'Микрофон выключен.');
+    document.getElementById('voice-source').textContent = active ? 'ЗАПИСЬ АУДИО' : waiting ? 'ПОДКЛЮЧЕНИЕ МИКРОФОНА' : finalizing ? 'ПОДГОТОВКА ЗАПИСИ' : 'ОЖИДАНИЕ';
+    document.getElementById('voice-stage-hint').textContent = active ? 'Волна реагирует на твой голос' : waiting ? 'Разреши микрофон в браузере' : 'Нажми «Аудио», чтобы начать запись';
+    document.getElementById('voice-input-name').textContent = active ? 'Микрофон' : 'Не выбран';
+    notice.textContent = message || (active ? 'Идет аудиозапись. Нажми «Аудио», чтобы остановить.' : waiting ? 'Ожидаю разрешение на доступ к микрофону.' : finalizing ? 'Подготавливаю аудиозапись.' : 'Микрофон выключен.');
     notice.dataset.error = String(error);
     document.querySelectorAll('[data-voice-style]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.voiceStyle === style)));
     if(styleChoice)styleChoice.value=style;
-    if (!active && source !== 'demo') updateReadings(performance.now());
+    if (!active) updateReadings(performance.now());
   }
 
   async function startMicrophone() {
-    stopSignal();
+    if (finalizing) return;
+    stopSignal(); discardRecording();
     if (!navigator.mediaDevices?.getUserMedia || !(window.AudioContext || window.webkitAudioContext)) {
       renderStatus('Этот браузер не поддерживает микрофон. Открой сайт в Safari или Chrome по HTTPS.', true);
       return;
     }
+    if (!window.MediaRecorder) { renderStatus('Запись аудио не поддерживается этим браузером.', true); return; }
     const attempt = sequence;
     source = 'requesting'; renderStatus();
     try {
@@ -79,16 +113,16 @@
         if (attempt !== sequence) return;
         stopSignal(); renderStatus('Микрофон отключен. Можно подключить его снова.', true);
       }));
-      source = 'mic'; startedAt = performance.now(); renderStatus();
+      source = 'mic'; startedAt = performance.now(); startRecording(incoming); renderStatus();
     } catch (error) {
       if (attempt !== sequence) return;
-      stopSignal();
+      recorder = null; finalizing = false; stopSignal();
       const messages = {
         NotAllowedError: 'Доступ к микрофону закрыт. Разреши его для этого сайта в настройках браузера и повтори.',
         NotFoundError: 'Микрофон не найден. Подключи устройство и повтори.',
         NotReadableError: 'Не удалось открыть микрофон. Проверь, не занят ли он другим приложением.'
       };
-      renderStatus(messages[error.name] || 'Микрофон недоступен. Повтори подключение или посмотри демо.', true);
+      renderStatus(messages[error.name] || (error.message === 'recording_unsupported' ? 'Подходящий формат аудиозаписи не найден.' : 'Не удалось начать аудиозапись. Повтори подключение.'), true);
     }
   }
 
@@ -109,24 +143,16 @@
       const rms = Math.sqrt(samples.reduce((sum, value) => sum + value * value, 0) / samples.length);
       decibels = Math.max(-90, 20 * Math.log10(Math.max(rms, .000001)));
       target = Math.min(1, Math.pow(Math.max(0, rms - .002) * 7, .7));
-    } else if (source === 'demo') {
-      const t = (time - startedAt) / 1000;
-      const phrase = Math.pow(Math.max(0, Math.sin(t * 1.08)), .7);
-      target = phrase * (.2 + .55 * Math.pow(Math.sin(t * 6.7), 2));
-      decibels = -56 + target * 45;
     }
     level += (target - level) * (target > level ? .35 : .12);
   }
 
   function updateReadings(time) {
-    const active = source === 'mic' || source === 'demo';
+    const active = source === 'mic';
     const seconds = active ? Math.floor((time - startedAt) / 1000) : 0;
     document.getElementById('voice-clock').textContent = String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
     document.getElementById('voice-level').textContent = active ? Math.round(decibels) + ' dBFS' : '-';
     document.getElementById('voice-level-fill').style.width = active ? Math.min(100, Math.max(0, (decibels + 65) / 65 * 100)) + '%' : '0%';
-    if (source === 'mic' && seconds >= 120) {
-      stopSignal(); renderStatus('Две минуты прослушивания завершены. Включи микрофон снова, если хочешь продолжить.');
-    }
   }
 
   function drawParticles(time) {
@@ -180,7 +206,7 @@
 
   function drawSilo(time) {
     const motion = reducedMotion.matches ? 0 : time * .0006;
-    const energy = source === 'mic' || source === 'demo' ? level : 0;
+    const energy = source === 'mic' ? level : 0;
     const center = width * .5, base = height * .84, reach = height * (.43 + energy * .3);
     context.save();
     const background = context.createLinearGradient(0,0,0,height);
@@ -249,18 +275,13 @@
     resize(); renderStatus();
     if (!frame) frame = requestAnimationFrame(animate);
   }
-  function leave() { stopSignal(); cancelAnimationFrame(frame); frame = 0; renderStatus(); }
+  function leave() { stopSignal(); review.pause(); cancelAnimationFrame(frame); frame = 0; renderStatus(); }
   function open() { window.missionDiary.open('audio'); }
   window.missionDiary.register('audio', {enter, leave});
   document.querySelectorAll('[data-open-voice]').forEach(button => button.addEventListener('click', open));
   micButton.addEventListener('click', () => {
     if (source === 'mic' || source === 'requesting') { stopSignal(); renderStatus(); }
     else void startMicrophone();
-  });
-  demoButton.addEventListener('click', () => {
-    const wasDemo = source === 'demo'; stopSignal();
-    if (!wasDemo) { source = 'demo'; startedAt = performance.now(); }
-    renderStatus();
   });
   function setStyle(value) {
     if(!['silo','particles','wave'].includes(value))return;
@@ -274,7 +295,7 @@
       renderStatus();
     } else if (visible() && !frame) frame = requestAnimationFrame(animate);
   });
-  window.addEventListener('pagehide', stopSignal);
+  window.addEventListener('pagehide', () => { stopSignal(); discardRecording(); });
   new ResizeObserver(resize).observe(stage);
   if (new URLSearchParams(location.search).get('voice') === '1') open();
 })();

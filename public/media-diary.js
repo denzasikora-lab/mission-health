@@ -11,10 +11,10 @@
     voiceViews.remove();voiceActions.append(choice);
   }
   const compactLabels={'Включить камеру':'Камера','Выключить камеру':'Выключить','Новая запись':'Еще запись','Начать запись':'Запись','Остановить запись':'Стоп','Подготовка записи':'Обработка','Включить микрофон':'Микрофон','Выключить микрофон':'Выключить','Отменить подключение':'Отмена','Посмотреть демо':'Демо','Остановить демо':'Стоп демо'};
-  for(const id of ['video-log-camera','video-log-record','voice-mic','voice-demo']){
+  for(const id of ['video-log-camera','voice-mic']){
     const button=document.getElementById(id);if(!button)continue;
     button.classList.add('diary-compact-button');
-    const syncLabel=()=>{const label=button.textContent.trim();button.title=label;button.setAttribute('aria-label',label);button.dataset.compactLabel=compactLabels[label]||label;};
+    const syncLabel=()=>{const label=button.textContent.trim();button.title=label;button.setAttribute('aria-label',label);button.dataset.compactLabel=id==='voice-mic'?'Аудио':compactLabels[label]||label;};
     syncLabel();new MutationObserver(syncLabel).observe(button,{childList:true,subtree:true,characterData:true});
   }
   let current='video',locked=false;

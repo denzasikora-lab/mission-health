@@ -7,7 +7,6 @@
   const video = document.getElementById('video-log-input');
   const review = document.getElementById('video-log-review');
   const cameraButton = document.getElementById('video-log-camera');
-  const recordButton = document.getElementById('video-log-record');
   const download = document.getElementById('video-log-download');
   const backgroundChoice = document.getElementById('video-log-background');
   const notice = document.getElementById('video-log-notice');
@@ -22,7 +21,7 @@
   const orbitBackground=new Image();orbitBackground.src='/assets/video-log-orbit.png';
   let phase = 'idle', epoch = 0, stream, worker, workerReady = false, workerBusy = false;
   let portrait, frame = 0, lastDraw = 0, lastSegmentation = 0;
-  let recorder, recordedStream, recordingStarted = 0, recordingTimer, cameraTimer, workerTimer;
+  let recorder, recordedStream, recordingStarted = 0, recordingTimer, cameraTimer, workerTimer, autoRecordAttempt = -1;
   let clipUrl, clipDate, entry = 1, identity, identityPromise, nameDirty = false, ownProfileChange = false;
   const earthStation = () => locationName.dataset.station || 'HOUSTON / JOHNSON';
   const storageKey = suffix => 'mission-health-log-' + (identity?.researcherId || 'local') + '-' + suffix;
@@ -57,12 +56,10 @@
   function renderControls() {
     const active = phase === 'live' || phase === 'recording';
     canvas.setAttribute('aria-label', backgroundChoice.value === 'room' ? 'Исходная камера без фона и надписей' : 'Камера видеодневника с выбранным оформлением');
-    cameraButton.textContent = phase === 'requesting' ? 'Отменить подключение' : active ? 'Выключить камеру' : clipUrl ? 'Новая запись' : 'Включить камеру';
+    cameraButton.textContent = phase === 'requesting' ? 'Отменить подключение' : phase === 'recording' ? 'Остановить запись' : phase === 'finishing' ? 'Подготовка записи' : active ? 'Выключить камеру' : clipUrl ? 'Новая запись' : 'Включить камеру';
     cameraButton.disabled = phase === 'finishing';
     cameraButton.setAttribute('aria-pressed', String(active));
-    recordButton.disabled = !(phase === 'recording' || phase === 'live' && (backgroundChoice.value === 'room' || portrait));
-    recordButton.querySelector('span').textContent = phase === 'recording' ? 'Остановить запись' : phase === 'finishing' ? 'Подготовка записи' : 'Начать запись';
-    recordButton.setAttribute('aria-pressed', String(phase === 'recording'));
+    cameraButton.dataset.recording = String(phase === 'recording');
     backgroundChoice.disabled = phase === 'recording' || phase === 'finishing';
     helmetZoom.disabled = backgroundChoice.disabled;
     document.getElementById('video-log-zoom-label').hidden = backgroundChoice.value !== 'helmet';
@@ -93,7 +90,7 @@
   function prepareBackground(attempt) {
     if (worker || backgroundChoice.value === 'room') return;
     if (!window.Worker || !window.OffscreenCanvas || !window.createImageBitmap) {
-      message('Этот браузер не поддерживает замену фона. Выбери «Без фона», чтобы включить обычную камеру.', true); return;
+      message('Этот браузер не поддерживает замену фона. Выбери «Обычная камера», чтобы включить обычную камеру.', true); return;
     }
     message('Загружаю обработчик фона. Кадры остаются на устройстве.');
     worker = new Worker('/video-background-worker.js?v=20261028-log1');
@@ -107,7 +104,7 @@
       activeWorker.terminate(); if (worker === activeWorker) worker = null;
       workerReady = workerBusy = false; portrait?.close(); portrait = null;
       if (recorder?.state === 'recording') stopCamera();
-      message('Фон не удалось обработать. Повтори подключение или выбери «Без фона» для обычной камеры.', true);
+      message('Фон не удалось обработать. Повтори подключение или выбери «Обычная камера» для обычной камеры.', true);
       renderControls();
     }
     worker.onmessage = event => {
@@ -116,9 +113,7 @@
       if (data.type === 'ready') { clearTimeout(workerTimer); workerTimer = null; workerReady = true; }
       else if (data.type === 'frame') {
         portrait?.close(); portrait = data.bitmap; workerBusy = false;
-        if (recordButton.disabled && phase === 'live') {
-          message('Камера включена. Выбранный фон готов. Можно начинать запись.'); renderControls();
-        }
+        if (phase === 'live') void recordWhenReady(attempt);
       } else if (data.type === 'error') backgroundError();
     };
     worker.onerror = backgroundError;
@@ -130,6 +125,12 @@
     message('Разреши камеру и микрофон в браузере. Голос входит в запись.');
     const attempt = epoch;
     try {
+      await (identityPromise ||= loadIdentity());
+      if (attempt !== epoch || !visible()) return;
+      if (!identity || !researcher.value.trim()) {
+        phase = 'idle'; renderControls();
+        message('Не удалось прочитать имя профиля. Обнови страницу после входа в аккаунт.', true); return;
+      }
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('unavailable');
       const incoming = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
@@ -151,7 +152,7 @@
         stopCamera(); if (phase !== 'finishing') phase = 'idle'; renderControls(); message('Камера выключена после трех минут просмотра.');
       }, 180000);
       if (backgroundChoice.value !== 'room') prepareBackground(attempt);
-      else message('Камера включена с твоим обычным фоном. Можно начинать запись.');
+      else void recordWhenReady(attempt);
     } catch (error) {
       if (attempt !== epoch) return;
       stopCamera(); phase = 'idle'; renderControls();
@@ -271,8 +272,14 @@
     else drawOverlay(time);
   }
 
+  function recordWhenReady(attempt) {
+    if (attempt !== epoch || phase !== 'live' || autoRecordAttempt === attempt || backgroundChoice.value !== 'room' && !portrait) return;
+    autoRecordAttempt = attempt;
+    // Готовое оформление запускает запись один раз для текущего подключения.
+    startRecording();
+  }
+
   function startRecording() {
-    if (phase === 'recording') { phase = 'finishing'; recorder.stop(); renderControls(); return; }
     if (phase !== 'live' || backgroundChoice.value !== 'room' && !portrait) return;
     updateSignature();
     if (!identity || !researcher.value.trim()) { message('Не удалось прочитать имя профиля. Обнови страницу после входа в аккаунт.', true); return; }
@@ -289,7 +296,7 @@
       const recording = recorder;
       let failed = false;
       recording.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
-      recording.onerror = () => { failed = true; stopCamera(); message('Не удалось завершить запись. Повтори после подключения камеры.', true); };
+      recording.onerror = () => { failed = true; stopCamera(); if (phase !== 'finishing') phase = 'idle'; renderControls(); message('Не удалось завершить запись. Повтори после подключения камеры.', true); };
       recording.onstop = () => {
         window.missionSpeech?.stop('video');
         recordedStream?.getTracks().forEach(track => track.stop()); recordedStream = null;
@@ -331,12 +338,12 @@
       stopCamera(); if (phase !== 'finishing') phase = 'idle'; renderControls(); message('Камера выключена.');
     } else void startCamera();
   });
-  recordButton.addEventListener('click', startRecording);
   backgroundChoice.addEventListener('change', () => {
     portrait?.close(); portrait = null;
     if (stream && backgroundChoice.value !== 'room') prepareBackground(epoch);
     if (backgroundChoice.value === 'room') { clearTimeout(workerTimer); workerTimer = null; worker?.terminate(); worker = null; workerReady = workerBusy = false; if (stream) message(''); }
     renderControls();
+    if (stream) void recordWhenReady(epoch);
   });
   function saveSignature() {
     updateSignature();
