@@ -1,10 +1,18 @@
 /* Локальные признаки изображения. Пороги качества и цвета шкал не являются клиническими нормами. */
 (() => {
   const metrics = [
-    {key:'width', title:'Контур лица', unit:'%', floor:.015, description:'Ширина скул относительно расстояния между внешними уголками глаз. Это не объем отека.'},
+    {key:'width', title:'Контур лица', unit:'%', relative:true, floor:.015, description:'Ширина скул относительно расстояния между внешними уголками глаз. Это не объем отека.'},
     {key:'balance', title:'Симметрия контура', unit:'п.п.', floor:.8, description:'Разница расстояний от носа до левой и правой скулы, в процентных пунктах.'},
     {key:'underEye', title:'Зона под глазами', unit:'L*', floor:1.2, color:true, description:'Контраст светлоты между зоной под глазами и щеками. Это не оценка усталости или мешков.'},
-    {key:'redness', title:'Оттенок щек', unit:'a*', floor:1, color:true, description:'Красно-зеленая компонента CIELAB щек относительно лба. Это не диагноз воспаления.'}
+    {key:'redness', title:'Оттенок щек', unit:'a*', floor:1, color:true, description:'Красно-зеленая компонента CIELAB щек относительно лба. Это не диагноз воспаления.'},
+    {key:'height', title:'Высота лица', unit:'%', relative:true, floor:.015, description:'Расстояние от верхней точки контура до подбородка относительно расстояния между внешними уголками глаз.'},
+    {key:'jawWidth', title:'Линия челюсти', unit:'%', relative:true, floor:.015, description:'Ширина нижнего контура лица, нормированная по расстоянию между внешними уголками глаз.'},
+    {key:'lowerFace', title:'Нижняя часть лица', unit:'%', relative:true, floor:.012, description:'Расстояние от основания носа до подбородка относительно расстояния между внешними уголками глаз.'},
+    {key:'eyeOpening', title:'Раскрытие глаз', unit:'п.п.', floor:.8, description:'Среднее отношение высоты глазной щели к ее ширине. Моргание и выражение лица меняют этот признак.'},
+    {key:'eyeBalance', title:'Симметрия глаз', unit:'п.п.', floor:.8, description:'Разница относительного раскрытия глаз между двумя сторонами кадра.'},
+    {key:'mouthWidth', title:'Ширина губ', unit:'%', relative:true, floor:.012, description:'Расстояние между уголками губ относительно расстояния между внешними уголками глаз.'},
+    {key:'toneBalance', title:'Разница тона щек', unit:'a*', floor:1, color:true, description:'Разница красно-зеленой компоненты CIELAB между щеками.'},
+    {key:'underEyeBalance', title:'Тон под глазами', unit:'L*', floor:1.2, color:true, description:'Разница контраста светлоты под глазами относительно щек между двумя сторонами кадра.'}
   ];
   const median = values => { const a=[...values].sort((x,y)=>x-y), m=Math.floor(a.length/2); return a.length ? a.length%2 ? a[m] : (a[m-1]+a[m])/2 : NaN; };
   const dist = (a,b) => Math.hypot(a.x-b.x,a.y-b.y);
@@ -59,27 +67,32 @@
     // Резкость измеряется на глазах, поскольку ровная кожа сама по себе может не иметь текстуры.
     const eyeSharp=[eyeL,eyeR].map(c=>patch(image,c,ex,ey,d*.13,d*.055)?.sharp||0);
     if(Math.max(...eyeSharp)<12)return reject('Подожди фокус камеры, не двигайся');
-    const a=dist(p[234],p[1]),b=dist(p[454],p[1]);
-    return {valid:true,metrics:{width:width/d,balance:100*(a-b)/(a+b),underEye:light.l-(patches.underL.l+patches.underR.l)/2,redness:(cL.a+cR.a)/2-f.a},light,pose:{yaw,pitch,roll},distance:d/image.width,center:mix(p[33],p[263]),points:p.filter((_,i)=>[10,33,133,263,362,234,454,1,152,50,280].includes(i)).map(v=>({x:v.x/image.width,y:v.y/image.height})),regions:Object.values(centers).map(v=>({x:v.x/image.width,y:v.y/image.height}))};
+    const a=dist(p[234],p[1]),b=dist(p[454],p[1]),eyeWidthL=dist(p[33],p[133]),eyeWidthR=dist(p[362],p[263]);
+    if(eyeWidthL<1||eyeWidthR<1)return reject('Глаза не удалось измерить');
+    const openL=dist(p[159],p[145])/eyeWidthL,openR=dist(p[386],p[374])/eyeWidthR;
+    const values={width:width/d,balance:100*(a-b)/(a+b),underEye:light.l-(patches.underL.l+patches.underR.l)/2,redness:(cL.a+cR.a)/2-f.a,height:dist(p[10],p[152])/d,jawWidth:dist(p[172],p[397])/d,lowerFace:dist(p[2],p[152])/d,eyeOpening:50*(openL+openR),eyeBalance:100*(openL-openR),mouthWidth:dist(p[61],p[291])/d,toneBalance:cL.a-cR.a,underEyeBalance:(cL.l-patches.underL.l)-(cR.l-patches.underR.l)};
+    if(metrics.some(metric=>!Number.isFinite(values[metric.key])||metric.relative&&values[metric.key]<=0))return reject('Контур лица не удалось измерить');
+    return {valid:true,metrics:values,light,pose:{yaw,pitch,roll},distance:d/image.width,center:mix(p[33],p[263]),points:p.filter((_,i)=>[10,33,133,263,362,234,454,1,2,152,172,397,61,291,159,145,386,374].includes(i)).map(v=>({x:v.x/image.width,y:v.y/image.height})),regions:Object.values(centers).map(v=>({x:v.x/image.width,y:v.y/image.height}))};
   }
   function summarize(samples) {
     if(samples.length<24)throw new Error('insufficient_reference');
-    const summary={version:1,count:samples.length,metrics:{},light:{},pose:{},distance:median(samples.map(s=>s.distance))};
+    if(samples.some(sample=>metrics.some(metric=>!Number.isFinite(sample.metrics?.[metric.key])||metric.relative&&sample.metrics[metric.key]<=0)))throw new Error('invalid_reference_sample');
+    const summary={version:2,count:samples.length,metrics:{},light:{},pose:{},distance:median(samples.map(s=>s.distance))};
     for(const metric of metrics){const values=samples.map(s=>s.metrics[metric.key]),center=median(values);summary.metrics[metric.key]={center,noise:Math.max(metric.floor,1.4826*median(values.map(v=>Math.abs(v-center))))};}
     for(const key of ['l','a','b','side'])summary.light[key]=median(samples.map(s=>s.light[key]));
     for(const key of ['yaw','pitch','roll'])summary.pose[key]=median(samples.map(s=>s.pose[key]));
     return summary;
   }
   function referenceValid(value) {
-    return value?.version===1&&Number.isFinite(value.distance)&&value.distance>0&&value.distance<1&&Number.isInteger(value.count)&&value.count>=24&&metrics.every(m=>Number.isFinite(value.metrics?.[m.key]?.center)&&Number.isFinite(value.metrics[m.key].noise)&&value.metrics[m.key].noise>=m.floor)&&value.metrics.width.center>0&&['l','a','b','side'].every(k=>Number.isFinite(value.light?.[k]))&&['yaw','pitch','roll'].every(k=>Number.isFinite(value.pose?.[k]));
+    return value?.version===2&&Number.isFinite(value.distance)&&value.distance>0&&value.distance<1&&Number.isInteger(value.count)&&value.count>=24&&metrics.every(m=>Number.isFinite(value.metrics?.[m.key]?.center)&&Number.isFinite(value.metrics[m.key].noise)&&value.metrics[m.key].noise>=m.floor&&(!m.relative||value.metrics[m.key].center>0))&&['l','a','b','side'].every(k=>Number.isFinite(value.light?.[k]))&&['yaw','pitch','roll'].every(k=>Number.isFinite(value.pose?.[k]));
   }
   function comparison(sample,reference) {
-    if(!sample.valid||!referenceValid(reference))return {valid:false,reason:sample.reason||'Нужен эталон'};
+    if(!sample.valid||!referenceValid(reference)||metrics.some(m=>!Number.isFinite(sample.metrics?.[m.key])||m.relative&&sample.metrics[m.key]<=0))return {valid:false,reason:sample.reason||'Нужен полный кадр и новый эталон'};
     if(Math.abs(sample.distance/reference.distance-1)>.15)return {valid:false,reason:'Верни расстояние до камеры как в эталоне'};
     if(['yaw','pitch','roll'].some(k=>Math.abs(sample.pose[k]-reference.pose[k])>5))return {valid:false,reason:'Повтори ракурс эталона'};
     const colorOk=Math.abs(sample.light.l-reference.light.l)<=7&&Math.abs(sample.light.a-reference.light.a)<=4&&Math.abs(sample.light.b-reference.light.b)<=4&&Math.abs(sample.light.side-reference.light.side)<=5;
     const values={};
-    for(const m of metrics){const ref=reference.metrics[m.key],delta=sample.metrics[m.key]-ref.center;values[m.key]={valid:!m.color||colorOk,delta:m.key==='width'?100*delta/ref.center:delta,z:Math.abs(delta)/ref.noise};}
+    for(const m of metrics){const ref=reference.metrics[m.key],delta=sample.metrics[m.key]-ref.center;values[m.key]={valid:!m.color||colorOk,delta:m.relative?100*delta/ref.center:delta,z:Math.abs(delta)/ref.noise};}
     return {valid:true,colorOk,values};
   }
   function smooth(samples) {

@@ -1,4 +1,4 @@
-importScripts('/camera-engine/vision-1.2.0.js','/appearance-core.js?v=20261029-vision5');
+importScripts('/camera-engine/vision-1.2.0.js','/appearance-core.js?v=20261030-dense12');
 let detector,canvas,context;
 self.onmessage=async({data})=>{
   const {type,bitmap,timestamp}=data;

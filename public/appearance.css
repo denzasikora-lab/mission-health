@@ -5,3 +5,28 @@
 .media-diary[data-mode=video]{width:min(1320px,calc(100% - 28px))}.log-analysis-layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(340px,1fr);align-items:start;gap:18px}.log-capture{min-width:0}.log-analysis-layout .appearance-panel{margin:0;padding:15px}.log-analysis-layout .appearance-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.log-analysis-layout .appearance-top{flex-wrap:wrap;gap:10px}.log-analysis-layout .appearance-preview{width:90px;flex-basis:90px;height:64px}.log-analysis-layout .appearance-guide{min-width:130px}.log-analysis-layout .appearance-header{flex-wrap:wrap;gap:4px}.log-analysis-layout .appearance-top button{margin-left:auto}.log-analysis-layout .appearance-limits{display:grid;gap:5px}.log-analysis-layout .log-options select{max-width:100%}.log-analysis-layout .log-controls{gap:8px}.log-analysis-layout .log-controls button,.log-analysis-layout .log-download{font-size:.68rem;padding:9px 12px}.log-analysis-layout .log-local{font-size:.5rem}
 @media(max-width:940px){.log-analysis-layout{grid-template-columns:1fr}.log-analysis-layout .appearance-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}.log-analysis-layout .appearance-header{flex-wrap:nowrap}.log-analysis-layout .appearance-limits{display:flex}}
 @media(max-width:650px){.media-diary[data-mode=video]{width:calc(100% - 16px)}.log-analysis-layout .appearance-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.log-analysis-layout{gap:14px}.log-analysis-layout .appearance-panel{padding:13px 11px}.log-analysis-layout .log-local{width:100%;margin-left:0}}
+
+.media-diary .log-analysis-layout .appearance-panel{container:appearance/inline-size;padding:10px;border-radius:12px}
+.media-diary .appearance-panel .appearance-header{gap:8px;align-items:center;flex-wrap:nowrap}
+.media-diary .appearance-panel .appearance-header h3{font-size:.8rem;line-height:1.3;margin:0}
+.media-diary .appearance-panel .appearance-badge{font-size:.5rem;gap:4px;white-space:nowrap}
+.media-diary .appearance-panel .appearance-top{display:grid;grid-template-columns:56px 28px minmax(0,1fr) 28px;gap:7px;align-items:center;margin:9px 0}
+.media-diary .appearance-panel .appearance-preview{width:56px;height:36px;border-radius:6px}
+.media-diary .appearance-panel .appearance-ring{width:28px;height:28px;font-size:.45rem}
+.media-diary .appearance-panel .appearance-guide{min-width:0}
+.media-diary .appearance-panel .appearance-guide p{font-size:.54rem;line-height:1.3;margin:0}
+.media-diary .appearance-panel .appearance-guide small{font-size:.46rem;line-height:1.3;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.media-diary .appearance-panel #appearance-reset{width:28px;height:28px;padding:0;margin:0;font-size:1rem;line-height:1;justify-self:end}
+.media-diary .appearance-panel .appearance-metrics{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.media-diary .appearance-panel .appearance-metric{position:relative;padding:7px;display:grid;grid-template-rows:auto auto 3px;gap:4px;align-content:start;border-radius:7px}
+.media-diary .appearance-panel .appearance-metric-title{font-size:.53rem;line-height:1.25;min-height:2.5em;overflow-wrap:anywhere}
+.media-diary .appearance-panel .appearance-metric strong{font-size:.85rem;line-height:1.15;min-height:1.15em;margin:0;white-space:nowrap}
+.media-diary .appearance-panel .appearance-scale{height:3px;margin-top:1px}
+.media-diary .appearance-panel .appearance-scale i{height:7px;top:-2px}
+.media-diary .appearance-panel .appearance-metric small{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.media-diary .appearance-panel .appearance-legend{gap:5px 10px;font-size:.47rem;line-height:1.3;margin-top:9px}
+.media-diary .appearance-panel .appearance-legend span:before{width:4px;height:4px;margin-right:4px}
+.media-diary .appearance-panel .appearance-method{margin-top:8px;padding-top:7px;font-size:.52rem}
+.media-diary .appearance-panel .appearance-note{font-size:.46rem;line-height:1.3;margin:7px 0 0}
+@container appearance (max-width:480px){.media-diary .appearance-panel .appearance-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@container appearance (max-width:300px){.media-diary .appearance-panel .appearance-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.media-diary .appearance-panel .appearance-top{grid-template-columns:28px minmax(0,1fr) 28px}.media-diary .appearance-panel .appearance-preview{display:none}.media-diary .appearance-panel .appearance-header h3{font-size:.72rem}.media-diary .appearance-panel .appearance-badge{font-size:.43rem}}
