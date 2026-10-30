@@ -275,7 +275,7 @@
     if (phase === 'recording') { phase = 'finishing'; recorder.stop(); renderControls(); return; }
     if (phase !== 'live' || backgroundChoice.value !== 'room' && !portrait) return;
     updateSignature();
-    if (!identity || !researcher.value.trim()) { message('Укажи имя и фамилию, чтобы подписать запись.', true); firstName.focus(); return; }
+    if (!identity || !researcher.value.trim()) { message('Не удалось прочитать имя профиля. Обнови страницу после входа в аккаунт.', true); return; }
     if (!canvas.captureStream || !window.MediaRecorder) { message('Запись видео не поддерживается этим браузером. Попробуй Safari или Chrome.', true); return; }
     const audio = stream.getAudioTracks().length > 0;
     const types = audio ? ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/webm;codecs=vp8,opus', 'video/mp4', 'video/webm'] : ['video/mp4;codecs=avc1.42E01E', 'video/webm;codecs=vp8', 'video/mp4', 'video/webm'];
