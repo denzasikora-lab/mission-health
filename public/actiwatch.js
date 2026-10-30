@@ -28,17 +28,17 @@
     const card=bodyPanel.querySelector('[data-home-metric='+key+']');if(!card)return;
     card.dataset.source=latest?'actiwatch':'demo';card.dataset.device='actiwatch';
     const number=card.querySelector('strong');number.textContent=value;if(unit)number.append(make('span','home-vital-unit',unit));
-    card.querySelector('small').textContent=note;
+    window.missionHome.setSource(key,note,latest?null:'https://www.nasa.gov/wp-content/uploads/2023/11/roi-iss-facilities-june2023.pdf');
     card.title=latest?'Actiwatch / '+latest.filename+' / до '+date(latest.summary.end):'Actiwatch / симуляция, не измерение пользователя';
   }
   function render(){
-    const summary=latest?.summary||demoState.summary,w=summary.latest24h,source=latest?'Actiwatch / CSV':'Actiwatch / симуляция';
+    const summary=latest?.summary||demoState.summary,w=summary.latest24h,source=latest?'Actiwatch / Actiware CSV':'Actiwatch Plus';
     const minutes=w.sleepSeconds===null?null:Math.round(w.sleepSeconds/60);
     metric('sleep',minutes===null?'-':String(Math.floor(minutes/60)),minutes===null?'':'ч '+minutes%60+' мин',source+(minutes===null?' / нет меток':''));
-    metric('activity',fmt(w.activityCounts),w.activityCounts===null?'':'counts',source+' / не шаги');
+    metric('activity',fmt(w.activityCounts),w.activityCounts===null?'':'counts',source+' / акселерометр');
     metric('light',fmt(w.meanLightLux),w.meanLightLux===null?'':'лк',source+' / белый свет');
     bodyPanel.dataset.actiwatchSource=latest?'actiwatch':'demo';
-    const label=bodyPanel.querySelector('header small');if(label)label.textContent=latest?'Демо + Actiwatch / CSV':'Демо / симуляция показателей';
+    const label=bodyPanel.querySelector('header small');if(label)label.textContent=latest?'Actiwatch CSV + симуляция':'Симуляция';
   }
   async function load(){
     const version=++loadVersion;

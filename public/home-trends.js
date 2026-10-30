@@ -10,7 +10,7 @@
   const metrics={
     hr:{name:'Пульс',unit:'уд/мин',digits:1,spread:3,bounds:[35,190],offset:[.3,1.4,2.4,2,1.3,.8]},
     spo2:{name:'SpO₂',unit:'%',deltaUnit:'п.п.',digits:1,spread:.35,bounds:[85,100],offset:[.4,.6,.8,1.6,2.3,1.2]},
-    temp:{name:'Температура запястья',unit:'°C',digits:2,spread:.13,bounds:[28,42],offset:[.6,1.1,1.2,2.7,3.4,2.2]},
+    temp:{name:'Температура кожи',unit:'°C',digits:2,spread:.13,bounds:[28,42],offset:[.6,1.1,1.2,2.7,3.4,2.2]},
     wellbeing:{name:'Самочувствие',unit:'из 100',deltaUnit:'п.',digits:1,spread:3,bounds:[1,100],offset:[-.3,-.7,-2.6,-1.9,-3.4,-2.2]},
     sleep:{name:'Сон',unit:'ч',deltaUnit:'мин',digits:1,spread:.45,bounds:[0,14],offset:[.3,.8,3.4,2.5,1.4,.8]},
     hrv:{name:'HRV',unit:'мс',digits:1,spread:4,bounds:[5,180],offset:[.4,-1.2,-1.8,-2.4,-3.5,-1.7]},
@@ -74,7 +74,7 @@
     card.setAttribute('role','button');card.tabIndex=0;card.setAttribute('aria-controls','home-trend-chart');
     const choose=()=>{selected=card.dataset.homeMetric;refresh();};
     card.addEventListener('click',event=>{if(!event.target.closest('button,a,input,select,textarea'))choose();});
-    card.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();choose();}});
+    card.addEventListener('keydown',event=>{if(event.target!==card)return;if(event.key==='Enter'||event.key===' '){event.preventDefault();choose();}});
   }
   function deltaText(key,delta){
     const config=metrics[key],value=key==='sleep'?delta*60:delta,digits=key==='sleep'?0:config.digits,threshold=.5*10**-digits;

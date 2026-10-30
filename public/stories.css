@@ -11,6 +11,7 @@
   .topbar{margin-inline:0;padding-inline:10px}
   .toolbar,.mission-nav,.mission-rail>.stories-section .stories-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;justify-items:center}
   .toolbar>.log-launch,.toolbar>.language-control,.toolbar>#mission-theme-toggle,.toolbar>.mission-popover-control{justify-self:center}
+  .mission-nav{grid-template-columns:repeat(3,minmax(0,1fr))}
   .mission-nav>button{width:100%;min-width:0;justify-content:center}
   body[data-visiting="true"] .mission-nav>[data-mission-nav="overview"]{grid-column:1/-1}
   .mission-rail>.stories-section .story-person{width:100%}

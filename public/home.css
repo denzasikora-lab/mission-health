@@ -27,3 +27,5 @@ html[data-theme=light] .home-human img{filter:brightness(.48) saturate(.8);opaci
 @media(prefers-reduced-motion:reduce){.watch-connection .watch-connection-flow{animation:none}}
 
 body[data-home=true] .mission-content .layout{grid-template-columns:minmax(0,1fr)}body[data-home=true] .mission-content .insight-column{display:none}
+
+.home-instrument{color:inherit;text-decoration:none}.home-instrument:hover,.home-instrument:focus-visible{text-decoration:underline;color:var(--accent)}

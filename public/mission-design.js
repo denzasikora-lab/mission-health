@@ -5,9 +5,9 @@
   const rail = document.querySelector('.crew-panel'); rail.classList.add('mission-rail'); rail.removeAttribute('data-i18n-aria'); rail.setAttribute('aria-label','Навигация и профили');
   const profile = document.querySelector('.profile'); rail.prepend(profile);
   const navigation = document.createElement('nav'); navigation.className = 'mission-nav'; navigation.lang = 'ru'; navigation.setAttribute('aria-label', 'Разделы Mission Health');
-  const icons = {overview:'M3 10 12 3l9 7v11h-6v-7H9v7H3Z',observations:'M16 16 22 22M19 10a9 9 0 1 1-18 0 9 9 0 0 1 18 0',diary:'M3 4h6a4 4 0 0 1 3 2 4 4 0 0 1 3-2h6v16h-6a4 4 0 0 0-3 2 4 4 0 0 0-3-2H3Z M12 6v16',sources:'M3 5c0-5 18-5 18 0v14c0 5-18 5-18 0Zm0 0c0 5 18 5 18 0M3 12c0 5 18 5 18 0'};
+  const icons = {overview:'M3 10 12 3l9 7v11h-6v-7H9v7H3Z',observations:'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z M3 12h4l2-3 4 6 2-3h6',diary:'M3 4h6a4 4 0 0 1 3 2 4 4 0 0 1 3-2h6v16h-6a4 4 0 0 0-3 2 4 4 0 0 0-3-2H3Z M12 6v16',sources:'M3 5c0-5 18-5 18 0v14c0 5-18 5-18 0Zm0 0c0 5 18 5 18 0M3 12c0 5 18 5 18 0'};
   icons.chat='M4 3h16v13H8l-4 5Z M8 8h8M8 12h5';icons.favorites='m12 3 2.8 5.7 6.3.9-4.55 4.43 1.07 6.27L12 17.34l-5.62 2.96 1.07-6.27L2.9 9.6l6.3-.9Z';
-  navigation.innerHTML = [['overview','Домой'],['observations','Наблюдения'],['chat','Общий чат'],['diary','Дневник'],['sources','Источники']].map(([key,label])=>`<button type="button" data-mission-nav="${key}" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[key]}"/></svg><span>${label}</span></button>`).join('');
+  navigation.innerHTML = [['overview','Домой'],['observations','Здоровье'],['diary','Дневник'],['sources','Исследования']].map(([key,label])=>`<button type="button" data-mission-nav="${key}" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[key]}"/></svg><span>${label}</span></button>`).join('');
   profile.after(navigation);
   const switcher = document.createElement('details'); switcher.className = 'mission-profiles';
   switcher.hidden=true;switcher.setAttribute('aria-hidden','true');
@@ -45,7 +45,7 @@
   const sun=themeGroup.querySelector('[data-theme-choice="light"]').innerHTML,moon=themeGroup.querySelector('[data-theme-choice="dark"]').innerHTML;
   const toolbar=document.querySelector('.toolbar');toolbar.append(themeToggle);
   const date=document.createElement('time');date.className='mission-date';date.textContent=new Intl.DateTimeFormat('ru',{day:'numeric',month:'long',year:'numeric'}).format(new Date());date.dateTime=new Date().toISOString().slice(0,10);toolbar.prepend(date);
-  const iconButton = document.createElement('button'); iconButton.type = 'button'; iconButton.className = 'mission-source-launch'; iconButton.setAttribute('aria-label','Открыть источники NASA'); iconButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></svg>';
+  const iconButton = document.createElement('button'); iconButton.type = 'button'; iconButton.className = 'mission-source-launch'; iconButton.setAttribute('aria-label','Открыть исследования NASA'); iconButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></svg>';
   toolbar.insertBefore(iconButton,toolbar.querySelector('.log-launch'));
   const atom='<svg viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1"><ellipse cx="16" cy="16" rx="15" ry="6"/><ellipse cx="16" cy="16" rx="15" ry="6" transform="rotate(60 16 16)"/><ellipse cx="16" cy="16" rx="15" ry="6" transform="rotate(120 16 16)"/></g><circle cx="16" cy="16" r="2" fill="currentColor"/></svg>';
   assistantTitle.insertAdjacentHTML('afterbegin',atom);
@@ -61,7 +61,7 @@
     anatomy.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.bodyMetric===state.metric)));
     const stats=document.querySelector('.mission-chart-stats');if(stats){const values=seriesFor(crew[state.crew],state.metric,state.period);stats.innerHTML=[['Среднее',values.reduce((sum,value)=>sum+value,0)/values.length],['Мин.',Math.min(...values)],['Макс.',Math.max(...values)]].map(([label,value])=>`<div><span>${label}</span><strong>${format(value,state.metric)}<small> ${unit(state.metric)}</small></strong></div>`).join('');}
     const trendTitle=document.getElementById('trend-heading');trendTitle.removeAttribute('data-i18n');trendTitle.textContent='Сравнение с личным фоном';
-    heading.querySelector('h1').textContent = state.workspace === 'research' ? researchState.dataset === 'library' ? 'Источники и исследования' : 'Реальные наблюдения' : 'Состояние и наблюдения';
+    heading.querySelector('h1').textContent = state.workspace === 'research' ? researchState.dataset === 'library' ? 'Исследования' : 'Реальные наблюдения' : 'Состояние и наблюдения';
     document.getElementById('mission-heading-description').textContent = state.workspace === 'research' ? 'NASA OSD-575 / BIDMC / открытые исследования' : 'Ключевые показатели выбранного профиля';
     document.querySelector('.mission-data-label').textContent = state.workspace === 'research' ? 'Исходные данные' : 'Демо-данные';
     window.missionBook?.render();
