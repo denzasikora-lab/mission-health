@@ -52,4 +52,8 @@ body[data-display="duo"] .shell{max-width:768px}#mission-device-button{position:
 @container mission (min-width:1001px){
   .mission-rail>.stories-section .story-person{flex:1;min-width:0;width:auto}
   .mission-rail>.stories-section .story-person strong{font-size:.52rem;white-space:normal;overflow:visible;text-overflow:clip}
+  .shell .mission-frame .mission-rail>.stories-section .stories-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;width:100%}
+  .shell .mission-frame .mission-rail>.stories-section .story-person{width:100%;min-width:0}
+  .shell .mission-frame .mission-rail>.stories-section .story-person>button:first-child{width:100%;min-width:0}
+  .shell .mission-frame .mission-rail>.stories-section .story-ring{width:42px;height:42px;min-width:0}
 }
