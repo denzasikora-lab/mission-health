@@ -5,7 +5,7 @@
   new MutationObserver(renderCountry).observe(document.documentElement,{attributes:true,attributeFilter:['lang']});renderCountry();
   const monitor='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>';
   const devices=document.createElement('div');devices.className='mission-popover-control';
-  devices.innerHTML='<button type="button" id="mission-device-button" class="mission-tool" aria-label="Вид экрана" aria-haspopup="menu" aria-expanded="false">'+monitor+'</button><div class="mission-popover" id="mission-device-menu" role="menu" aria-label="Вид экрана" hidden><h2>Вид экрана</h2>'+[['desktop','Компьютер'],['tablet','Планшет'],['duo','iPhone Duo'],['phone','Телефон']].map(([key,label])=>`<button type="button" role="menuitemradio" data-display-mode="${key}" aria-checked="false"><span>${label}</span><i aria-hidden="true">✓</i></button>`).join('')+'</div>';
+  devices.innerHTML='<button type="button" id="mission-device-button" class="mission-tool" aria-label="Вид экрана" aria-haspopup="menu" aria-expanded="false">'+monitor+'</button><div class="mission-popover" id="mission-device-menu" role="menu" aria-label="Вид экрана" hidden><h2>Вид экрана</h2>'+[['desktop','Компьютер'],['tablet','Планшет'],['phone','Телефон'],['duo','iPhone Duo']].map(([key,label])=>`<button type="button" role="menuitemradio" data-display-mode="${key}" aria-checked="false"><span>${label}</span><i aria-hidden="true">✓</i></button>`).join('')+'</div>';
   toolbar.append(devices);
   const deviceButton=document.getElementById('mission-device-button'),deviceMenu=document.getElementById('mission-device-menu');
   let mode='auto';
