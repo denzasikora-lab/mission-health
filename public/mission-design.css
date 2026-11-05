@@ -43,7 +43,13 @@ body[data-display="duo"] .shell{max-width:768px}#mission-device-button{position:
 .topbar{--mission-control-size:41px}
 .topbar :is(.brand-mark,.mission-tool,.voice-launch,.log-launch,.language-button,.mission-source-launch){width:var(--mission-control-size);height:var(--mission-control-size);min-width:var(--mission-control-size);min-height:var(--mission-control-size);border-radius:50%}
 .topbar .brand-mark{padding:0;border:1px solid var(--border);background:transparent;box-shadow:inset 0 1px #aaffbb12;display:grid;place-items:center}
-.topbar .brand-mark img{width:88%;height:88%;object-fit:contain}
+.topbar .brand-mark img{width:92%;height:92%;object-fit:contain;filter:grayscale(1) contrast(4);transform:translateX(4.5%)}
+.topbar .brand-mark{align-self:center;justify-self:center}
 :root[data-theme=light] .topbar .brand-mark{background:transparent}
 @container mission (max-width:1000px){.topbar{--mission-control-size:36px}}
 @container mission (max-width:700px){.topbar{--mission-control-size:38px}}
+
+@container mission (min-width:1001px){
+  .mission-rail>.stories-section .story-person{flex:1;min-width:0;width:auto}
+  .mission-rail>.stories-section .story-person strong{font-size:.52rem;white-space:normal;overflow:visible;text-overflow:clip}
+}

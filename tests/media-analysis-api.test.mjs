@@ -5,7 +5,7 @@ import {readFile,readdir} from 'node:fs/promises';
 import {DatabaseSync} from 'node:sqlite';
 import {webcrypto} from 'node:crypto';
 const root=new URL('../',import.meta.url);
-const source=(await Promise.all(['public/apparent-age-core.js','worker/photos.js','worker/speech.js','worker/activity.js','worker/media-analysis.js','worker/index.js'].map(path=>readFile(new URL(path,root),'utf8')))).join('\n').replace('export default','globalThis.app =');
+const source=(await Promise.all(['public/skin-spots-core.js','public/apparent-age-core.js','worker/photos.js','worker/speech.js','worker/activity.js','worker/media-analysis.js','worker/index.js'].map(path=>readFile(new URL(path,root),'utf8')))).join('\n').replace('export default','globalThis.app =');
 const migrations=await Promise.all((await readdir(new URL('drizzle/',root))).filter(n=>n.endsWith('.sql')).sort().map(n=>readFile(new URL('drizzle/'+n,root),'utf8')));
 const identifier='a7337ee1-9cf8-42cf-b0d5-75d90258835c';
 const wav=new Uint8Array(64);wav.set(new TextEncoder().encode('RIFF'));wav.set(new TextEncoder().encode('WAVE'),8);
@@ -36,3 +36,26 @@ test('Поврежденные признаки и векторы не сохр�
 function ageFeatures(){return{acoustic:null,model:'embeddinggemma-2:daa72c51243991dfcaf9f9137d2c573d8f7790c0:q4:768',videoVector:Array.from({length:768},(_,i)=>i===0?1:0),tone:[],apparentAge:{method:'embeddinggemma2-text-age-v1',status:'estimated',reason:'consensus',samples:3,range:{min:40,max:49},votes:[4,4,4,4,4,4],scores:Array.from({length:9},(_,i)=>({band:i,similarity:i===4?.4:.2})),comparison:'no_reference'}};}
 test('Видимый возраст сохраняется с видео без звука и не превращается в медицинское старение',async t=>{const f=fixture(t),r=await f.send({kind:'video',transcript:'Нейтральная запись',features:ageFeatures()});assert.equal(r.status,200);const row=f.db.prepare("SELECT references_json FROM journal_messages WHERE role='user'").get(),ref=JSON.parse(row.references_json)[0];assert.deepEqual(ref.features.apparentAge.range,{min:40,max:49});assert.equal(ref.features.acoustic,null);const messages=JSON.parse(f.outgoing.at(-1).options.body).messages;assert.match(messages[0].content,/не утверждай старение/);assert.match(messages[1].content[0].text,/погрешность в годах не установлена/);assert.equal(JSON.stringify(ref).includes('storageScope'),false);});
 test('Аудио без кадров не принимает возраст и поврежденный возраст не сохраняется',async t=>{for(const edit of [f=>f.apparentAge.range.min=44,f=>f.apparentAge.scores[0].similarity=2,f=>f.apparentAge.samples=1]){const f=fixture(t),features=ageFeatures();edit(features);assert.equal((await f.send({kind:'video',features})).status,400);assert.equal(f.objects.size,0);}const f=fixture(t),features=ageFeatures();features.acoustic={level:-20,quiet:.1,clipping:0,seconds:5};assert.equal((await f.send({kind:'audio',features})).status,400);});
+
+function skinFeatures(withVector=true){
+  const vector=Array.from({length:768},(_,i)=>i===0?1:0),features={acoustic:null,skin:{method:'aligned-face-spots-v1',status:'compared',reason:'ready',samples:3,referenceAt:new Date().toISOString(),trackingKey:'029036ef-a29c-4bb0-a0be-f26d07eff82d',coverage:['forehead','left-cheek','right-cheek'],newCount:1,changedCount:0,items:[{id:'forehead-0',region:'forehead',change:'new',x:.5,y:.5,areaPixels:Math.PI*16,diameterPixels:8,relativeArea:.004,color:{r:60,g:40,b:20},lab:{l:30,a:10,b:20},tone:'dark',baseline:null,areaChangePercent:null,deltaE:null}]}};
+  if(withVector){Object.assign(features,{model:'embeddinggemma-2:daa72c51243991dfcaf9f9137d2c573d8f7790c0:q4:768',videoVector:vector,tone:[]});features.skin.items[0].vector=vector;}
+  return features;
+}
+test('Сравнение пятен сохраняет размер и цвет без миллиметров, координат аккаунта и выдуманного диагноза',async t=>{
+  const f=fixture(t),features=skinFeatures();features.skin.owner='private';features.skin.items[0].diagnosis='fake';const result=await f.send({kind:'video',transcript:'Проверка',features});assert.equal(result.status,200);
+  const reference=JSON.parse(f.db.prepare("SELECT references_json FROM journal_messages WHERE role='user'").get().references_json)[0];assert.equal(reference.features.skin.items[0].vector.length,768);assert.equal(reference.features.skin.items[0].diameterPixels,8);assert.equal(reference.features.skin.owner,undefined);assert.equal(reference.features.skin.items[0].diagnosis,undefined);
+  const messages=JSON.parse(f.outgoing.at(-1).options.body).messages;assert.match(messages[0].content,/Не выдумывай миллиметры/);assert.match(messages[1].content[0].text,/Размер только в пикселях/);assert.doesNotMatch(messages[1].content[0].text,/"vector":/);
+});
+test('Векторный поиск находит прошлый участок своего владельца и того же эталона',async t=>{
+  const f=fixture(t);await f.send({kind:'video',features:skinFeatures(),transcript:'Первая запись'});const features=skinFeatures(),second='73b1fd88-50ef-44bf-bc10-1d92c413eb94';features.skin.items[0].vector=Array.from({length:768},(_,i)=>i===0?.8:i===1?.6:0);
+  const result=await f.send({kind:'video',id:second,features,transcript:'Вторая запись'});assert.equal(result.status,200);assert.equal(result.body.skinMatches.length,1);assert.equal(result.body.skinMatches[0].recordId,identifier);assert.ok(Math.abs(result.body.skinMatches[0].similarity-.8)<1e-8);
+  const duplicate=await f.send({kind:'video',id:second,features});assert.equal(duplicate.body.skinMatches.length,1);assert.equal(duplicate.body.duplicate,true);
+  const different=skinFeatures();different.skin.trackingKey='86fe003b-aabc-48c1-9024-e4ffcc6fad50';assert.equal((await f.send({kind:'video',id:'86fe003b-aabc-48c1-9024-e4ffcc6fad50',features:different})).body.skinMatches.length,0);
+  assert.equal((await f.send({owner:'person-b',kind:'video',id:'5849b426-35e1-43bd-97a1-51c97b1727ba',features:skinFeatures()})).body.skinMatches.length,0);
+});
+test('Сбой эмбеддера оставляет измерения изображения и не притворяется выполненным векторным поиском',async t=>{const f=fixture(t),result=await f.send({kind:'video',features:skinFeatures(false)});assert.equal(result.status,200);assert.deepEqual(result.body.skinMatches,[]);const ref=JSON.parse(f.db.prepare("SELECT references_json FROM journal_messages WHERE role='user'").get().references_json)[0];assert.equal(ref.features.skin.items[0].vector,undefined);assert.equal(ref.features.model,undefined);});
+test('Аудио не принимает признаки кожи, а неверные проценты или векторы не попадают в архив',async t=>{
+  for(const edit of [f=>f.skin.items[0].vector=[1,0],f=>f.skin.items[0].color.r=999,f=>f.skin.items[0].change='changed',f=>f.skin.samples=1]){const f=fixture(t),features=skinFeatures();edit(features);assert.equal((await f.send({kind:'video',features})).status,400);assert.equal(f.objects.size,0);}
+  const f=fixture(t),features=skinFeatures();features.acoustic={level:-20,quiet:0,clipping:0,seconds:5};assert.equal((await f.send({kind:'audio',features})).status,400);
+});

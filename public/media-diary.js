@@ -19,13 +19,21 @@
     const syncLabel=()=>{const label=button.textContent.trim();button.title=label;button.setAttribute('aria-label',label);button.dataset.compactLabel=id==='voice-mic'?'Аудио':compactLabels[label]||label;};
     syncLabel();new MutationObserver(syncLabel).observe(button,{childList:true,subtree:true,characterData:true});
   }
+  function alignHeading(){
+    const heading=panels.video.querySelector('.diary-category-heading'),nav=document.querySelector('.mission-rail>.stories-section'),frame=document.querySelector('.mission-frame');
+    if(!active||!heading?.getBoundingClientRect||!nav||!frame)return;
+    if(getComputedStyle(frame).display!=='grid'){heading.style.minHeight='';return;}
+    const height=nav.getBoundingClientRect().bottom-heading.getBoundingClientRect().top;
+    heading.style.minHeight=Math.max(0,height)+'px';
+  }
+  if(window.ResizeObserver){const observer=new window.ResizeObserver(alignHeading);for(const node of [document.querySelector('.mission-rail'),document.querySelector('.mission-rail>.stories-section'),document.querySelector('.shell')])if(node)observer.observe(node);}
   function render(){
     const visible=state.workspace==='crew'&&state.view==='diary';
     dialog.hidden=!visible;dialog.dataset.active=String(visible);document.body.dataset.diary=String(visible);
     dialog.dataset.mode='combined';
     for(const panel of Object.values(panels))panel.hidden=false;
-    if(visible===active)return;
-    active=visible;
+    if(visible===active){alignHeading();return;}
+    active=visible;alignHeading();
     recordings.clear();dialog.dataset.recording='false';
     if(active){
       for(const engine of engines.values()){engine.prepare?.();engine.enter();}

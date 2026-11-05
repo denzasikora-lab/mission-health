@@ -1,5 +1,5 @@
-importScripts('/camera-engine/vision-1.2.0.js','/appearance-core.js?v=20261030-dense12');
-let detector,canvas,context,lastAgeFrame=0;
+importScripts('/camera-engine/vision-1.2.0.js','/appearance-core.js?v=20261030-dense12','/skin-spots-core.js?v=20261105-spots1');
+let detector,canvas,context,lastAgeFrame=0,lastSkinFrame=0;
 self.onmessage=async({data})=>{
   const {type,bitmap,timestamp}=data;
   try{
@@ -12,7 +12,10 @@ self.onmessage=async({data})=>{
       context.drawImage(bitmap,0,0);
       const result=detector.detectForVideo(canvas,timestamp);
       const measurement=MissionAppearanceCore.measure(context.getImageData(0,0,canvas.width,canvas.height),result);
-      let ageFrame=null;
+      let ageFrame=null,skinSnapshot=null;
+      if(timestamp-lastSkinFrame>=1000){
+        try{skinSnapshot=MissionSkinSpotsCore.extract(context.getImageData(0,0,canvas.width,canvas.height),result.faceLandmarks?.[0]||[],measurement,MissionAppearanceCore.lab);}catch{skinSnapshot={valid:false,reason:'need_frames'};}lastSkinFrame=timestamp;
+      }
       if(measurement.valid&&timestamp-lastAgeFrame>=1000){
         try{
         const points=result.faceLandmarks[0],xs=points.map(p=>p.x*canvas.width),ys=points.map(p=>p.y*canvas.height);
@@ -23,7 +26,7 @@ self.onmessage=async({data})=>{
         ageFrame=await crop.convertToBlob({type:'image/jpeg',quality:.9});lastAgeFrame=timestamp;
         }catch{ageFrame=null;}
       }
-      self.postMessage({type:'measurement',measurement,timestamp,ageFrame});
+      self.postMessage({type:'measurement',measurement,timestamp,ageFrame,skinSnapshot});
     }
   }catch{self.postMessage({type:'error'});}
   finally{bitmap?.close();}

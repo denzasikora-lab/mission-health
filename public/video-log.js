@@ -76,6 +76,7 @@
   }
 
   function stopCamera() {
+    if(recorder?.state==='recording')recorder.observationSnapshot=recorder.captureObservation?.();
     epoch++; window.missionSpeech?.stop('video'); microphoneMeter.stop();
     window.missionAppearance?.stop();
     if (recorder?.state === 'recording') { phase = 'finishing'; recorder.stop(); }
@@ -294,11 +295,12 @@
       recordedStream = new MediaStream(stream.getTracks().map(track => track.clone()));
       recorder = new MediaRecorder(recordedStream, { mimeType, videoBitsPerSecond: 900000, audioBitsPerSecond: 96000 });
       const recording = recorder;
+      recording.captureObservation=()=>window.missionAppearance?.ageSnapshot?.(ageContext);
       let failed = false;
       recording.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
       recording.onerror = () => { failed = true; stopCamera(); if (phase !== 'finishing') phase = 'idle'; renderControls(); message('Не удалось завершить запись. Повтори после подключения камеры.', true); };
       recording.onstop = () => {
-        const ageInput = window.missionAppearance?.ageSnapshot?.(ageContext);
+        const ageInput = recording.observationSnapshot||window.missionAppearance?.ageSnapshot?.(ageContext);
         window.missionSpeech?.stop('video');
         recordedStream?.getTracks().forEach(track => track.stop()); recordedStream = null;
         stopCamera(); recorder = null;

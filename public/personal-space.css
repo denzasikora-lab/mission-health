@@ -29,3 +29,5 @@
 
 .wellbeing-readout{flex-wrap:wrap}
 .wellbeing-readout>span{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:break-word;line-height:1.45}
+
+.nasagpt-sidebar[hidden]{display:none!important}

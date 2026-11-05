@@ -45,13 +45,13 @@
     stop();ageFrames=[];ageSession++;video=input;device||={};cameraKey=device.key||JSON.stringify([device.deviceId||'',input.videoWidth,input.videoHeight]);
     if(!identity){mark('Нужно имя профиля');hint.textContent='Не удалось прочитать профиль. Обнови страницу.';return;}
     if(!window.Worker||!window.OffscreenCanvas||!window.createImageBitmap){mark('Анализ недоступен');hint.textContent='Браузер не поддерживает обработчик кадров.';return;}
-    active=true;scope=key();load();
+    active=true;scope=key();load();window.missionSkinSpots?.setScope(scope);
     samples=[];recent=[];streaks={};lastSent=lastMeasurement=0;neutral('Загрузка');renderProgress();resetButton.disabled=true;
     if(!reference&&storageOk)hint.textContent='Лицо прямо, ровный свет.';
     else if(reference)hint.textContent='Тот же свет и ракурс. Сравнение идет на паузах речи.';
     mark('Загрузка модели','loading');
     const attempt=epoch;
-    try{engine=new Worker('/appearance-worker.js?v=20261105-age1');}catch{stop();mark('Анализ недоступен');hint.textContent='Не удалось создать обработчик камеры.';return;}const worker=engine;
+    try{engine=new Worker('/appearance-worker.js?v=20261105-spots1');}catch{stop();mark('Анализ недоступен');hint.textContent='Не удалось создать обработчик камеры.';return;}const worker=engine;
     const failed=()=>{if(attempt!==epoch)return;stop();mark('Не удалось запустить анализ');hint.textContent='Проверь загрузку модели и повторно включи камеру. Запись видео доступна.';};
     timer=setTimeout(failed,45000);
     worker.onerror=failed;
@@ -62,7 +62,7 @@
         busy=false;clearTimeout(frameTimer);lastMeasurement=performance.now();
         try{
           if(data.measurement.valid&&data.ageFrame){ageFrames.push({blob:data.ageFrame,time:data.timestamp,light:data.measurement.light.l,distance:data.measurement.distance});if(ageFrames.length>3)ageFrames.shift();}
-          consume(data.measurement,data.timestamp);
+          consume(data.measurement,data.timestamp);if(data.skinSnapshot)window.missionSkinSpots?.observe(data.skinSnapshot,data.timestamp);
         }catch{failed();}
       }else if(data.type==='error')failed();
     };
@@ -125,7 +125,7 @@
     }
   }
   function stop(){
-    epoch++;active=false;ready=busy=false;clearTimeout(timer);clearTimeout(frameTimer);cancelAnimationFrame(frame);frame=0;
+    epoch++;active=false;ready=busy=false;window.missionSkinSpots?.pause();clearTimeout(timer);clearTimeout(frameTimer);cancelAnimationFrame(frame);frame=0;
     engine?.terminate();engine=null;samples=[];recent=[];streaks={};lastValid=0;resetButton.disabled=true;
     neutral('Камера выключена');mark('Ожидание камеры');progress.textContent='-';progress.style.setProperty('--capture',0);ctx.clearRect(0,0,preview.width,preview.height);
   }
@@ -136,7 +136,7 @@
     if(!context||context.scope!==scope||context.session!==ageSession)return null;
     const selected=ageFrames.filter(item=>item.time>=context.since);
     const valid=selected.length>0&&selected.every(item=>Math.abs(item.light-selected[0].light)<=8&&Math.abs(item.distance/selected[0].distance-1)<=.2);
-    return{context:{...context},frames:valid?selected.map(item=>item.blob):[],conditions:valid?{light:selected.reduce((s,v)=>s+v.light,0)/selected.length,distance:selected.reduce((s,v)=>s+v.distance,0)/selected.length}:null};
+    return{skin:window.missionSkinSpots?.snapshot(context),context:{...context},frames:valid?selected.map(item=>item.blob):[],conditions:valid?{light:selected.reduce((s,v)=>s+v.light,0)/selected.length,distance:selected.reduce((s,v)=>s+v.distance,0)/selected.length}:null};
   }
   window.missionAppearance={start,stop,setIdentity,ageContext,ageSnapshot};
 })();

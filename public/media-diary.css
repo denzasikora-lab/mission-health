@@ -62,3 +62,9 @@ body[data-diary=true] .mission-content .main-column>:not(#media-diary-dialog),bo
   #media-diary-dialog .voice-analysis-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
   #media-diary-dialog .apparent-age-reference{flex-wrap:wrap}
 }
+
+#media-diary-dialog .diary-category-titles{display:grid;gap:8px;min-width:0}
+#media-diary-dialog .diary-category-titles h2{margin:0;font-family:inherit;font-weight:600;font-size:1.1rem;line-height:1.4;overflow-wrap:break-word}
+#media-diary-dialog #video-log-dialog>.diary-category-heading{justify-content:space-between;gap:12px;flex-wrap:wrap}
+#media-diary-dialog #video-log-dialog>.diary-category-heading h3{font-size:.82rem;color:#8eaaa3}
+#media-diary-dialog .log-heading-tools{min-width:0}

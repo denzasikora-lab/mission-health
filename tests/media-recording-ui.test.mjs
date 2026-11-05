@@ -179,7 +179,7 @@ function diaryFixture(){
   const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);};
   const dialog=node('media-diary-dialog'),state={workspace:'crew',view:'health'},events=[],navigation=[];
   dialog.hidden=true;dialog.querySelectorAll=()=>[];dialog.querySelector=()=>node('analysis-caption');dialog.showModal=()=>{throw new Error('Не должно открываться отдельное окно');};
-  node('video-log-background').closest=()=>null;node('voice-dialog').querySelector=()=>null;
+  node('video-log-background').closest=()=>null;node('voice-dialog').querySelector=()=>null;node('video-log-dialog').querySelector=()=>null;
   let api;const window={missionActivity:{record(){}},dispatchEvent:event=>events.push(event.type),scrollTo(){},missionDesign:{navigate(section){navigation.push(section);state.workspace='crew';state.view=section==='diary'?'diary':'health';api.render();}}};
   const document={body:{dataset:{}},getElementById:node,querySelector:selector=>selector==='.main-column'?node('main-column'):null,querySelectorAll:()=>[]};
   vm.runInNewContext(diarySource,{window,document,state,Event,MutationObserver:class{observe(){}}});api=window.missionDiary;return{api,node,dialog,state,events,navigation,document};

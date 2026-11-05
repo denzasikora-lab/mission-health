@@ -25,6 +25,7 @@
     }finally{input.pause();input.removeAttribute('src');input.load();URL.revokeObjectURL(url);}
   }
   async function submit(kind,blob,duration,ageInput=null){
+    if(kind==='video')window.missionSkinSpots?.pending(ageInput?.skin?.report);
     const state=states.get(kind),root=document.createElement('article'),heading=document.createElement('header'),status=document.createElement('p'),answer=document.createElement('div'),retry=document.createElement('button');root.className='media-analysis-job';
     const createdAt=new Date().toISOString();heading.textContent=(kind==='audio'?'Аудио':'Видео')+' / '+new Date(createdAt).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'});status.setAttribute('role','status');answer.className='media-analysis-answer';retry.type='button';retry.textContent='Повторить анализ';retry.hidden=true;root.append(heading,status,answer,retry);state.root.append(root);state.root.hidden=false;
     // Речь и самооценка относятся к остановленной записи, независимо от следующих записей.
@@ -43,7 +44,7 @@
       job.status.textContent='NasaGPT анализирует запись...';
       const response=await fetch('/api/media-analysis',{method:'POST',body:form,signal:AbortSignal.timeout(150000)}),result=await response.json();
       if(!response.ok||result.status!=='analyzed')throw Object.assign(new Error(result.error||'media_analysis_unavailable'),{saved:result.saved});
-      job.phase='complete';job.status.textContent='Анализ сохранен в архиве';job.answer.textContent=result.analysis;window.missionVoiceAnalysis?.transcript(item.kind,result.transcript||item.transcript);job.payload=null;
+      if(item.kind==='video'&&item.features?.skin)window.missionSkinSpots?.matches(result.skinMatches||[],item.features.skin.trackingKey);job.phase='complete';job.status.textContent='Анализ сохранен в архиве';job.answer.textContent=result.analysis;window.missionVoiceAnalysis?.transcript(item.kind,result.transcript||item.transcript);job.payload=null;
       void window.missionBook?.refresh();void window.missionActivity?.refresh();
     }catch(error){job.phase='failed';job.status.textContent=error.saved?'Запись сохранена. Анализ пока недоступен.':'Не удалось отправить запись на анализ.';job.retry.hidden=false;}
   }

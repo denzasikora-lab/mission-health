@@ -37,6 +37,13 @@
 #research-main .research-source-line a{overflow-wrap:anywhere}
 #research-main .research-playback>*{min-width:0;max-width:100%}
 #research-main .research-playback input{flex:1 1 10rem}
+.ecg-trace{fill:none;stroke:var(--accent);stroke-width:1.4;stroke-linejoin:round}
+.research-ecg .ecg-beat path{fill:none;stroke:var(--muted);stroke-width:.8;stroke-dasharray:3 6;opacity:.4}
+.research-ecg .ecg-beat[data-kind=other] path{stroke:#e2c175;opacity:.8}
+.research-ecg .ecg-beat[data-kind=other] text{fill:#e2c175}
+.research-legend i.ecg-legend-other{background:#e2c175}
+.ecg-position{display:grid;gap:10px;font-size:.75rem;margin:18px 0;color:var(--muted)}
+.ecg-position input{width:100%;min-width:0;margin:0;box-sizing:border-box;accent-color:var(--accent);direction:ltr}
 @container research-navigation (min-width:680px){
   #research-datasets{grid-template-columns:repeat(3,minmax(0,1fr))}
 }

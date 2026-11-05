@@ -1,0 +1,1477 @@
+{
+  "id": "OSD-569",
+  "version": 4,
+  "mission": "Inspiration4",
+  "year": 2021,
+  "assay": "Complete Blood Count",
+  "tissue": "Whole Blood",
+  "description": "Реальные опубликованные показатели общего анализа крови четырех участников Inspiration4. Все значения взяты из публичного файла NASA OSD-569 и сверены со второй таблицей NASA.",
+  "source": "https://osdr.nasa.gov/bio/repo/data/studies/OSD-569",
+  "provenance": [
+    {
+      "role": "original",
+      "url": "https://osdr.nasa.gov/geode-py/ws/studies/OSD-569/download?source=datamanager&file=LSDS-7_Complete_Blood_Count_CBC.upload_SUBMITTED.csv",
+      "file": "LSDS-7_Complete_Blood_Count_CBC.upload_SUBMITTED.csv",
+      "bytes": 26138,
+      "sha256": "10a878b009eb2ea11a13fe92ad698098858639e8ed02f5ee849431313b9457d3",
+      "restricted": false
+    },
+    {
+      "role": "cross-check",
+      "url": "https://osdr.nasa.gov/geode-py/ws/studies/OSD-569/download?source=datamanager&file=LSDS-7_Complete_Blood_Count_CBC_TRANSFORMED.csv",
+      "file": "LSDS-7_Complete_Blood_Count_CBC_TRANSFORMED.csv",
+      "bytes": 9317,
+      "sha256": "32e4f9c97d3b636b5d5c2e72dab8c4d3319dee64c437508b092dad04603b2b8f",
+      "restricted": false
+    },
+    {
+      "role": "metadata",
+      "url": "https://osdr.nasa.gov/osdr/data/osd/meta/569",
+      "sha256": "1386ef12579f21717eeaacf5509732dc9c4d42db0f0c79a2e69562d966fdba31"
+    },
+    {
+      "role": "file-inventory",
+      "url": "https://osdr.nasa.gov/osdr/data/osd/files/569",
+      "sha256": "5fa72a93326ca73ea76f953d4ac0cdd3ee2623ec9c4343415fde28fe808cbfdc"
+    }
+  ],
+  "verifiedAtUtc": "2026-11-05T19:32:43+00:00",
+  "verifiedValues": 168,
+  "participantCount": 4,
+  "sampleCount": 28,
+  "timepoints": [
+    "L-92",
+    "L-44",
+    "L-3",
+    "R+1",
+    "R+45",
+    "R+82",
+    "R+194"
+  ],
+  "timepointMetadata": [
+    {
+      "id": "L-92",
+      "reference": "launch",
+      "day": -92,
+      "phase": "preflight"
+    },
+    {
+      "id": "L-44",
+      "reference": "launch",
+      "day": -44,
+      "phase": "preflight"
+    },
+    {
+      "id": "L-3",
+      "reference": "launch",
+      "day": -3,
+      "phase": "preflight"
+    },
+    {
+      "id": "R+1",
+      "reference": "return",
+      "day": 1,
+      "phase": "postflight"
+    },
+    {
+      "id": "R+45",
+      "reference": "return",
+      "day": 45,
+      "phase": "postflight"
+    },
+    {
+      "id": "R+82",
+      "reference": "return",
+      "day": 82,
+      "phase": "postflight"
+    },
+    {
+      "id": "R+194",
+      "reference": "return",
+      "day": 194,
+      "phase": "postflight"
+    }
+  ],
+  "metrics": [
+    {
+      "key": "white_blood_cells_thousand_ul",
+      "label": "Лейкоциты",
+      "sourceAnalyte": "WHITE BLOOD CELL COUNT",
+      "unit": "10^3/µL",
+      "sourceUnit": "Thousand/uL",
+      "transformedColumn": "white_blood_cell_count_value_thousand_per_microliter"
+    },
+    {
+      "key": "red_blood_cells_million_ul",
+      "label": "Эритроциты",
+      "sourceAnalyte": "RED BLOOD CELL COUNT",
+      "unit": "10^6/µL",
+      "sourceUnit": "Million/uL",
+      "transformedColumn": "red_blood_cell_count_value_million_per_microliter"
+    },
+    {
+      "key": "hemoglobin_g_dl",
+      "label": "Гемоглобин",
+      "sourceAnalyte": "HEMOGLOBIN",
+      "unit": "g/dL",
+      "sourceUnit": "g/dL",
+      "transformedColumn": "hemoglobin_value_percent"
+    },
+    {
+      "key": "hematocrit_percent",
+      "label": "Гематокрит",
+      "sourceAnalyte": "HEMATOCRIT",
+      "unit": "%",
+      "sourceUnit": "%",
+      "transformedColumn": "hematocrit_value_percent"
+    },
+    {
+      "key": "neutrophils_percent",
+      "label": "Нейтрофилы",
+      "sourceAnalyte": "NEUTROPHILS",
+      "unit": "%",
+      "sourceUnit": "%",
+      "transformedColumn": "neutrophils_value_percent"
+    },
+    {
+      "key": "lymphocytes_percent",
+      "label": "Лимфоциты",
+      "sourceAnalyte": "LYMPHOCYTES",
+      "unit": "%",
+      "sourceUnit": "%",
+      "transformedColumn": "lymphocytes_value_percent"
+    }
+  ],
+  "limitations": [
+    "Маленькая наблюдательная выборка: четыре человека и один трехдневный полет. Значения описывают эту выборку, причинный эффект полета из них не следует.",
+    "CBC измерен только в наземные точки. Измерений CBC в полете нет. L обозначает дни относительно старта, R обозначает дни относительно возвращения; это разные начала отсчета.",
+    "Показаны шесть заранее указанных показателей из 20 исходных типов анализа. Они заполнены во всех 28 образцах; пропуски не заменялись и значения не интерполировались.",
+    "Для гемоглобина используется единица g/dL из оригинального SUBMITTED-файла. Имя столбца hemoglobin_value_percent в TRANSFORMED-файле не соответствует оригинальной единице, хотя все 28 чисел совпадают.",
+    "В исходных файлах есть подозрительные значения в других показателях образца C003/L-92, включая тромбоциты 12.9 Thousand/uL, MPV 330 fL и абсолютные нейтрофилы 10.1 cells/uL. Эти показатели не включены, значения источника не исправлялись догадкой.",
+    "Пол и референсные интервалы из исходной таблицы не используются для клинических выводов. Набор служит учебной визуализации и не задает диагностические пороги."
+  ],
+  "normalization": [
+    "Три исходных названия с суффиксом (FEMALE) у C003/R+1 сопоставлены тем же показателям эритроцитов, гемоглобина и гематокрита. Числа и единицы сохранены.",
+    "Thousand/uL отображается как 10^3/µL, Million/uL как 10^6/µL. Числовое масштабирование не выполнялось."
+  ],
+  "rows": [
+    {
+      "sample_id": "C001_whole-blood_L-92_cbc",
+      "astronaut_id": "C001",
+      "timepoint": "L-92",
+      "phase": "preflight",
+      "white_blood_cells_thousand_ul": 5.4,
+      "red_blood_cells_million_ul": 4.58,
+      "hemoglobin_g_dl": 14.1,
+      "hematocrit_percent": 42.5,
+      "neutrophils_percent": 43.5,
+      "lymphocytes_percent": 41.5
+    },
+    {
+      "sample_id": "C001_whole-blood_L-44_cbc",
+      "astronaut_id": "C001",
+      "timepoint": "L-44",
+      "phase": "preflight",
+      "white_blood_cells_thousand_ul": 5.5,
+      "red_blood_cells_million_ul": 4.85,
+      "hemoglobin_g_dl": 14.9,
+      "hematocrit_percent": 45.1,
+      "neutrophils_percent": 54.5,
+      "lymphocytes_percent": 33.8
+    },
+    {
+      "sample_id": "C001_whole-blood_L-3_cbc",
+      "astronaut_id": "C001",
+      "timepoint": "L-3",
+      "phase": "preflight",
+      "white_blood_cells_thousand_ul": 7.0,
+      "red_blood_cells_million_ul": 4.69,
+      "hemoglobin_g_dl": 14.7,
+      "hematocrit_percent": 44.5,
+      "neutrophils_percent": 51.0,
+      "lymphocytes_percent": 38.1
+    },
+    {
+      "sample_id": "C001_whole-blood_R+1_cbc",
+      "astronaut_id": "C001",
+      "timepoint": "R+1",
+      "phase": "postflight",
+      "white_blood_cells_thousand_ul": 5.0,
+      "red_blood_cells_million_ul": 4.84,
+      "hemoglobin_g_dl": 14.7,
+      "hematocrit_percent": 43.6,
+      "neutrophils_percent": 53.7,
+      "lymphocytes_percent": 32.8
+    },
+    {
+      "sample_id": "C001_whole-blood_R+45_cbc",
+      "astronaut_id": "C001",
+      "timepoint": "R+45",
+      "phase": "postflight",
+      "white_blood_cells_thousand_ul": 4.9,
+      "red_blood_cells_million_ul": 4.63,
+      "hemoglobin_g_dl": 14.3,
+      "hematocrit_percent": 43.3,
+      "neutrophils_percent": 44.9,
+      "lymphocytes_percent": 43.8
+    },
+    {
+      "sample_id": "C001_whole-blood_R+82_cbc",
+      "astronaut_id": "C001",
+      "timepoint": "R+82",
+      "phase": "postflight",
+      "white_blood_cells_thousand_ul": 4.9,
+      "red_blood_cells_million_ul": 5.02,
+      "hemoglobin_g_dl": 15.7,
+      "hematocrit_percent": 46.1,
+      "neutrophils_percent": 40.7,
+      "lymphocytes_percent": 44.3
+    },
+    {
+      "sample_id": "C001_whole-blood_R+194_cbc",
+      "astronaut_id": "C001",
+      "timepoint": "R+194",
+      "phase": "postflight",
+      "white_blood_cells_thousand_ul": 4.9,
+      "red_blood_cells_million_ul": 4.66,
+      "hemoglobin_g_dl": 14.1,
+      "hematocrit_percent": 41.8,
+      "neutrophils_percent": 48.8,
+      "lymphocytes_percent": 37.7
+    },
+    {
+      "sample_id": "C002_whole-blood_L-92_cbc",
+      "astronaut_id": "C002",
+      "timepoint": "L-92",
+      "phase": "preflight",
+      "white_blood_cells_thousand_ul": 6.5,
+      "red_blood_cells_million_ul": 4.36,
+      "hemoglobin_g_dl": 13.2,
+      "hematocrit_percent": 40.8,
+      "neutrophils_percent": 57.0,
+      "lymphocytes_percent": 32.6
+    },
+    {
+      "sample_id": "C002_whole-blood_L-44_cbc",
+      "astronaut_id": "C002",
+      "timepoint": "L-44",
+      "phase": "preflight",
+      "white_blood_cells_thousand_ul": 5.4,
+      "red_blood_cells_million_ul": 3.93,
+      "hemoglobin_g_dl": 12.8,
+      "hematocrit_percent": 37.8,
+      "neutrophils_percent": 53.2,
+      "lymphocytes_percent": 36.7
+    },
+    {
+      "sample_id": "C002_whole-blood_L-3_cbc",
+      "astronaut_id": "C002",
+      "timepoint": "L-3",
+      "phase": "preflight",
+      "white_blood_cells_thousand_ul": 7.2,
+      "red_blood_cells_million_ul": 3.72,
+      "hemoglobin_g_dl": 11.5,
+      "hematocrit_percent": 35.9,
+      "neutrophils_percent": 51.4,
+      "lymphocytes_percent": 39.9
+    },
+    {
+      "sample_id": "C002_whole-blood_R+1_cbc",
+      "astronaut_id": "C002",
+      "timepoint": "R+1",
+      "phase": "postflight",
+      "white_blood_cells_thousand_ul": 5.5,
+      "red_blood_cells_million_ul": 4.02,
+      "hemoglobin_g_dl": 12.1,
+      "hematocrit_percent": 36.4,
+      "neutrophils_percent": 60.5,
+      "lymphocytes_percent": 28.0
+    },
+    {
+      "sample_id": "C002_whole-blood_R+45_cbc",
+      "astronaut_id": "C002",
+      "timepoint": "R+45",
+      "phase": "postflight",
+      "white_blood_cells_thousand_ul": 6.4,
+      "red_blood_cells_million_ul": 4.02,
+      "hemoglobin_g_dl": 12.2,
+      "hematocrit_percent": 37.1,
+      "neutrophils_percent": 43.2,
+      "lymphocytes_percent": 44.9
+    },
+    {
+      "sample_id": "C002_whole-blood_R+82_cbc",
+      "astronaut_id": "C002",
+      "timepoint": "R+82",
+      "phase": "postflight",
+      "white_blood_cells_thousand_ul": 5.3,
+      "red_blood_cells_million_ul": 3.84,
+      "hemoglobin_g_dl": 11.5,
+      "hematocrit_percent": 34.7,
+      "neutrophils_percent": 59.1,
+      "lymphocytes_percent": 32.1
+    },
+    {
+      "sample_id": "C002_whole-blood_R+194_cbc",
+      "astronaut_id": "C002",
+      "timepoint": "R+194",
+      "phase": "postflight",
+      "white_blood_cells_thousand_ul": 6.4,
+      "red_blood_cells_million_ul": 4.11,
+      "hemoglobin_g_dl": 12.7,
+      "hematocrit_percent": 38.3,
+      "neutrophils_percent": 48.8,
+      "lymphocytes_percent": 40.2
+    },
+    {
+      "sample_id": "C003_whole-blood_L-92_cbc",
+      "astronaut_id": "C003",
+      "timepoint": "L-92",
+      "phase": "preflight",
+      "white_blood_cells_thousand_ul": 9.6,
+      "red_blood_cells_million_ul": 4.46,
+      "hemoglobin_g_dl": 13.2,
+      "hematocrit_percent": 40.7,
+      "neutrophils_percent": 71.1,
+      "lymphocytes_percent": 20.8
+    },
+    {
+      "sample_id": "C003_whole-blood_L-44_cbc",
+      "astronaut_id": "C003",
+      "timepoint": "L-44",
+      "phase": "preflight",
+      "white_blood_cells_thousand_ul": 9.3,
+      "red_blood_cells_million_ul": 4.62,
+      "hemoglobin_g_dl": 14.4,
+      "hematocrit_percent": 42.6,
+      "neutrophils_percent": 68.9,
+      "lymphocytes_percent": 22.4
+    },
+    {
+      "sample_id": "C003_whole-blood_L-3_cbc",
+      "astronaut_id": "C003",
+      "timepoint": "L-3",
+      "phase": "preflight",
+      "white_blood_cells_thousand_ul": 9.8,
+      "red_blood_cells_million_ul": 4.5,
+      "hemoglobin_g_dl": 13.3,
+      "hematocrit_percent": 41.6,
+      "neutrophils_percent": 59.1,
+      "lymphocytes_percent": 32.2
+    },
+    {
+      "sample_id": "C003_whole-blood_R+1_cbc",
+      "astronaut_id": "C003",
+      "timepoint": "R+1",
+      "phase": "postflight",
+      "white_blood_cells_thousand_ul": 7.0,
+      "red_blood_cells_million_ul": 4.67,
+      "hemoglobin_g_dl": 13.5,
+      "hematocrit_percent": 41.4,
+      "neutrophils_percent": 58.4,
+      "lymphocytes_percent": 29.8
+    },
+    {
+      "sample_id": "C003_whole-blood_R+45_cbc",
+      "astronaut_id": "C003",
+      "timepoint": "R+45",
+      "phase": "postflight",
+      "white_blood_cells_thousand_ul": 7.8,
+      "red_blood_cells_million_ul": 5.09,
+      "hemoglobin_g_dl": 14.6,
+      "hematocrit_percent": 44.3,
+      "neutrophils_percent": 59.2,
+      "lymphocytes_percent": 30.5
+    },
+    {
+      "sample_id": "C003_whole-blood_R+82_cbc",
+      "astronaut_id": "C003",
+      "timepoint": "R+82",
+      "phase": "postflight",
+      "white_blood_cells_thousand_ul": 8.8,
+      "red_blood_cells_million_ul": 4.89,
+      "hemoglobin_g_dl": 14.4,
+      "hematocrit_percent": 44.6,
+      "neutrophils_percent": 52.0,
+      "lymphocytes_percent": 36.9
+    },
+    {
+      "sample_id": "C003_whole-blood_R+194_cbc",
+      "astronaut_id": "C003",
+      "timepoint": "R+194",
+      "phase": "postflight",
+      "white_blood_cells_thousand_ul": 7.4,
+      "red_blood_cells_million_ul": 4.64,
+      "hemoglobin_g_dl": 13.3,
+      "hematocrit_percent": 40.4,
+      "neutrophils_percent": 56.1,
+      "lymphocytes_percent": 30.0
+    },
+    {
+      "sample_id": "C004_whole-blood_L-92_cbc",
+      "astronaut_id": "C004",
+      "timepoint": "L-92",
+      "phase": "preflight",
+      "white_blood_cells_thousand_ul": 7.7,
+      "red_blood_cells_million_ul": 5.48,
+      "hemoglobin_g_dl": 17.0,
+      "hematocrit_percent": 49.1,
+      "neutrophils_percent": 61.9,
+      "lymphocytes_percent": 23.2
+    },
+    {
+      "sample_id": "C004_whole-blood_L-44_cbc",
+      "astronaut_id": "C004",
+      "timepoint": "L-44",
+      "phase": "preflight",
+      "white_blood_cells_thousand_ul": 6.4,
+      "red_blood_cells_million_ul": 5.57,
+      "hemoglobin_g_dl": 16.6,
+      "hematocrit_percent": 50.0,
+      "neutrophils_percent": 57.8,
+      "lymphocytes_percent": 25.2
+    },
+    {
+      "sample_id": "C004_whole-blood_L-3_cbc",
+      "astronaut_id": "C004",
+      "timepoint": "L-3",
+      "phase": "preflight",
+      "white_blood_cells_thousand_ul": 10.6,
+      "red_blood_cells_million_ul": 5.4,
+      "hemoglobin_g_dl": 16.8,
+      "hematocrit_percent": 49.0,
+      "neutrophils_percent": 59.6,
+      "lymphocytes_percent": 27.8
+    },
+    {
+      "sample_id": "C004_whole-blood_R+1_cbc",
+      "astronaut_id": "C004",
+      "timepoint": "R+1",
+      "phase": "postflight",
+      "white_blood_cells_thousand_ul": 8.1,
+      "red_blood_cells_million_ul": 5.55,
+      "hemoglobin_g_dl": 16.5,
+      "hematocrit_percent": 48.3,
+      "neutrophils_percent": 55.9,
+      "lymphocytes_percent": 26.6
+    },
+    {
+      "sample_id": "C004_whole-blood_R+45_cbc",
+      "astronaut_id": "C004",
+      "timepoint": "R+45",
+      "phase": "postflight",
+      "white_blood_cells_thousand_ul": 6.8,
+      "red_blood_cells_million_ul": 5.54,
+      "hemoglobin_g_dl": 16.8,
+      "hematocrit_percent": 49.0,
+      "neutrophils_percent": 53.2,
+      "lymphocytes_percent": 28.5
+    },
+    {
+      "sample_id": "C004_whole-blood_R+82_cbc",
+      "astronaut_id": "C004",
+      "timepoint": "R+82",
+      "phase": "postflight",
+      "white_blood_cells_thousand_ul": 7.9,
+      "red_blood_cells_million_ul": 5.45,
+      "hemoglobin_g_dl": 16.4,
+      "hematocrit_percent": 47.5,
+      "neutrophils_percent": 55.2,
+      "lymphocytes_percent": 29.2
+    },
+    {
+      "sample_id": "C004_whole-blood_R+194_cbc",
+      "astronaut_id": "C004",
+      "timepoint": "R+194",
+      "phase": "postflight",
+      "white_blood_cells_thousand_ul": 8.3,
+      "red_blood_cells_million_ul": 5.58,
+      "hemoglobin_g_dl": 16.5,
+      "hematocrit_percent": 48.0,
+      "neutrophils_percent": 50.6,
+      "lymphocytes_percent": 31.8
+    }
+  ],
+  "sourceRows": [
+    {
+      "sample_id": "C001_whole-blood_L-92_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 2,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "5.4"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 3,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "4.58"
+        },
+        "hemoglobin_g_dl": {
+          "row": 4,
+          "analyte": "HEMOGLOBIN",
+          "value": "14.1"
+        },
+        "hematocrit_percent": {
+          "row": 5,
+          "analyte": "HEMATOCRIT",
+          "value": "42.5"
+        },
+        "neutrophils_percent": {
+          "row": 17,
+          "analyte": "NEUTROPHILS",
+          "value": "43.5"
+        },
+        "lymphocytes_percent": {
+          "row": 18,
+          "analyte": "LYMPHOCYTES",
+          "value": "41.5"
+        }
+      }
+    },
+    {
+      "sample_id": "C001_whole-blood_L-44_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 22,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "5.5"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 23,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "4.85"
+        },
+        "hemoglobin_g_dl": {
+          "row": 24,
+          "analyte": "HEMOGLOBIN",
+          "value": "14.9"
+        },
+        "hematocrit_percent": {
+          "row": 25,
+          "analyte": "HEMATOCRIT",
+          "value": "45.1"
+        },
+        "neutrophils_percent": {
+          "row": 37,
+          "analyte": "NEUTROPHILS",
+          "value": "54.5"
+        },
+        "lymphocytes_percent": {
+          "row": 38,
+          "analyte": "LYMPHOCYTES",
+          "value": "33.8"
+        }
+      }
+    },
+    {
+      "sample_id": "C001_whole-blood_L-3_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 42,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "7"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 43,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "4.69"
+        },
+        "hemoglobin_g_dl": {
+          "row": 44,
+          "analyte": "HEMOGLOBIN",
+          "value": "14.7"
+        },
+        "hematocrit_percent": {
+          "row": 45,
+          "analyte": "HEMATOCRIT",
+          "value": "44.5"
+        },
+        "neutrophils_percent": {
+          "row": 57,
+          "analyte": "NEUTROPHILS",
+          "value": "51"
+        },
+        "lymphocytes_percent": {
+          "row": 58,
+          "analyte": "LYMPHOCYTES",
+          "value": "38.1"
+        }
+      }
+    },
+    {
+      "sample_id": "C001_whole-blood_R+1_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 62,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "5"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 63,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "4.84"
+        },
+        "hemoglobin_g_dl": {
+          "row": 64,
+          "analyte": "HEMOGLOBIN",
+          "value": "14.7"
+        },
+        "hematocrit_percent": {
+          "row": 65,
+          "analyte": "HEMATOCRIT",
+          "value": "43.6"
+        },
+        "neutrophils_percent": {
+          "row": 77,
+          "analyte": "NEUTROPHILS",
+          "value": "53.7"
+        },
+        "lymphocytes_percent": {
+          "row": 78,
+          "analyte": "LYMPHOCYTES",
+          "value": "32.8"
+        }
+      }
+    },
+    {
+      "sample_id": "C001_whole-blood_R+45_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 82,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "4.9"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 83,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "4.63"
+        },
+        "hemoglobin_g_dl": {
+          "row": 84,
+          "analyte": "HEMOGLOBIN",
+          "value": "14.3"
+        },
+        "hematocrit_percent": {
+          "row": 85,
+          "analyte": "HEMATOCRIT",
+          "value": "43.3"
+        },
+        "neutrophils_percent": {
+          "row": 97,
+          "analyte": "NEUTROPHILS",
+          "value": "44.9"
+        },
+        "lymphocytes_percent": {
+          "row": 98,
+          "analyte": "LYMPHOCYTES",
+          "value": "43.8"
+        }
+      }
+    },
+    {
+      "sample_id": "C001_whole-blood_R+82_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 102,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "4.9"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 103,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "5.02"
+        },
+        "hemoglobin_g_dl": {
+          "row": 104,
+          "analyte": "HEMOGLOBIN",
+          "value": "15.7"
+        },
+        "hematocrit_percent": {
+          "row": 105,
+          "analyte": "HEMATOCRIT",
+          "value": "46.1"
+        },
+        "neutrophils_percent": {
+          "row": 117,
+          "analyte": "NEUTROPHILS",
+          "value": "40.7"
+        },
+        "lymphocytes_percent": {
+          "row": 118,
+          "analyte": "LYMPHOCYTES",
+          "value": "44.3"
+        }
+      }
+    },
+    {
+      "sample_id": "C001_whole-blood_R+194_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 122,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "4.9"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 123,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "4.66"
+        },
+        "hemoglobin_g_dl": {
+          "row": 124,
+          "analyte": "HEMOGLOBIN",
+          "value": "14.1"
+        },
+        "hematocrit_percent": {
+          "row": 125,
+          "analyte": "HEMATOCRIT",
+          "value": "41.8"
+        },
+        "neutrophils_percent": {
+          "row": 137,
+          "analyte": "NEUTROPHILS",
+          "value": "48.8"
+        },
+        "lymphocytes_percent": {
+          "row": 138,
+          "analyte": "LYMPHOCYTES",
+          "value": "37.7"
+        }
+      }
+    },
+    {
+      "sample_id": "C002_whole-blood_L-92_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 142,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "6.5"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 143,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "4.36"
+        },
+        "hemoglobin_g_dl": {
+          "row": 144,
+          "analyte": "HEMOGLOBIN",
+          "value": "13.2"
+        },
+        "hematocrit_percent": {
+          "row": 145,
+          "analyte": "HEMATOCRIT",
+          "value": "40.8"
+        },
+        "neutrophils_percent": {
+          "row": 156,
+          "analyte": "NEUTROPHILS",
+          "value": "57"
+        },
+        "lymphocytes_percent": {
+          "row": 157,
+          "analyte": "LYMPHOCYTES",
+          "value": "32.6"
+        }
+      }
+    },
+    {
+      "sample_id": "C002_whole-blood_L-44_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 161,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "5.4"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 162,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "3.93"
+        },
+        "hemoglobin_g_dl": {
+          "row": 163,
+          "analyte": "HEMOGLOBIN",
+          "value": "12.8"
+        },
+        "hematocrit_percent": {
+          "row": 164,
+          "analyte": "HEMATOCRIT",
+          "value": "37.8"
+        },
+        "neutrophils_percent": {
+          "row": 175,
+          "analyte": "NEUTROPHILS",
+          "value": "53.2"
+        },
+        "lymphocytes_percent": {
+          "row": 176,
+          "analyte": "LYMPHOCYTES",
+          "value": "36.7"
+        }
+      }
+    },
+    {
+      "sample_id": "C002_whole-blood_L-3_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 180,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "7.2"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 181,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "3.72"
+        },
+        "hemoglobin_g_dl": {
+          "row": 182,
+          "analyte": "HEMOGLOBIN",
+          "value": "11.5"
+        },
+        "hematocrit_percent": {
+          "row": 183,
+          "analyte": "HEMATOCRIT",
+          "value": "35.9"
+        },
+        "neutrophils_percent": {
+          "row": 194,
+          "analyte": "NEUTROPHILS",
+          "value": "51.4"
+        },
+        "lymphocytes_percent": {
+          "row": 195,
+          "analyte": "LYMPHOCYTES",
+          "value": "39.9"
+        }
+      }
+    },
+    {
+      "sample_id": "C002_whole-blood_R+1_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 199,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "5.5"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 200,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "4.02"
+        },
+        "hemoglobin_g_dl": {
+          "row": 201,
+          "analyte": "HEMOGLOBIN",
+          "value": "12.1"
+        },
+        "hematocrit_percent": {
+          "row": 202,
+          "analyte": "HEMATOCRIT",
+          "value": "36.4"
+        },
+        "neutrophils_percent": {
+          "row": 213,
+          "analyte": "NEUTROPHILS",
+          "value": "60.5"
+        },
+        "lymphocytes_percent": {
+          "row": 214,
+          "analyte": "LYMPHOCYTES",
+          "value": "28"
+        }
+      }
+    },
+    {
+      "sample_id": "C002_whole-blood_R+45_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 218,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "6.4"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 219,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "4.02"
+        },
+        "hemoglobin_g_dl": {
+          "row": 220,
+          "analyte": "HEMOGLOBIN",
+          "value": "12.2"
+        },
+        "hematocrit_percent": {
+          "row": 221,
+          "analyte": "HEMATOCRIT",
+          "value": "37.1"
+        },
+        "neutrophils_percent": {
+          "row": 233,
+          "analyte": "NEUTROPHILS",
+          "value": "43.2"
+        },
+        "lymphocytes_percent": {
+          "row": 234,
+          "analyte": "LYMPHOCYTES",
+          "value": "44.9"
+        }
+      }
+    },
+    {
+      "sample_id": "C002_whole-blood_R+82_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 238,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "5.3"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 239,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "3.84"
+        },
+        "hemoglobin_g_dl": {
+          "row": 240,
+          "analyte": "HEMOGLOBIN",
+          "value": "11.5"
+        },
+        "hematocrit_percent": {
+          "row": 241,
+          "analyte": "HEMATOCRIT",
+          "value": "34.7"
+        },
+        "neutrophils_percent": {
+          "row": 253,
+          "analyte": "NEUTROPHILS",
+          "value": "59.1"
+        },
+        "lymphocytes_percent": {
+          "row": 254,
+          "analyte": "LYMPHOCYTES",
+          "value": "32.1"
+        }
+      }
+    },
+    {
+      "sample_id": "C002_whole-blood_R+194_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 258,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "6.4"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 259,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "4.11"
+        },
+        "hemoglobin_g_dl": {
+          "row": 260,
+          "analyte": "HEMOGLOBIN",
+          "value": "12.7"
+        },
+        "hematocrit_percent": {
+          "row": 261,
+          "analyte": "HEMATOCRIT",
+          "value": "38.3"
+        },
+        "neutrophils_percent": {
+          "row": 272,
+          "analyte": "NEUTROPHILS",
+          "value": "48.8"
+        },
+        "lymphocytes_percent": {
+          "row": 273,
+          "analyte": "LYMPHOCYTES",
+          "value": "40.2"
+        }
+      }
+    },
+    {
+      "sample_id": "C003_whole-blood_L-92_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 416,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "9.6"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 417,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "4.46"
+        },
+        "hemoglobin_g_dl": {
+          "row": 418,
+          "analyte": "HEMOGLOBIN",
+          "value": "13.2"
+        },
+        "hematocrit_percent": {
+          "row": 419,
+          "analyte": "HEMATOCRIT",
+          "value": "40.7"
+        },
+        "neutrophils_percent": {
+          "row": 430,
+          "analyte": "NEUTROPHILS",
+          "value": "71.1"
+        },
+        "lymphocytes_percent": {
+          "row": 431,
+          "analyte": "LYMPHOCYTES",
+          "value": "20.8"
+        }
+      }
+    },
+    {
+      "sample_id": "C003_whole-blood_L-44_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 435,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "9.3"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 436,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "4.62"
+        },
+        "hemoglobin_g_dl": {
+          "row": 437,
+          "analyte": "HEMOGLOBIN",
+          "value": "14.4"
+        },
+        "hematocrit_percent": {
+          "row": 438,
+          "analyte": "HEMATOCRIT",
+          "value": "42.6"
+        },
+        "neutrophils_percent": {
+          "row": 450,
+          "analyte": "NEUTROPHILS",
+          "value": "68.9"
+        },
+        "lymphocytes_percent": {
+          "row": 451,
+          "analyte": "LYMPHOCYTES",
+          "value": "22.4"
+        }
+      }
+    },
+    {
+      "sample_id": "C003_whole-blood_L-3_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 455,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "9.8"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 456,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "4.5"
+        },
+        "hemoglobin_g_dl": {
+          "row": 457,
+          "analyte": "HEMOGLOBIN",
+          "value": "13.3"
+        },
+        "hematocrit_percent": {
+          "row": 458,
+          "analyte": "HEMATOCRIT",
+          "value": "41.6"
+        },
+        "neutrophils_percent": {
+          "row": 470,
+          "analyte": "NEUTROPHILS",
+          "value": "59.1"
+        },
+        "lymphocytes_percent": {
+          "row": 471,
+          "analyte": "LYMPHOCYTES",
+          "value": "32.2"
+        }
+      }
+    },
+    {
+      "sample_id": "C003_whole-blood_R+1_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 535,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "7"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 536,
+          "analyte": "RED BLOOD CELL COUNT (FEMALE)",
+          "value": "4.67"
+        },
+        "hemoglobin_g_dl": {
+          "row": 537,
+          "analyte": "HEMOGLOBIN (FEMALE)",
+          "value": "13.5"
+        },
+        "hematocrit_percent": {
+          "row": 538,
+          "analyte": "HEMATOCRIT (FEMALE)",
+          "value": "41.4"
+        },
+        "neutrophils_percent": {
+          "row": 550,
+          "analyte": "NEUTROPHILS",
+          "value": "58.4"
+        },
+        "lymphocytes_percent": {
+          "row": 551,
+          "analyte": "LYMPHOCYTES",
+          "value": "29.8"
+        }
+      }
+    },
+    {
+      "sample_id": "C003_whole-blood_R+45_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 475,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "7.8"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 476,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "5.09"
+        },
+        "hemoglobin_g_dl": {
+          "row": 477,
+          "analyte": "HEMOGLOBIN",
+          "value": "14.6"
+        },
+        "hematocrit_percent": {
+          "row": 478,
+          "analyte": "HEMATOCRIT",
+          "value": "44.3"
+        },
+        "neutrophils_percent": {
+          "row": 490,
+          "analyte": "NEUTROPHILS",
+          "value": "59.2"
+        },
+        "lymphocytes_percent": {
+          "row": 491,
+          "analyte": "LYMPHOCYTES",
+          "value": "30.5"
+        }
+      }
+    },
+    {
+      "sample_id": "C003_whole-blood_R+82_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 495,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "8.8"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 496,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "4.89"
+        },
+        "hemoglobin_g_dl": {
+          "row": 497,
+          "analyte": "HEMOGLOBIN",
+          "value": "14.4"
+        },
+        "hematocrit_percent": {
+          "row": 498,
+          "analyte": "HEMATOCRIT",
+          "value": "44.6"
+        },
+        "neutrophils_percent": {
+          "row": 510,
+          "analyte": "NEUTROPHILS",
+          "value": "52"
+        },
+        "lymphocytes_percent": {
+          "row": 511,
+          "analyte": "LYMPHOCYTES",
+          "value": "36.9"
+        }
+      }
+    },
+    {
+      "sample_id": "C003_whole-blood_R+194_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 515,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "7.4"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 516,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "4.64"
+        },
+        "hemoglobin_g_dl": {
+          "row": 517,
+          "analyte": "HEMOGLOBIN",
+          "value": "13.3"
+        },
+        "hematocrit_percent": {
+          "row": 518,
+          "analyte": "HEMATOCRIT",
+          "value": "40.4"
+        },
+        "neutrophils_percent": {
+          "row": 530,
+          "analyte": "NEUTROPHILS",
+          "value": "56.1"
+        },
+        "lymphocytes_percent": {
+          "row": 531,
+          "analyte": "LYMPHOCYTES",
+          "value": "30"
+        }
+      }
+    },
+    {
+      "sample_id": "C004_whole-blood_L-92_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 277,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "7.7"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 278,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "5.48"
+        },
+        "hemoglobin_g_dl": {
+          "row": 279,
+          "analyte": "HEMOGLOBIN",
+          "value": "17"
+        },
+        "hematocrit_percent": {
+          "row": 280,
+          "analyte": "HEMATOCRIT",
+          "value": "49.1"
+        },
+        "neutrophils_percent": {
+          "row": 291,
+          "analyte": "NEUTROPHILS",
+          "value": "61.9"
+        },
+        "lymphocytes_percent": {
+          "row": 292,
+          "analyte": "LYMPHOCYTES",
+          "value": "23.2"
+        }
+      }
+    },
+    {
+      "sample_id": "C004_whole-blood_L-44_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 296,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "6.4"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 297,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "5.57"
+        },
+        "hemoglobin_g_dl": {
+          "row": 298,
+          "analyte": "HEMOGLOBIN",
+          "value": "16.6"
+        },
+        "hematocrit_percent": {
+          "row": 299,
+          "analyte": "HEMATOCRIT",
+          "value": "50"
+        },
+        "neutrophils_percent": {
+          "row": 311,
+          "analyte": "NEUTROPHILS",
+          "value": "57.8"
+        },
+        "lymphocytes_percent": {
+          "row": 312,
+          "analyte": "LYMPHOCYTES",
+          "value": "25.2"
+        }
+      }
+    },
+    {
+      "sample_id": "C004_whole-blood_L-3_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 316,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "10.6"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 317,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "5.4"
+        },
+        "hemoglobin_g_dl": {
+          "row": 318,
+          "analyte": "HEMOGLOBIN",
+          "value": "16.8"
+        },
+        "hematocrit_percent": {
+          "row": 319,
+          "analyte": "HEMATOCRIT",
+          "value": "49"
+        },
+        "neutrophils_percent": {
+          "row": 331,
+          "analyte": "NEUTROPHILS",
+          "value": "59.6"
+        },
+        "lymphocytes_percent": {
+          "row": 332,
+          "analyte": "LYMPHOCYTES",
+          "value": "27.8"
+        }
+      }
+    },
+    {
+      "sample_id": "C004_whole-blood_R+1_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 336,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "8.1"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 337,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "5.55"
+        },
+        "hemoglobin_g_dl": {
+          "row": 338,
+          "analyte": "HEMOGLOBIN",
+          "value": "16.5"
+        },
+        "hematocrit_percent": {
+          "row": 339,
+          "analyte": "HEMATOCRIT",
+          "value": "48.3"
+        },
+        "neutrophils_percent": {
+          "row": 351,
+          "analyte": "NEUTROPHILS",
+          "value": "55.9"
+        },
+        "lymphocytes_percent": {
+          "row": 352,
+          "analyte": "LYMPHOCYTES",
+          "value": "26.6"
+        }
+      }
+    },
+    {
+      "sample_id": "C004_whole-blood_R+45_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 356,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "6.8"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 357,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "5.54"
+        },
+        "hemoglobin_g_dl": {
+          "row": 358,
+          "analyte": "HEMOGLOBIN",
+          "value": "16.8"
+        },
+        "hematocrit_percent": {
+          "row": 359,
+          "analyte": "HEMATOCRIT",
+          "value": "49"
+        },
+        "neutrophils_percent": {
+          "row": 371,
+          "analyte": "NEUTROPHILS",
+          "value": "53.2"
+        },
+        "lymphocytes_percent": {
+          "row": 372,
+          "analyte": "LYMPHOCYTES",
+          "value": "28.5"
+        }
+      }
+    },
+    {
+      "sample_id": "C004_whole-blood_R+82_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 376,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "7.9"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 377,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "5.45"
+        },
+        "hemoglobin_g_dl": {
+          "row": 378,
+          "analyte": "HEMOGLOBIN",
+          "value": "16.4"
+        },
+        "hematocrit_percent": {
+          "row": 379,
+          "analyte": "HEMATOCRIT",
+          "value": "47.5"
+        },
+        "neutrophils_percent": {
+          "row": 391,
+          "analyte": "NEUTROPHILS",
+          "value": "55.2"
+        },
+        "lymphocytes_percent": {
+          "row": 392,
+          "analyte": "LYMPHOCYTES",
+          "value": "29.2"
+        }
+      }
+    },
+    {
+      "sample_id": "C004_whole-blood_R+194_cbc",
+      "metrics": {
+        "white_blood_cells_thousand_ul": {
+          "row": 396,
+          "analyte": "WHITE BLOOD CELL COUNT",
+          "value": "8.3"
+        },
+        "red_blood_cells_million_ul": {
+          "row": 397,
+          "analyte": "RED BLOOD CELL COUNT",
+          "value": "5.58"
+        },
+        "hemoglobin_g_dl": {
+          "row": 398,
+          "analyte": "HEMOGLOBIN",
+          "value": "16.5"
+        },
+        "hematocrit_percent": {
+          "row": 399,
+          "analyte": "HEMATOCRIT",
+          "value": "48"
+        },
+        "neutrophils_percent": {
+          "row": 411,
+          "analyte": "NEUTROPHILS",
+          "value": "50.6"
+        },
+        "lymphocytes_percent": {
+          "row": 412,
+          "analyte": "LYMPHOCYTES",
+          "value": "31.8"
+        }
+      }
+    }
+  ]
+}

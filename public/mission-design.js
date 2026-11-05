@@ -68,11 +68,11 @@
     anatomy.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.bodyMetric===state.metric)));
     const stats=document.querySelector('.mission-chart-stats');if(stats){const values=seriesFor(crew[state.crew],state.metric,state.period);stats.innerHTML=[['Среднее',values.reduce((sum,value)=>sum+value,0)/values.length],['Мин.',Math.min(...values)],['Макс.',Math.max(...values)]].map(([label,value])=>`<div><span>${label}</span><strong>${format(value,state.metric)}<small> ${unit(state.metric)}</small></strong></div>`).join('');}
     const trendTitle=document.getElementById('trend-heading');trendTitle.removeAttribute('data-i18n');trendTitle.textContent='Сравнение с личным фоном';
-    heading.querySelector('h1').textContent = state.workspace === 'research' ? researchState.dataset === 'library' ? 'Исследования' : 'Реальные наблюдения' : 'Состояние и наблюдения';
-    document.getElementById('mission-heading-description').textContent = state.workspace === 'research' ? 'NASA OSD-575 / BIDMC / открытые исследования' : 'Ключевые показатели выбранного профиля';
+    heading.querySelector('h1').textContent = state.workspace === 'research' ? ['library','blood','ecg'].includes(researchState.dataset) ? 'Исследования' : 'Реальные наблюдения' : 'Состояние и наблюдения';
+    document.getElementById('mission-heading-description').textContent = state.workspace === 'research' ? 'NASA OSD-575 / OSD-569 / BIDMC / MIT-BIH' : 'Ключевые показатели выбранного профиля';
     window.missionBook?.render();
     window.missionConversations?.render(state.view);
-    const active = state.workspace === 'research' ? researchState.dataset === 'library' ? 'sources' : 'observations' : state.view === 'journal' ? 'archive' : ['chat','favorites','diary'].includes(state.view)?state.view:'overview';
+    const active = state.workspace === 'research' ? ['library','blood','ecg'].includes(researchState.dataset) ? 'sources' : 'observations' : state.view === 'journal' ? 'archive' : ['chat','favorites','diary'].includes(state.view)?state.view:'overview';
     if(active==='chat'||active==='favorites'){heading.querySelector('h1').textContent=active==='chat'?'NasaGPT':'Избранное';document.getElementById('mission-heading-description').textContent=active==='chat'?'Разговор с NasaGPT':'Важные записи и ответы в одном месте';}
     navigation.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.missionNav===active&&!(active==='overview'&&state.visiting))));
     window.missionHome?.render();window.missionDiary.render();window.missionActivity?.render();
