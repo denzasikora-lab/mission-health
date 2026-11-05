@@ -29,3 +29,5 @@
 .wellbeing-readout>span{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:break-word;line-height:1.45}
 
 .nasagpt-sidebar[hidden]{display:none!important}
+
+@container mission (max-width:450px){#nasagpt-sidebar .personal-tabs>button{font-size:clamp(.5rem,2.2cqw,.65rem);padding-inline:2px;white-space:nowrap;overflow-wrap:normal}}
