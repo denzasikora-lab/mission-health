@@ -30,7 +30,7 @@ function fixture(){
 }
 const settle=async()=>{await Promise.resolve();await Promise.resolve();await Promise.resolve();};
 test('Крестик появляется у текста и сразу очищает подпись, теги и возвращает фокус',()=>{
-  const f=fixture();assert.equal(f.clear.hidden,true);f.type('как я поймал катенка');f.advance(140);assert.ok(f.tags().includes('#Kittens'));assert.equal(f.clear.hidden,false);f.clear.dispatchEvent(new Event('click'));assert.equal(f.input.value,'');assert.deepEqual(f.tags(),[]);assert.equal(f.clear.hidden,true);assert.equal(f.input.focused,true);f.advance(1000);assert.equal(f.calls.length,0);
+  const f=fixture();assert.equal(f.clear.hidden,true);assert.equal(f.section.hidden,true);f.type('как я поймал катенка');f.advance(140);assert.ok(f.tags().includes('#Kittens'));assert.equal(f.section.hidden,false);assert.equal(f.clear.hidden,false);f.clear.dispatchEvent(new Event('click'));assert.equal(f.input.value,'');assert.deepEqual(f.tags(),[]);assert.equal(f.section.hidden,true);assert.equal(f.clear.hidden,true);assert.equal(f.input.focused,true);f.advance(1000);assert.equal(f.calls.length,0);
 });
 test('Быстрый набор вызывает один подбор по последней версии подписи',()=>{
   const f=fixture();f.type('Котенок');f.advance(500);f.type('Котенок играет дома');f.advance(649);assert.equal(f.calls.length,0);f.advance(1);assert.equal(f.calls.length,1);assert.equal(f.calls[0].path,'/api/story-tags');assert.equal(JSON.parse(f.calls[0].options.body).caption,'Котенок играет дома');

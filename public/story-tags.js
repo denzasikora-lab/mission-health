@@ -20,10 +20,10 @@
     const clear=document.createElement('button');clear.type='button';clear.className='story-caption-clear';clear.setAttribute('aria-label','Очистить подпись');clear.title='Очистить подпись';clear.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>';field.append(clear);
     const syncClear=()=>{clear.hidden=!input.value;clear.disabled=input.disabled;};syncClear();new MutationObserver(syncClear).observe(input,{attributes:true,attributeFilter:['disabled']});
     const section=document.createElement('section');section.className='story-tags';section.setAttribute('aria-label','Хэштеги по подписи');
-    section.innerHTML='<header><span><i aria-hidden="true">✧</i> Хэштеги</span><small>На английском</small></header><div class="story-tags-zone"><div class="story-tag-list" aria-label="Предложенные хэштеги"></div><p class="story-tags-empty">Напиши подпись / хэштеги появятся здесь</p><div class="story-tags-fx" aria-hidden="true"></div></div><span class="sr-only story-tags-status" role="status" aria-live="polite"></span>';
-    input.closest('label').after(section);
-    const list=section.querySelector('.story-tag-list'),zone=section.querySelector('.story-tags-zone'),fx=section.querySelector('.story-tags-fx'),empty=section.querySelector('.story-tags-empty'),status=section.querySelector('.story-tags-status');
-    const subtitle=section.querySelector('header small');let modelTimer,controller,requestVersion=0;
+    section.innerHTML='<div class="story-tags-zone"><div class="story-tag-list" aria-label="Предложенные хэштеги"></div><div class="story-tags-fx" aria-hidden="true"></div></div><span class="sr-only story-tags-status" role="status" aria-live="polite"></span>';
+    section.hidden=true;input.closest('label').after(section);
+    const list=section.querySelector('.story-tag-list'),zone=section.querySelector('.story-tags-zone'),fx=section.querySelector('.story-tags-fx'),status=section.querySelector('.story-tags-status');
+    let modelTimer,controller,requestVersion=0;
     const reduced=matchMedia('(prefers-reduced-motion: reduce)');let previous=input.value,tags=[],typingTimer,finishTimer,active=false,queue=[],effectIndex=0,composing=false,deleted=false;
     const animations=new Set();
     const animate=(node,frames,options)=>{if(!node.animate||reduced.matches)return;const animation=node.animate(frames,options);animations.add(animation);animation.finished.then(()=>animations.delete(animation),()=>animations.delete(animation));return animation;};
@@ -55,7 +55,9 @@
     function update(suggested){
       syncClear();clearTimeout(typingTimer);if(composing)return;
       const next=Array.isArray(suggested)?suggested:generate(input.value),same=next.join('|')===tags.join('|'),wasDelete=deleted;deleted=false;
-      if(same)return;
+      if(same){section.hidden=!next.length;return;}
+      if(!next.length){tags=[];list.replaceChildren();section.hidden=true;status.textContent='Хэштеги очищены.';queue=[];finish();return;}
+      section.hidden=false;
       const zoneBox=zone.getBoundingClientRect(),oldNodes=new Map([...list.children].map(node=>[node.textContent,node])),oldBoxes=new Map([...oldNodes].map(([tag,node])=>[tag,node.getBoundingClientRect()]));
       const leaving=[...oldNodes].filter(([tag])=>!next.includes(tag));
       const ghosts=leaving.map(([tag,node])=>{const rect=node.getBoundingClientRect();return {tag,x:rect.left-zoneBox.left,y:rect.top-zoneBox.top,width:rect.width};});
@@ -65,25 +67,25 @@
         return chip;
       }));
       for(const chip of list.children){const old=oldBoxes.get(chip.textContent);if(!old)continue;const rect=chip.getBoundingClientRect(),x=old.left-rect.left,y=old.top-rect.top;if(x||y)animate(chip,[{transform:`translate(${x}px,${y}px)`},{transform:'translate(0,0)'}],{duration:280,easing:'ease-out'});}
-      tags=next;empty.hidden=Boolean(tags.length);status.textContent=tags.length?'Хэштеги: '+tags.join(', '):'Хэштеги очищены.';
+      tags=next;status.textContent=tags.length?'Хэштеги: '+tags.join(', '):'Хэштеги очищены.';
       if(wasDelete&&ghosts.length)play(ghosts);
       else for(const ghost of ghosts){const node=document.createElement('span');node.className='story-tag story-tag-ghost';node.textContent=ghost.tag;node.style.left=ghost.x+'px';node.style.top=ghost.y+'px';fx.append(node);const animation=animate(node,[{opacity:.6},{opacity:0,transform:'translateY(-7px) scale(.9)'}],{duration:180,fill:'forwards'});if(animation)animation.finished.then(()=>node.remove(),()=>node.remove());else node.remove();}
     }
-    function cancel(){clearTimeout(modelTimer);controller?.abort();controller=null;requestVersion++;subtitle.textContent='На английском';zone.removeAttribute('aria-busy');}
+    function cancel(){clearTimeout(modelTimer);controller?.abort();controller=null;requestVersion++;zone.removeAttribute('aria-busy');}
     function refine(){
       cancel();if(composing||!core.meaningful(input.value))return;
       const version=requestVersion,caption=input.value;
       modelTimer=setTimeout(async()=>{
         if(version!==requestVersion||caption!==input.value)return;
-        const current=new AbortController();controller=current;subtitle.textContent='Подбираю...';zone.setAttribute('aria-busy','true');
+        const current=new AbortController();controller=current;zone.setAttribute('aria-busy','true');
         try{const tags=await suggest(caption,{signal:current.signal});if(version===requestVersion&&caption===input.value)update(tags);}catch{}
-        finally{if(version===requestVersion){controller=null;subtitle.textContent='На английском';zone.removeAttribute('aria-busy');}}
+        finally{if(version===requestVersion){controller=null;zone.removeAttribute('aria-busy');}}
       },650);
     }
     input.addEventListener('input',event=>{deleted ||= event.inputType?.startsWith('delete')||input.value.length<previous.length;previous=input.value;syncClear();clearTimeout(typingTimer);refine();if(!composing)typingTimer=setTimeout(update,140);});
     input.addEventListener('compositionstart',()=>{composing=true;cancel();clearTimeout(typingTimer);});input.addEventListener('compositionend',()=>{composing=false;update();refine();});
     clear.addEventListener('click',()=>{if(input.disabled)return;composing=false;input.value='';input.dispatchEvent(new Event('input',{bubbles:true}));update();input.focus();});
-    function reset(){cancel();clearTimeout(typingTimer);queue=[];finish();tags=[];previous=input.value;deleted=false;list.replaceChildren();empty.hidden=false;status.textContent='';delete section.dataset.lastEffect;update();}
+    function reset(){cancel();clearTimeout(typingTimer);queue=[];finish();tags=[];previous=input.value;deleted=false;list.replaceChildren();section.hidden=true;status.textContent='';delete section.dataset.lastEffect;update();}
     const dialog=input.closest('dialog');dialog.addEventListener('close',()=>{cancel();queue=[];clearTimeout(typingTimer);finish();});
     document.addEventListener('visibilitychange',()=>{if(document.hidden){queue=[];finish();}});
     return {reset,flush:update};
