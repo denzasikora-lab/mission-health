@@ -18,7 +18,7 @@
   const anatomy = document.createElement('section'); anatomy.className='mission-anatomy'; anatomy.setAttribute('aria-label','Схема показателей профиля'); anatomy.innerHTML='<img src="assets/health-body.svg?v=20261030-illustrated1" alt="Иллюстрация тела человека, без медицинской диагностики"><div>'+[['hr','Пульс'],['spo2','SpO₂'],['temp','Темп.'],['fatigue','Тонус']].map(([key,label])=>`<button type="button" data-body-metric="${key}"><span>${label}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${metricIcons[key]}"/></svg></button>`).join('')+'</div>'; rail.append(anatomy);
   const oldResearch = document.getElementById('research-workspace'), oldCrew = document.getElementById('crew-workspace');
   const heading = document.createElement('header'); heading.className = 'mission-heading'; heading.lang = 'ru';
-  heading.innerHTML = '<div><p class="mission-kicker">ЛИЧНЫЙ ФОН / НАБЛЮДЕНИЯ / ДНЕВНИК</p><h1 id="mission-heading-title">Состояние и наблюдения</h1><p id="mission-heading-description">Ключевые показатели на сегодня</p></div><span class="mission-data-label">Демо-данные</span>';
+  heading.innerHTML = '<div><p class="mission-kicker">ЛИЧНЫЙ ФОН / НАБЛЮДЕНИЯ / ДНЕВНИК</p><h1 id="mission-heading-title">Состояние и наблюдения</h1><p id="mission-heading-description">Ключевые показатели на сегодня</p></div>';
   content.append(heading, oldResearch, oldCrew); frame.append(rail, content); document.querySelector('.workspace-switch').after(frame);
   const journal = document.getElementById('journal-view');
   const right = document.querySelector('.insight-column');
@@ -70,11 +70,10 @@
     const trendTitle=document.getElementById('trend-heading');trendTitle.removeAttribute('data-i18n');trendTitle.textContent='Сравнение с личным фоном';
     heading.querySelector('h1').textContent = state.workspace === 'research' ? researchState.dataset === 'library' ? 'Исследования' : 'Реальные наблюдения' : 'Состояние и наблюдения';
     document.getElementById('mission-heading-description').textContent = state.workspace === 'research' ? 'NASA OSD-575 / BIDMC / открытые исследования' : 'Ключевые показатели выбранного профиля';
-    document.querySelector('.mission-data-label').textContent = state.workspace === 'research' ? 'Исходные данные' : 'Демо-данные';
     window.missionBook?.render();
     window.missionConversations?.render(state.view);
     const active = state.workspace === 'research' ? researchState.dataset === 'library' ? 'sources' : 'observations' : state.view === 'journal' ? 'archive' : ['chat','favorites'].includes(state.view)?state.view:'overview';
-    if(active==='chat'||active==='favorites'){heading.querySelector('h1').textContent=active==='chat'?'NasaGPT':'Избранное';document.getElementById('mission-heading-description').textContent=active==='chat'?'Разговор с NasaGPT':'Важные записи и ответы в одном месте';document.querySelector('.mission-data-label').textContent='Личное';}
+    if(active==='chat'||active==='favorites'){heading.querySelector('h1').textContent=active==='chat'?'NasaGPT':'Избранное';document.getElementById('mission-heading-description').textContent=active==='chat'?'Разговор с NasaGPT':'Важные записи и ответы в одном месте';}
     navigation.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.missionNav===active&&!(active==='overview'&&state.visiting))));
     window.missionHome?.render();window.missionActivity?.render();
     themeGroup.querySelectorAll('[data-theme-choice]').forEach(button=>{button.setAttribute('aria-pressed',String(button.dataset.themeChoice===themeMode));if(button.dataset.themeChoice==='system'){button.setAttribute('aria-label','Системная тема');button.title='Системная тема';}});

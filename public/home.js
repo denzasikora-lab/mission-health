@@ -32,6 +32,7 @@
   for(const [key,[value,unit]]of Object.entries(demoValues)){const card=home.querySelector('[data-home-metric='+key+']'),number=card.querySelector('strong');number.textContent=value;number.append(make('span','home-vital-unit',unit));setSource(key,...instruments[key]);card.dataset.source='demo';}
   function render(){
     const isHome=state.workspace==='crew'&&state.view==='health'&&!state.visiting;
+    document.querySelector('.mission-heading').hidden=isHome;
     const homeButton=document.getElementById('mission-home-button');homeButton.setAttribute('aria-pressed',String(isHome));
     document.querySelectorAll('[data-crew]').forEach(button=>button.setAttribute('aria-pressed',String(state.visiting&&Number(button.dataset.crew)===state.crew)));
     document.body.dataset.home=String(isHome);document.body.dataset.visiting=String(Boolean(state.visiting));home.hidden=!isHome;
@@ -41,8 +42,7 @@
     }else if(chat.parentElement!==legacy.parentElement)legacy.before(chat);
     friendProfile.classList.toggle('friend-profile',true);
     const report=window.missionCheckin.current(),vital=home.querySelector('[data-home-metric=wellbeing]');vital.querySelector('strong').textContent=(report?report.score:80)+' / 100';vital.querySelector('small').textContent=report?'Твоя самооценка':'Шкала самочувствия';vital.dataset.source=report?'self_report':'demo';
-    if(isHome){document.getElementById('mission-heading-title').textContent='Моя страница';document.getElementById('mission-heading-description').textContent='Личный дневник и самочувствие';document.querySelector('.mission-data-label').textContent='Личное';}
-    else if(state.workspace==='crew'&&state.view==='health'&&state.visiting){document.getElementById('mission-heading-title').textContent='В гостях / '+crew[state.crew].name;document.getElementById('mission-heading-description').textContent='Показатели профиля друга';}
+    if(state.workspace==='crew'&&state.view==='health'&&state.visiting){document.getElementById('mission-heading-title').textContent='В гостях / '+crew[state.crew].name;document.getElementById('mission-heading-description').textContent='Показатели профиля друга';}
   }
   window.missionHome={render,setSource};window.addEventListener('mission-profile-change',render);window.addEventListener('mission-wellbeing-change',render);render();
 })();
