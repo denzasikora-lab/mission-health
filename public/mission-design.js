@@ -38,7 +38,7 @@
   document.querySelector('.bottom-grid').before(audio);
   document.querySelector('.bottom-grid').classList.add('mission-observations');
   const brandMark=document.querySelector('.brand-mark');brandMark.removeAttribute('aria-hidden');
-  brandMark.innerHTML='<img class="nasa-header-light" src="assets/nasa-brand/nasa-header-light.png" alt="NASA" width="208" height="146"><img class="nasa-header-dark" src="assets/nasa-brand/nasa-header-dark.png" alt="NASA" width="238" height="154">';
+  brandMark.innerHTML='<img class="nasa-brand-logo" src="assets/nasa-brand/nasa-insignia.png" alt="NASA" width="121" height="102">';
   document.querySelector('.brand>span:last-child').textContent = 'MISSION HEALTH';
   const subtitle = document.createElement('span'); subtitle.className = 'mission-brand-caption'; subtitle.textContent = 'Bug Busters / NASA Space Apps'; document.querySelector('.brand').append(subtitle);
   const themeGroup = document.querySelector('.theme-control'); themeGroup.hidden=true;
