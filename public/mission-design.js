@@ -72,7 +72,7 @@
     document.getElementById('mission-heading-description').textContent = state.workspace === 'research' ? 'NASA OSD-575 / OSD-569 / BIDMC / MIT-BIH' : 'Ключевые показатели выбранного профиля';
     window.missionBook?.render();
     window.missionConversations?.render(state.view);
-    const active = state.workspace === 'research' ? ['library','blood','ecg'].includes(researchState.dataset) ? 'sources' : 'observations' : state.view === 'journal' ? 'archive' : ['chat','favorites','diary'].includes(state.view)?state.view:'overview';
+    const active = state.workspace === 'research' ? 'sources' : state.view === 'journal' ? 'archive' : state.view === 'health' ? 'observations' : ['chat','favorites','diary'].includes(state.view)?state.view:'overview';
     if(active==='chat'||active==='favorites'){heading.querySelector('h1').textContent=active==='chat'?'NasaGPT':'Избранное';document.getElementById('mission-heading-description').textContent=active==='chat'?'Разговор с NasaGPT':'Важные записи и ответы в одном месте';}
     navigation.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.missionNav===active&&!(active==='overview'&&state.visiting))));
     window.missionHome?.render();window.missionDiary.render();window.missionActivity?.render();
@@ -81,10 +81,9 @@
   function navigate(section) {
     void window.missionActivity?.record('navigation',{target:section});
     state.visiting=false;
-    researchStop(); state.workspace = section === 'observations' || section === 'sources' ? 'research' : 'crew';
+    researchStop(); state.workspace = section === 'sources' ? 'research' : 'crew';
     if (section === 'sources') researchState.dataset = 'library';
-    else if (section === 'observations' && researchState.dataset === 'library') researchState.dataset = 'nasa';
-    state.view = section === 'archive' ? 'journal' : ['chat','favorites','diary'].includes(section)?section:'health';
+    state.view = section === 'archive' ? 'journal' : section === 'observations' ? 'health' : ['chat','favorites','diary'].includes(section)?section:'overview';
     window.research.render(); renderJournal(); render();
     if(section==='diary')window.scrollTo({top:0,behavior:'auto'});
     if (section === 'archive') { void loadJournal();window.missionBook?.refresh(); document.getElementById('mission-book')?.scrollIntoView({behavior:'smooth',block:'start'}); }
@@ -98,6 +97,6 @@
   const chartBody=document.createElement('div');chartBody.className='mission-chart-body';const plot=document.createElement('div');plot.className='mission-chart-plot';const chart=document.querySelector('.chart-wrap');chart.before(chartBody);chartBody.append(plot);plot.append(chart,document.getElementById('chart-axis'));const stats=document.createElement('div');stats.className='mission-chart-stats';chartBody.append(stats);
   document.querySelectorAll('[data-period]').forEach(button=>button.addEventListener('click',render));
   window.missionDesign = {render,navigate,content,rail};
-  state.workspace = 'crew'; state.view = 'health'; state.theme = themeMode==='system'?(palette.matches?'dark':'light'):themeMode;
+  state.workspace = 'crew'; state.view = 'overview'; state.theme = themeMode==='system'?(palette.matches?'dark':'light'):themeMode;
   window.render(); void loadJournal();
 })();

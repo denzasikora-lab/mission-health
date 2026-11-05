@@ -31,13 +31,13 @@
   const demoValues={hr:['72','уд/мин'],spo2:['98','%'],temp:['36,7','°C'],sleep:['7','ч 40 мин'],hrv:['46','мс'],respiration:['14','/мин'],pressure:['118/76','мм рт. ст.'],recovery:['86','/100'],steps:['6240','шагов'],activity:['66 218','counts'],light:['187,3','лк']};
   for(const [key,[value,unit]]of Object.entries(demoValues)){const card=home.querySelector('[data-home-metric='+key+']'),number=card.querySelector('strong');if(['spo2','recovery'].includes(key))number.innerHTML=window.missionGauge.markup({value:Number(value),label:key==='spo2'?'SpO₂':'Восстановление',unit:key==='spo2'?'%':undefined});else{number.textContent=value;number.append(make('span','home-vital-unit',unit));}setSource(key,...instruments[key]);card.dataset.source='demo';}
   function render(){
-    const isHome=state.workspace==='crew'&&state.view==='health'&&!state.visiting;
-    document.querySelector('.mission-heading').hidden=isHome||state.workspace==='crew'&&state.view==='diary';
-    const homeButton=document.getElementById('mission-home-button');homeButton.setAttribute('aria-pressed',String(isHome));
+    const isHealth=state.workspace==='crew'&&state.view==='health'&&!state.visiting,isOverview=state.workspace==='crew'&&state.view==='overview';
+    document.querySelector('.mission-heading').hidden=isHealth||isOverview||state.workspace==='crew'&&state.view==='diary';
+    const homeButton=document.getElementById('mission-home-button');homeButton.setAttribute('aria-pressed',String(isOverview));
     document.querySelectorAll('[data-crew]').forEach(button=>button.setAttribute('aria-pressed',String(state.visiting&&Number(button.dataset.crew)===state.crew)));
-    document.body.dataset.home=String(isHome);document.body.dataset.visiting=String(Boolean(state.visiting));home.hidden=!isHome;
+    document.body.dataset.home=String(isHealth);document.body.dataset.overview=String(isOverview);document.body.dataset.visiting=String(Boolean(state.visiting));home.hidden=!isHealth;
     const chat=document.getElementById('nasagpt-sidebar'),legacy=document.getElementById('journal-view');
-    chat.hidden=isHome||state.view==='diary';
+    chat.hidden=isHealth||isOverview||state.view==='diary';
     if(chat.parentElement!==legacy.parentElement)legacy.before(chat);
     friendProfile.classList.toggle('friend-profile',true);
     const report=window.missionCheckin.current(),vital=home.querySelector('[data-home-metric=wellbeing]');vital.querySelector('strong').innerHTML=window.missionGauge.markup({value:report?report.score:80,label:'Самочувствие'});vital.querySelector(':scope > small').textContent=report?'Твоя самооценка':'Шкала самочувствия';vital.dataset.source=report?'self_report':'demo';

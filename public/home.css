@@ -41,3 +41,5 @@ html[data-theme=light] .home-human img{filter:saturate(.8);opacity:1}
   .home-vitals{grid-template-columns:minmax(0,1fr) 70px minmax(0,1fr)}
   .home-vital:is([data-home-metric=pressure],[data-home-metric=activity]) strong{font-size:.9rem}
 }
+
+body[data-overview=true] .mission-content{display:none}
