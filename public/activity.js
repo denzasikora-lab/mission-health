@@ -1,7 +1,7 @@
 (() => {
-  const root=document.createElement('section');root.id='personal-activity';root.className='personal-activity panel glass';
+  const root=document.createElement('section');root.id='personal-activity';root.className='personal-activity';
   root.innerHTML='<header><h2>Недавние события</h2><span><i></i>Сейчас</span></header><ol aria-live="polite"></ol><p role="status"></p>';
-  document.getElementById('mission-book').append(root);
+  document.getElementById('book-history-panel').append(root);
   const list=root.querySelector('ol'),status=root.querySelector('p'),draftTimers=new WeakMap();let loading=false,queued=false,timer,lastEvents=[];
   function render(events=lastEvents){
     lastEvents=events;list.replaceChildren();

@@ -23,8 +23,10 @@ body[data-book="true"] .mission-content .insight-column,body[data-book="true"] .
 
 .cover-nasa{display:block;width:96px;height:80px;object-fit:contain;flex:none;margin:4px 0}
 
-/* Соседние разделы архива сохраняют видимый отступ между рамками. */
-#mission-book>.book-training,#mission-book>.personal-activity{margin-block-start:24px;margin-block-end:0;min-width:0}
+/* Обучение и события находятся внутри одной общей рамки архива. */
+#mission-book>.book-history-panel{display:grid;gap:22px;margin-block-start:24px;margin-block-end:0;padding:22px;min-width:0;border-radius:16px}
+#book-history-panel>.book-training{margin:0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
+#book-history-panel>.personal-activity{margin:0;padding:20px 0 0;border:0;border-top:1px solid var(--border);border-radius:0;background:transparent;box-shadow:none;min-width:0}
 #mission-book .book-training>div{min-width:0;overflow-wrap:break-word}
 #mission-book .book-training button{max-width:100%;white-space:normal}
-@container mission (max-width:700px){#mission-book>.book-training,#mission-book>.personal-activity{margin-block-start:18px}}
+@container mission (max-width:700px){#mission-book>.book-history-panel{margin-block-start:18px;padding:16px;gap:16px}#book-history-panel>.personal-activity{padding-top:16px}}

@@ -1,8 +1,8 @@
 (() => {
   const views=new Set(),voices=new Map();
-  const icons={clip:'<path d="m21.4 11.6-8.5 8.5a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/>',mic:'<rect x="8" y="2" width="8" height="13" rx="4"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4m-4 0h8"/>',expand:'<path d="M8 3H3v5m0-5 6 6m7-6h5v5m0-5-6 6M3 16v5h5m-5 0 6-6m12 1v5h-5m5 0-6-6"/>'};
+  const icons={clip:'<path d="m21.4 11.6-8.5 8.5a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/>',mic:'<rect x="8" y="2" width="8" height="13" rx="4"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4m-4 0h8"/>'};
   function button(label,icon){const b=document.createElement('button');b.type='button';b.setAttribute('aria-label',label);b.title=label;b.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'+icon+'</svg>';return b;}
-  function resize(view){const input=view.input;input.style.height='auto';input.style.height=Math.min(Math.max(input.scrollHeight,view.form.dataset.expanded==='true'?160:60),view.form.dataset.expanded==='true'?400:200)+'px';}
+  function resize(view){const input=view.input;input.style.height='auto';input.style.height=Math.min(Math.max(input.scrollHeight,60),200)+'px';}
   function releaseDraft(voice){if(voice.store.voiceToken===voice){voice.store.dictating=false;voice.store.voiceToken=null;}}
   function stop(view,discard=false){const voice=voices.get(view);if(!voice)return;if(discard||!voice.recorder)voice.cancelled=true;clearTimeout(voice.timer);if(voice.recorder?.state==='recording')voice.recorder.stop();voice.stream?.getTracks().forEach(track=>track.stop());if(discard||voice.cancelled){releaseDraft(voice);if(discard)voice.store.notice='';voices.delete(view);refresh(view);}}
   function refresh(view){
@@ -60,13 +60,12 @@
   function attach(view,adapter){
     view.chatAdapter=adapter;views.add(view);
     const tools=document.createElement('div');tools.className='chat-composer-tools';view.chatTools=tools;
-    view.chatClip=button('Прикрепить файл',icons.clip);view.chatMic=button('Голосовой ввод',icons.mic);const expand=button('Развернуть поле сообщения',icons.expand);expand.setAttribute('aria-expanded','false');
+    view.chatClip=button('Прикрепить файл',icons.clip);view.chatMic=button('Голосовой ввод',icons.mic);
     const picker=document.createElement('input');picker.type='file';picker.multiple=true;picker.hidden=true;picker.setAttribute('aria-label','Файлы сообщения');
     view.chatFiles=document.createElement('div');view.chatFiles.className='chat-pending-files';view.input.before(view.chatFiles,picker);
-    tools.append(view.chatClip,view.chatMic,expand);view.form.querySelector('footer').prepend(tools);
+    tools.append(view.chatClip,view.chatMic);view.form.querySelector('footer').prepend(tools);
     view.chatClip.addEventListener('click',()=>picker.click());picker.addEventListener('change',()=>{const files=[...picker.files];picker.value='';void upload(view,files);});
     view.chatMic.addEventListener('click',()=>void microphone(view));
-    expand.addEventListener('click',()=>{const expanded=view.form.dataset.expanded!=='true';view.form.dataset.expanded=String(expanded);expand.setAttribute('aria-expanded',String(expanded));const label=expanded?'Свернуть поле сообщения':'Развернуть поле сообщения';expand.setAttribute('aria-label',label);expand.title=label;resize(view);view.input.focus();});
     view.input.addEventListener('input',()=>resize(view));refresh(view);
   }
   function contextChanged(view){stop(view,true);refresh(view);}

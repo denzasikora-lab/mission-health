@@ -17,7 +17,8 @@ function fixture(t){
   const sandbox={Request,Response,Headers,FormData,Blob,URL,TextEncoder,TextDecoder,AbortSignal,crypto:webcrypto,btoa,console,fetch:async(url,options)=>{outgoing.push({url,options});if(url.includes('speech.invalid'))return Response.json(failSpeech?{error:'offline'}:{text:'Сегодня после тренировки устал, боли нет.'},{status:failSpeech?503:200});return Response.json(failModel?{error:'offline'}:{choices:[{message:{content:'Самочувствие описано пользователем. Объективных измерений в записи нет.'}}]},{status:failModel?503:200});}};
   vm.runInNewContext(source,sandbox);
   async function send({owner='person-a',kind='audio',id=identifier,bytes,frames,transcript='',features,origin='https://site.invalid'}={}){const form=new FormData();form.set('id',id);form.set('kind',kind);form.set('duration','5');form.set('transcript',transcript);if(features)form.set('features',JSON.stringify(features));form.set('file',new Blob([bytes||(kind==='video'?clip:wav)]),'recording');for(const frame of frames||(kind==='video'?[jpg,jpg,jpg]:[]))form.append('frame',new Blob([frame]),'frame.jpg');const headers={origin};if(owner)headers['oai-authenticated-user-id']=owner;const response=await sandbox.app.fetch(new Request('https://site.invalid/api/media-analysis',{method:'POST',headers,body:form}),env,{waitUntil(){}});return{status:response.status,body:await response.json()};}
-  return{env,db,objects,outgoing,send,setSpeechFailure:value=>failSpeech=value,setModelFailure:value=>failModel=value};
+  async function get(owner='person-a'){const headers=owner?{'oai-authenticated-user-id':owner}:{};const response=await sandbox.app.fetch(new Request('https://site.invalid/api/media-analysis',{headers}),env,{waitUntil(){}});return {status:response.status,body:await response.json()};}
+  return{env,db,objects,outgoing,send,get,setSpeechFailure:value=>failSpeech=value,setModelFailure:value=>failModel=value};
 }
 test('Аудио распознается, анализируется и сохраняется вместе с ответом в личном дневнике',async t=>{const f=fixture(t),r=await f.send();assert.equal(r.status,200);assert.equal(r.body.status,'analyzed');assert.equal(f.outgoing.length,2);assert.equal(f.objects.size,1);assert.equal(f.db.prepare('SELECT COUNT(*) n FROM journal_messages').get().n,2);const body=JSON.parse(f.outgoing[1].options.body);assert.match(body.messages[1].content[0].text,/Сегодня после тренировки/);assert.match(body.messages[0].content,/Не выводи из лица или голоса диагноз/);});
 test('Видео передает модели три вложения изображения и текст речи',async t=>{const f=fixture(t),r=await f.send({kind:'video',transcript:'Сообщение пользователя'});assert.equal(r.status,200);assert.equal(r.body.frames,3);const body=JSON.parse(f.outgoing[0].options.body);assert.equal(body.messages[1].content.filter(p=>p.type==='image_url').length,3);assert.match(body.messages[1].content[0].text,/Сообщение пользователя/);});
@@ -58,4 +59,25 @@ test('Сбой эмбеддера оставляет измерения изоб
 test('Аудио не принимает признаки кожи, а неверные проценты или векторы не попадают в архив',async t=>{
   for(const edit of [f=>f.skin.items[0].vector=[1,0],f=>f.skin.items[0].color.r=999,f=>f.skin.items[0].change='changed',f=>f.skin.samples=1]){const f=fixture(t),features=skinFeatures();edit(features);assert.equal((await f.send({kind:'video',features})).status,400);assert.equal(f.objects.size,0);}
   const f=fixture(t),features=skinFeatures();features.acoustic={level:-20,quiet:0,clipping:0,seconds:5};assert.equal((await f.send({kind:'audio',features})).status,400);
+});
+
+
+test('Последние сохраненные измерения возвращаются без повторного декодирования и без векторов',async t=>{
+  const f=fixture(t),features={acoustic:{level:-24,quiet:.2,clipping:.001,seconds:5},model:'embeddinggemma-2:daa72c51243991dfcaf9f9137d2c573d8f7790c0:q4:768',audioVector:Array.from({length:768},(_,i)=>i===0?1:0),tone:[{label:'neutral',similarity:.6}]};
+  await f.send({transcript:'Проверка звука',features});const requests=f.outgoing.length,result=await f.get();assert.equal(result.status,200);assert.equal(f.outgoing.length,requests);assert.equal(result.body.items.length,1);
+  const item=result.body.items[0];assert.equal(item.kind,'audio');assert.equal(item.id,identifier);assert.equal(item.status,'analyzed');assert.equal(item.features.acoustic.level,-24);assert.equal(item.features.tone[0].similarity,.6);assert.equal(item.transcript,'Проверка звука');assert.match(item.analysis,/Самочувствие/);assert.equal(item.features.audioVector,undefined);assert.equal(JSON.stringify(item).includes('digest'),false);
+});
+test('Сохраненные измерения доступны только владельцу и не требуют хранилища исходных файлов',async t=>{
+  const f=fixture(t);await f.send({features:{acoustic:{level:-21,quiet:.1,clipping:0,seconds:5}},transcript:'Собственная запись'});f.env.PHOTOS=null;
+  assert.equal((await f.get('person-a')).body.items.length,1);assert.deepEqual((await f.get('person-b')).body.items,[]);assert.equal((await f.get(null)).status,401);
+});
+test('Отказ языковой модели не теряет реальные акустические измерения и речь',async t=>{
+  const f=fixture(t);f.env.LLM_API_KEY='';await f.send({features:{acoustic:{level:-30,quiet:.4,clipping:.002,seconds:5}},transcript:'Сохраненная речь'});
+  const item=(await f.get()).body.items[0];assert.equal(item.status,'measured');assert.equal(item.analysis,'');assert.equal(item.transcript,'Сохраненная речь');assert.equal(item.features.acoustic.quiet,.4);assert.equal(f.outgoing.length,0);
+});
+test('Пустая новая запись не затирает последние пригодные измерения своего формата',async t=>{
+  const f=fixture(t);await f.send({features:{acoustic:{level:-28,quiet:.3,clipping:0,seconds:5}},transcript:'Первая запись'});
+  await f.send({id:'bd9955a7-a316-4a38-a1bd-72e17c9e40a9',transcript:'Вторая запись без декодированного звука'});
+  await f.send({kind:'video',id:'e768409a-982d-4d82-8235-a1482b6b5687',features:{acoustic:{level:-18,quiet:.02,clipping:.004,seconds:5}},transcript:'Звук видео'});
+  const items=(await f.get()).body.items;assert.equal(items.length,2);assert.equal(items.find(item=>item.kind==='audio').id,identifier);assert.equal(items.find(item=>item.kind==='video').features.acoustic.level,-18);
 });

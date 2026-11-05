@@ -36,9 +36,10 @@
     const homeButton=document.getElementById('mission-home-button');homeButton.setAttribute('aria-pressed',String(isOverview));
     document.querySelectorAll('[data-crew]').forEach(button=>button.setAttribute('aria-pressed',String(state.visiting&&Number(button.dataset.crew)===state.crew)));
     document.body.dataset.home=String(isHealth);document.body.dataset.overview=String(isOverview);document.body.dataset.visiting=String(Boolean(state.visiting));home.hidden=!isHealth;
-    const chat=document.getElementById('nasagpt-sidebar'),legacy=document.getElementById('journal-view');
-    chat.hidden=isHealth||isOverview||state.view==='diary';
-    if(chat.parentElement!==legacy.parentElement)legacy.before(chat);
+    const chat=document.getElementById('nasagpt-sidebar');
+    if(!isOverview&&!chat.hidden)window.missionChatComposer.stopWithin(chat);
+    chat.hidden=!isOverview;
+    if(chat.parentElement!==home.parentElement)home.before(chat);
     friendProfile.classList.toggle('friend-profile',true);
     const report=window.missionCheckin.current(),vital=home.querySelector('[data-home-metric=wellbeing]');vital.querySelector('strong').innerHTML=window.missionGauge.markup({value:report?report.score:80,label:'Самочувствие'});vital.querySelector(':scope > small').textContent=report?'Твоя самооценка':'Шкала самочувствия';vital.dataset.source=report?'self_report':'demo';
     if(state.workspace==='crew'&&state.view==='health'&&state.visiting){document.getElementById('mission-heading-title').textContent='В гостях / '+crew[state.crew].name;document.getElementById('mission-heading-description').textContent='Показатели профиля друга';}

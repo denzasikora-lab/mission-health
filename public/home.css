@@ -42,4 +42,6 @@ html[data-theme=light] .home-human img{filter:saturate(.8);opacity:1}
   .home-vital:is([data-home-metric=pressure],[data-home-metric=activity]) strong{font-size:.9rem}
 }
 
-body[data-overview=true] .mission-content{display:none}
+body[data-overview=true] .main-column>:not(#nasagpt-sidebar){display:none!important}
+body[data-overview=true] .mission-content .layout{grid-template-columns:minmax(0,1fr)}
+body[data-overview=true] .mission-content .insight-column{display:none}

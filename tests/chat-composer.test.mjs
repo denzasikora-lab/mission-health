@@ -39,8 +39,8 @@ function fixture({permission,configuration}={}){
   const adapter={store,render(){window.missionChatComposer.refresh(view);}};window.missionChatComposer.attach(view,adapter);
   return {view,store,calls,recorders,tracks,api:window.missionChatComposer,microphoneCalls:()=>microphoneCalls};
 }
-test('Во всех беседах есть скрепка, микрофон и симметричная кнопка расширения',()=>{
-  const f=fixture();assert.equal(f.view.chatTools.children.length,3);const expand=f.view.chatTools.children[2];expand.click();assert.equal(expand.attributes['aria-expanded'],'true');assert.equal(f.view.form.dataset.expanded,'true');assert.equal(f.view.input.style.height,'160px');expand.click();assert.equal(expand.attributes['aria-expanded'],'false');assert.equal(f.view.input.style.height,'80px');assert.equal(f.calls.length,0);
+test('В беседах остаются скрепка и микрофон без кнопки расширения',()=>{
+  const f=fixture();assert.equal(f.view.chatTools.children.length,2);assert.equal(f.view.chatTools.children[0].attributes['aria-label'],'Прикрепить файл');assert.equal(f.view.chatTools.children[1].attributes['aria-label'],'Голосовой ввод');assert.equal(f.view.input.style.height,'80px');assert.equal(f.calls.length,0);
 });
 test('Отмена до ответа конфигурации не запрашивает разрешение микрофона',async()=>{
   let resolve;const configuration=new Promise(r=>{resolve=r;});const f=fixture({configuration});f.view.chatMic.click();f.api.contextChanged(f.view);resolve({ok:true,json:async()=>({api:true})});await settle();assert.equal(f.microphoneCalls(),0);assert.equal(f.store('chat').dictating,false);

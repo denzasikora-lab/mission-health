@@ -1,7 +1,23 @@
 (() => {
-  const states=new Map(),queue=[];let processing=false;
+  const states=new Map(),queue=[];let processing=false,restoring=null;
   for(const kind of ['audio','video']){
     const host=document.querySelector(kind==='audio'?'#voice-dialog':'#video-log-dialog .diary-visual-analysis'),root=document.createElement('section');root.className='media-analysis-result';root.hidden=true;host.append(root);states.set(kind,{kind,root,jobs:[]});
+  }
+  async function restore(){
+    if(restoring)return restoring;
+    restoring=(async()=>{
+      try{
+        const response=await fetch('/api/media-analysis',{cache:'no-store',signal:AbortSignal.timeout(15000)}),result=await response.json();if(!response.ok||!Array.isArray(result.items))return;
+        for(const item of result.items){
+          const state=states.get(item.kind);if(!state)continue;
+          window.missionVoiceAnalysis?.restore?.(item.kind,item);
+          if(state.jobs.length||!item.analysis||state.savedId===item.id)continue;
+          state.saved?.remove();const root=document.createElement('article'),heading=document.createElement('header'),answer=document.createElement('div');root.className='media-analysis-job';answer.className='media-analysis-answer';
+          heading.textContent='Последний сохраненный анализ / '+new Date(item.createdAt).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'short'});answer.textContent=item.analysis;root.append(heading,answer);state.root.append(root);state.root.hidden=false;state.saved=root;state.savedId=item.id;
+        }
+      }catch{}
+    })();
+    try{await restoring;}finally{restoring=null;}
   }
   function updateQueue(){for(const [index,item]of queue.entries())item.status.textContent='В очереди анализа / '+(index+1);}
   async function pump(){
@@ -36,7 +52,7 @@
     try{
       const item=job.payload;job.status.textContent='Подготавливаю запись для анализа...';
       if(item.kind==='video'&&!item.frames)item.frames=await frames(item.blob,item.duration);
-      if(item.features===undefined)item.features=await window.missionVoiceAnalysis?.analyze(item.kind,item.blob,item.frames||[],item.ageInput);
+      if(item.features===undefined)item.features=await window.missionVoiceAnalysis?.analyze(item.kind,item.blob,item.frames||[],item.ageInput,item.createdAt);
       if(!item.transcript)item.transcript=await item.transcriptTask||'';
       window.missionVoiceAnalysis?.transcript(item.kind,item.transcript);
       const form=new FormData();if(item.features)form.set('features',JSON.stringify(item.features));for(const key of ['id','kind','duration','transcript','createdAt'])form.set(key,String(item[key]));form.set('file',item.blob,'recording.'+(item.blob.type.includes('mp4')?'mp4':'webm'));for(const frame of item.frames||[])form.append('frame',frame,'frame.jpg');
@@ -56,5 +72,6 @@
     function attach(stream){if(!engine)return;try{input=engine.createMediaStreamSource(stream);analyser=engine.createAnalyser();analyser.fftSize=2048;samples=new Float32Array(analyser.fftSize);input.connect(analyser);name.textContent='Микрофон';const current=generation;function tick(time){if(current!==generation)return;frame=requestAnimationFrame(tick);if(time-last<100)return;last=time;if(engine.state!=='running'){reset();return;}analyser.getFloatTimeDomainData(samples);const rms=Math.sqrt(samples.reduce((sum,v)=>sum+v*v,0)/samples.length),db=Math.max(-90,20*Math.log10(Math.max(rms,.000001)));value.textContent=Math.round(db)+' dBFS';fill.style.width=Math.min(100,Math.max(0,(db+65)/65*100))+'%';}frame=requestAnimationFrame(tick);}catch{reset();}}
     return{prepare,attach,stop};
   }
-  window.missionMedia={submit,busy:kind=>states.get(kind)?.jobs.some(job=>job.phase==='waiting'||job.phase==='processing')||false,meter};
+  window.addEventListener?.('mission-diary-open',()=>void restore());
+  window.missionMedia={submit,restore,busy:kind=>states.get(kind)?.jobs.some(job=>job.phase==='waiting'||job.phase==='processing')||false,meter};
 })();

@@ -12,6 +12,11 @@
     for(const button of voiceViews.querySelectorAll('[data-voice-style]')){const option=document.createElement('option');option.value=button.dataset.voiceStyle;option.textContent={silo:'Silo',particles:'Частицы',wave:'Волна'}[option.value]||button.textContent;option.title=button.textContent;option.selected=button.getAttribute('aria-pressed')==='true';choice.append(option);}
     voiceViews.remove();voiceActions.append(choice);
   }
+  const audioStage=panels.audio.querySelector('.voice-stage');
+  if(audioStage&&voiceActions){
+    const capture=document.createElement('div');capture.className='diary-audio-capture';audioStage.before(capture);
+    for(const node of [audioStage,panels.audio.querySelector('.voice-readings'),voiceActions,document.getElementById('voice-notice')])if(node)capture.append(node);
+  }
   const compactLabels={'Включить камеру':'Камера','Выключить камеру':'Выключить','Новая запись':'Еще запись','Начать запись':'Запись','Остановить запись':'Стоп','Подготовка записи':'Обработка','Включить микрофон':'Микрофон','Выключить микрофон':'Выключить','Отменить подключение':'Отмена','Посмотреть демо':'Демо','Остановить демо':'Стоп демо'};
   for(const id of ['video-log-camera','voice-mic']){
     const button=document.getElementById(id);if(!button)continue;

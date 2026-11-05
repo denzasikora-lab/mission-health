@@ -148,11 +148,11 @@ test('Лимит аудиозаписи завершает ролик и осв�
 });
 
 const analysisSource=await readFile(new URL('../public/media-analysis.js',import.meta.url),'utf8');
-function analysisFixture({failFirst=false,analysis,request}={}){
+function analysisFixture({failFirst=false,analysis,request,saved=[]}={}){
   const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);},calls=[],locks=[],frames=new Map();let index=0,ids=0;const engines=[];
   class AudioEngine{constructor(){this.state='running';engines.push(this);}resume(){return Promise.resolve();}close(){this.state='closed';return Promise.resolve();}createMediaStreamSource(){return{connect(){},disconnect(){}};}createAnalyser(){return{fftSize:2048,disconnect(){},getFloatTimeDomainData(samples){samples.fill(.1);}};}}
   const window={missionVoiceAnalysis:analysis?{analyze:analysis,transcript(){}}:undefined,AudioContext:AudioEngine,missionDiary:{lock:(...args)=>locks.push(args)},missionSpeech:{finish:async()=>'Распознанная речь'},missionCheckin:{current:()=>({score:74,wellbeingScale:100})}};
-  vm.runInNewContext(analysisSource,{window,document:{getElementById:node,querySelector:node,createElement:()=>new Element()},crypto:{randomUUID:()=>ids++?'ad511184-9b59-4529-9ffa-'+String(ids).padStart(12,'0'):identifierForClient},FormData,Blob,AbortSignal,URL,performance,Float32Array,setTimeout,clearTimeout,requestAnimationFrame:callback=>{frames.set(++index,callback);return index;},cancelAnimationFrame:id=>frames.delete(id),fetch:async(_url,options)=>{calls.push(options.body);if(request)return request(options.body);return failFirst&&calls.length===1?Response.json({saved:true,status:'pending'},{status:503}):Response.json({status:'analyzed',analysis:'Ответ модели'});}});
+  vm.runInNewContext(analysisSource,{window,document:{getElementById:node,querySelector:node,createElement:()=>new Element()},crypto:{randomUUID:()=>ids++?'ad511184-9b59-4529-9ffa-'+String(ids).padStart(12,'0'):identifierForClient},FormData,Blob,AbortSignal,URL,performance,Float32Array,setTimeout,clearTimeout,requestAnimationFrame:callback=>{frames.set(++index,callback);return index;},cancelAnimationFrame:id=>frames.delete(id),fetch:async(_url,options)=>{if(options.method!=='POST')return Response.json({items:saved});calls.push(options.body);if(request)return request(options.body);return failFirst&&calls.length===1?Response.json({saved:true,status:'pending'},{status:503}):Response.json({status:'analyzed',analysis:'Ответ модели'});}});
   return{api:window.missionMedia,node,calls,locks,frames,engines,window};
 }
 const identifierForClient='ad511184-9b59-4529-9ffa-69cfe258c81e';
@@ -208,3 +208,41 @@ test('Повторный показ дневника не сбрасывает �
 });
 
 test('Новая запись не подменяет расшифровку старой записи',async()=>{const speech=await readFile(new URL('../public/speech.js',import.meta.url),'utf8'),part=speech.slice(speech.indexOf('  async function finish('),speech.indexOf('  window.missionSpeech=')),state={version:1,processing:true,queue:[],transcript:'Старый голос'},context={states:new Map([['voice',state]]),stop(){},Date,setTimeout(callback){state.version++;state.processing=false;state.transcript='Новый голос';callback();}};vm.runInNewContext(part+'globalThis.finish=finish;',context);assert.equal(await context.finish('voice'),'');});
+
+
+const voiceAnalysisSource=await readFile(new URL('../public/voice-analysis.js',import.meta.url),'utf8');
+function voiceAnalysisFixture({decode}={}){
+  class FeatureElement extends Element{
+    constructor(tag){super();this.tag=tag;}
+    querySelector(selector){const match=selector.match(/^\[data-voice-feature=(\w+)\] strong$/);if(!match)return null;const nodes=[...this.children];while(nodes.length){const item=nodes.shift();if(item.dataset.voiceFeature===match[1])return item.children.find(child=>child.tag==='strong');nodes.push(...item.children);}return null;}
+  }
+  const host=new FeatureElement('section'),window={missionGauge:{markup:({value})=>'gauge:'+value}};
+  if(decode)window.AudioContext=class{decodeAudioData(){return decode;}close(){return Promise.resolve();}};
+  const workers=[];
+  class FeatureWorker{constructor(){workers.push(this);}postMessage(data){this.id=data.id;}terminate(){this.terminated=true;}}
+  class OfflineEngine{constructor(_channels,length){this.length=length;this.destination={};}createBufferSource(){return{connect(){},start(){}};}createBuffer(){return{copyToChannel(){}};}startRendering(){return Promise.resolve({getChannelData:()=>new Float32Array(this.length).fill(.1)});}}
+  vm.runInNewContext(voiceAnalysisSource,{window,document:{querySelector:()=>host,createElement:tag=>new FeatureElement(tag)},Blob,Date,Intl,Float32Array,OfflineAudioContext:OfflineEngine,Worker:FeatureWorker,crypto:{randomUUID:()=>identifierForClient},setTimeout:()=>1,clearTimeout(){}});
+  const panel=kind=>host.children.find(item=>item.dataset.voiceAnalysis===kind),feature=(kind,key)=>panel(kind).querySelector('[data-voice-feature='+key+'] strong');return{api:window.missionVoiceAnalysis,panel,feature,workers};
+}
+const savedVoice={kind:'audio',createdAt:'2026-11-05T08:10:00Z',features:{acoustic:{level:-25.4,quiet:.2,clipping:.001,seconds:5},model:'embeddinggemma-2:daa72c51243991dfcaf9f9137d2c573d8f7790c0:q4:768',tone:[{label:'neutral',similarity:.62}]},transcript:'Сохраненная речь'};
+test('Без исходной записи карточки явно называют недостающие данные вместо прочерков',()=>{
+  const f=voiceAnalysisFixture();for(const kind of ['audio','video']){for(const key of ['level','pauses','clipping'])assert.equal(f.feature(kind,key).textContent,'Нужна запись');assert.equal(f.feature(kind,'tone').textContent,'Нужен анализ голоса');}
+});
+test('Сохраненные акустические результаты восстанавливают числа, круговые шкалы и окраску',()=>{
+  const f=voiceAnalysisFixture();assert.equal(f.api.restore('audio',savedVoice),true);assert.equal(f.feature('audio','level').textContent,'-25 dBFS');assert.equal(f.feature('audio','pauses').innerHTML,'gauge:20');assert.equal(f.feature('audio','clipping').innerHTML,'gauge:0.1');assert.equal(f.feature('audio','tone').textContent,'Нейтральная / 0.62');assert.match(f.panel('audio').children[0].children[1].textContent,/Последняя запись/);assert.equal(f.panel('audio').children[4].children[1].textContent,'Сохраненная речь');
+  assert.equal(f.api.restore('audio',{...savedVoice,createdAt:'2026-11-04T08:10:00Z',features:{acoustic:{level:-80,quiet:1,clipping:0,seconds:5}}}),false);assert.equal(f.feature('audio','level').textContent,'-25 dBFS');
+});
+test('Ожидание и сбой декодирования новой записи сохраняют измерения предыдущей с подписью времени',async()=>{
+  const wait=deferred(),f=voiceAnalysisFixture({decode:wait.promise});f.api.restore('audio',savedVoice);const pending=f.api.analyze('audio',new Blob(['sound']),[],null,'2026-11-05T09:00:00Z');await settle();assert.equal(f.feature('audio','level').textContent,'-25 dBFS');assert.equal(f.api.restore('audio',{...savedVoice,createdAt:'2026-11-05T08:30:00Z'}),false);wait.resolve(null);await pending;assert.equal(f.feature('audio','level').textContent,'-25 dBFS');assert.match(f.panel('audio').children[0].children[1].textContent,/ниже запись от/);
+});
+test('Открытие последних результатов не запускает повторное распознавание или отправку записи',async()=>{
+  const item={...savedVoice,id:'audio-saved',status:'analyzed',analysis:'Сохраненный ответ'},f=analysisFixture({saved:[item]}),restored=[];f.window.missionVoiceAnalysis={restore:(...args)=>restored.push(args)};await f.api.restore();assert.equal(f.calls.length,0);assert.equal(restored.length,1);assert.equal(restored[0][1].features.acoustic.level,-25.4);const root=f.node('#voice-dialog').children[0];assert.equal(root.hidden,false);assert.equal(root.children[0].children[1].textContent,'Сохраненный ответ');
+});
+
+
+test('Акустические числа появляются сразу после декодирования до ответа эмбеддера',async()=>{
+  const data=new Float32Array(16000).fill(.1),f=voiceAnalysisFixture({decode:Promise.resolve({length:data.length,sampleRate:16000,numberOfChannels:1,getChannelData:()=>data})});
+  const pending=f.api.analyze('audio',new Blob(['sound']),[],null,'2026-11-05T09:30:00Z');await settle();
+  assert.equal(f.workers.length,1);assert.equal(f.feature('audio','level').textContent,'-20 dBFS');assert.equal(f.feature('audio','pauses').innerHTML,'gauge:0');assert.equal(f.feature('audio','clipping').innerHTML,'gauge:0');assert.equal(f.feature('audio','tone').textContent,'Анализ голоса...');assert.equal(f.panel('audio').dataset.recordedAt,'2026-11-05T09:30:00Z');
+  f.workers[0].onmessage({data:{id:f.workers[0].id,type:'error',reason:'model_unavailable'}});await pending;assert.equal(f.feature('audio','level').textContent,'-20 dBFS');assert.equal(f.feature('audio','tone').textContent,'Нет результата модели');
+});

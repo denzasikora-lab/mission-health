@@ -7,16 +7,29 @@
   let epoch=0,engine,ready=false,busy=false,active=false,frame=0,lastSent=0,timer,frameTimer,video,identity,scope='',cameraKey='',reference,collecting=false;
   let samples=[],recent=[],streaks={},lastValid=0,lastMeasurement=0,storageOk=true;
   const storagePrefix='mission-appearance-v2:';
+  const resultPrefix='mission-appearance-result-v1:',resultMemory=new Map();let lastResult=null,lastStored=0,resultStorageOk=true;
   const frameInput=document.createElement('canvas'),frameContext=frameInput.getContext('2d');
   let ageFrames=[],ageSession=0;
   function mark(text,state='idle'){if(status.textContent!==text)status.textContent=text;root.dataset.state=state;}
-  function neutral(reason){for(const [key,card] of cards){card.node.dataset.level='neutral';card.value.textContent='-';card.label.textContent=reason||labels.neutral;card.node.setAttribute('aria-label',core.metrics.find(metric=>metric.key===key).title+': '+card.label.textContent);card.bar.style.setProperty('--signal',0);}streaks={};}
+  function resultKey(){return identity?resultPrefix+JSON.stringify([identity.storageScope,identity.name]):'';}
+  function resultValid(item,exactCamera=false){return item?.version===1&&typeof item.cameraKey==='string'&&item.cameraKey&&(!exactCamera||item.cameraKey===cameraKey)&&Number.isFinite(Date.parse(item.at))&&Number.isFinite(Date.parse(item.referenceAt))&&core.metrics.some(metric=>item.values?.[metric.key])&&core.metrics.every(metric=>!item.values?.[metric.key]||Number.isFinite(item.values[metric.key].delta)&&Number.isFinite(item.values[metric.key].z)&&item.values[metric.key].z>=0&&Number.isFinite(Date.parse(item.values[metric.key].at))&&['green','amber','red'].includes(item.values[metric.key].level));}
+  function restoreResult(exactCamera=false){
+    lastResult=null;const id=resultKey();if(!id)return;
+    try{const item=resultMemory.get(id)||JSON.parse(localStorage.getItem(id)||'null');if(resultValid(item,exactCamera)&&(!reference||item.referenceAt===reference.at))lastResult=item;}catch{}
+    if(lastResult||exactCamera||!identity)window.missionApparentAge?.setScope(lastResult?storagePrefix+JSON.stringify([identity.storageScope,identity.name,lastResult.cameraKey]):scope);
+  }
+  function persistResult(){const id=resultKey();if(!id||!lastResult)return;resultMemory.set(id,lastResult);try{localStorage.setItem(id,JSON.stringify(lastResult));lastStored=Date.now();resultStorageOk=true;}catch{resultStorageOk=false;}}
+  function displayValue(card,metric,item){card.value.textContent=(item.delta>0?'+':'')+item.delta.toLocaleString('ru-RU',{maximumFractionDigits:1,minimumFractionDigits:1})+' '+metric.unit;card.bar.style.setProperty('--signal',Math.min(item.z/4,1));}
+  function neutral(reason){
+    for(const metric of core.metrics){const card=cards.get(metric.key),saved=lastResult?.values[metric.key];card.node.dataset.level='neutral';card.node.dataset.resultSource=saved?'saved':'missing';if(saved)displayValue(card,metric,saved);else{card.value.textContent='Нет сравнения';card.bar.style.setProperty('--signal',0);}card.label.textContent=(saved?'Последнее / ':'')+(reason||labels.neutral);card.node.setAttribute('aria-label',metric.title+': '+(saved?card.value.textContent+'. Последний результат от '+new Date(saved.at).toLocaleString('ru-RU')+'. ':'')+(reason||labels.neutral));}
+    streaks={};
+  }
   for(const metric of core.metrics){
-    const node=document.createElement('article');node.className='appearance-metric';node.dataset.level='neutral';
+    const node=document.createElement('article');node.className='appearance-metric';node.dataset.level='neutral';node.dataset.resultSource='missing';
     const title=document.createElement('span');title.textContent=metric.title;title.className='appearance-metric-title';
-    const value=document.createElement('strong');value.textContent='-';
+    const value=document.createElement('strong');value.textContent='Нет записи';
     const bar=document.createElement('div');bar.className='appearance-scale';bar.setAttribute('aria-hidden','true');bar.append(document.createElement('i'));
-    const label=document.createElement('small');label.textContent=labels.neutral;
+    const label=document.createElement('small');label.textContent='Включи камеру и собери эталон';
     node.append(title,value,bar,label);node.title=metric.description;node.setAttribute('aria-label',metric.title+': '+labels.neutral);
     document.getElementById('appearance-metrics').append(node);cards.set(metric.key,{node,value,bar,label});
   }
@@ -38,14 +51,16 @@
   function setIdentity(value){
     const next=value?.storageScope&&value.name?.trim()?{storageScope:value.storageScope,name:value.name.trim()}:null;
     if(next&&identity?.storageScope===next.storageScope&&identity?.name===next.name)return;
-    const wasActive=active||Boolean(video?.srcObject),input=video,device=cameraKey;stop();identity=next;scope=next?key():'';reference=null;ageFrames=[];ageSession++;
+    const wasActive=active||Boolean(video?.srcObject),input=video,device=cameraKey;stop();identity=next;scope=next?key():'';reference=null;ageFrames=[];ageSession++;window.missionApparentAge?.setIdentity(next);restoreResult();neutral('Камера выключена');
+    if(lastResult){mark('Последнее сравнение / '+new Date(lastResult.at).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'short'}),'recorded');hint.textContent='Последний результат. Включи камеру для нового сравнения.';referenceLabel.textContent='Эталон / '+new Date(lastResult.referenceAt).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'short'});}
+    else{mark('Ожидание камеры');hint.textContent='Включи камеру и собери личный эталон для сравнения.';referenceLabel.textContent='Эталон / 24 кадра';}
     if(wasActive&&next)start(input,{key:device});
   }
   function start(input,device={}){
     stop();ageFrames=[];ageSession++;video=input;device||={};cameraKey=device.key||JSON.stringify([device.deviceId||'',input.videoWidth,input.videoHeight]);
     if(!identity){mark('Нужно имя профиля');hint.textContent='Не удалось прочитать профиль. Обнови страницу.';return;}
     if(!window.Worker||!window.OffscreenCanvas||!window.createImageBitmap){mark('Анализ недоступен');hint.textContent='Браузер не поддерживает обработчик кадров.';return;}
-    active=true;scope=key();load();window.missionSkinSpots?.setScope(scope);
+    active=true;scope=key();load();restoreResult(true);window.missionApparentAge?.setScope(scope);window.missionSkinSpots?.setScope(scope);
     samples=[];recent=[];streaks={};lastSent=lastMeasurement=0;neutral('Загрузка');renderProgress();resetButton.disabled=true;
     if(!reference&&storageOk)hint.textContent='Лицо прямо, ровный свет.';
     else if(reference)hint.textContent='Тот же свет и ракурс. Сравнение идет на паузах речи.';
@@ -117,17 +132,20 @@
     hint.textContent=!compared.colorOk?'Свет или баланс белого изменился: цветовые шкалы приостановлены.':storageOk?'Локальное сравнение / исходный кадр без эффектов':'Эталон только в этом сеансе / память браузера недоступна';
     for(const metric of core.metrics){
       const v=compared.values[metric.key],card=cards.get(metric.key);
-      if(!v.valid){card.node.dataset.level='neutral';card.value.textContent='-';card.label.textContent='Повтори освещение';card.node.setAttribute('aria-label',metric.title+': '+card.label.textContent);card.bar.style.setProperty('--signal',0);streaks[metric.key]=null;continue;}
+      if(!v.valid){const saved=lastResult?.values[metric.key];card.node.dataset.level='neutral';card.node.dataset.resultSource=saved?'saved':'missing';if(saved)displayValue(card,metric,saved);else{card.value.textContent='Нужен свет';card.bar.style.setProperty('--signal',0);}card.label.textContent=(saved?'Последнее / ':'')+'Повтори освещение';card.node.setAttribute('aria-label',metric.title+': '+card.label.textContent);streaks[metric.key]=null;continue;}
       if(v.z>=3)streaks[metric.key]??=time;else streaks[metric.key]=null;
       const state=core.level(v.z,streaks[metric.key]===null?0:time-streaks[metric.key]);
-      card.node.dataset.level=state;card.value.textContent=(v.delta>0?'+':'')+v.delta.toLocaleString('ru-RU',{maximumFractionDigits:1,minimumFractionDigits:1})+' '+metric.unit;
+      card.node.dataset.level=state;card.node.dataset.resultSource='live';card.value.textContent=(v.delta>0?'+':'')+v.delta.toLocaleString('ru-RU',{maximumFractionDigits:1,minimumFractionDigits:1})+' '+metric.unit;
       card.label.textContent=labels[state];card.node.setAttribute('aria-label',metric.title+': '+card.value.textContent+', '+labels[state]);card.bar.style.setProperty('--signal',Math.min(v.z/4,1));
+      if(!lastResult||lastResult.cameraKey!==cameraKey||lastResult.referenceAt!==reference.at)lastResult={version:1,cameraKey,referenceAt:reference.at,at:new Date().toISOString(),values:{}};
+      lastResult.values[metric.key]={delta:v.delta,z:v.z,level:state,at:new Date().toISOString()};lastResult.at=new Date().toISOString();
     }
+    if(Date.now()-lastStored>=2000)persistResult();
   }
   function stop(){
     epoch++;active=false;ready=busy=false;window.missionSkinSpots?.pause();clearTimeout(timer);clearTimeout(frameTimer);cancelAnimationFrame(frame);frame=0;
     engine?.terminate();engine=null;samples=[];recent=[];streaks={};lastValid=0;resetButton.disabled=true;
-    neutral('Камера выключена');mark('Ожидание камеры');progress.textContent='-';progress.style.setProperty('--capture',0);ctx.clearRect(0,0,preview.width,preview.height);
+    persistResult();neutral('Камера выключена');mark(lastResult?'Последнее сравнение / '+new Date(lastResult.at).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'short'}):'Ожидание камеры',lastResult?'recorded':'idle');progress.textContent=lastResult?resultStorageOk?'Сохранено':'Сеанс':'Нет кадра';progress.style.setProperty('--capture',0);ctx.clearRect(0,0,preview.width,preview.height);
   }
   resetButton.addEventListener('click',()=>{if(active&&ready)resetCapture();});
   document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});

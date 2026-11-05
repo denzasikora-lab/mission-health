@@ -68,3 +68,22 @@ body[data-diary=true] .mission-content .main-column>:not(#media-diary-dialog),bo
 #media-diary-dialog #video-log-dialog>.diary-category-heading{justify-content:space-between;gap:12px;flex-wrap:wrap}
 #media-diary-dialog #video-log-dialog>.diary-category-heading h3{font-size:.82rem;color:#8eaaa3}
 #media-diary-dialog .log-heading-tools{min-width:0}
+
+/* Запись и каждый результат анализа отделены собственной рамкой и отступом. */
+#media-diary-dialog .log-capture,#media-diary-dialog .diary-audio-capture,
+#media-diary-dialog .diary-visual-analysis>:is(.appearance-panel,.apparent-age-panel,.skin-spots-panel,.media-analysis-result),
+#media-diary-dialog .voice-analysis-panel,#media-diary-dialog #voice-dialog>.media-analysis-result{
+  min-width:0;max-width:100%;padding:14px;margin:0;border:1px solid #315b61;border-radius:13px;background:#0c1c20;
+}
+#media-diary-dialog #voice-dialog>:is(.voice-analysis-panel,.media-analysis-result){margin-top:16px}
+#media-diary-dialog .log-analysis-layout{gap:16px}
+#media-diary-dialog .diary-audio-capture .voice-stage{margin:0}
+#media-diary-dialog :is(.log-capture,.diary-audio-capture) :is(.log-notice,.voice-notice){margin-bottom:0}
+#media-diary-dialog .diary-visual-analysis>.media-analysis-result:empty{display:none}
+@container media-diary (max-width:450px){
+  #media-diary-dialog .log-capture,#media-diary-dialog .diary-audio-capture,
+  #media-diary-dialog .diary-visual-analysis>:is(.appearance-panel,.apparent-age-panel,.skin-spots-panel,.media-analysis-result),
+  #media-diary-dialog .voice-analysis-panel,#media-diary-dialog #voice-dialog>.media-analysis-result{padding:10px}
+}
+#media-diary-dialog .appearance-metric[data-result-source=missing] strong{font-size:.68rem;line-height:1.5;overflow-wrap:break-word}
+#media-diary-dialog .voice-analysis-metrics strong{line-height:1.5;overflow-wrap:break-word}
