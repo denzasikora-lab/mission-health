@@ -30,4 +30,4 @@
 
 .nasagpt-sidebar[hidden]{display:none!important}
 
-@container mission (max-width:450px){#nasagpt-sidebar .personal-tabs>button{font-size:clamp(.5rem,2.2cqw,.65rem);padding-inline:2px;white-space:nowrap;overflow-wrap:normal}}
+@container mission (max-width:450px){#nasagpt-sidebar .personal-tabs{grid-template-columns:minmax(0,.95fr) minmax(0,1.1fr) minmax(0,1.5fr) minmax(0,1.1fr)}#nasagpt-sidebar .personal-tabs>button{font-size:clamp(.5rem,2.2cqw,.65rem);padding-inline:2px;white-space:nowrap;overflow-wrap:normal}}
