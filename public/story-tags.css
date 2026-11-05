@@ -9,3 +9,12 @@
 @media(prefers-reduced-motion:reduce){.story-tags *, .story-tags *:before,.story-tags *:after{animation:none!important;transition:none!important}.story-tags-fx{display:none}}
 
 .story-tags[data-effect=black-hole] header i{color:#c39955}.story-tags[data-effect=snap] header i{color:#a782cf}
+
+/* Очистка подписи остается справа внутри поля и не перекрывает текст. */
+.story-caption-field{position:relative;display:block;min-width:0;width:100%}
+.story-capture-form .story-caption-field input{padding-inline-end:44px}
+.story-caption-field .story-caption-clear{position:absolute;inset-inline-end:6px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:32px;height:32px;padding:6px;border:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer}
+.story-caption-clear:hover{background:var(--hover);color:var(--text)}
+.story-caption-clear:focus-visible{outline:2px solid var(--accent);outline-offset:0}
+.story-caption-clear svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+.story-caption-clear[hidden]{display:none!important}.story-caption-clear:disabled{opacity:.4;cursor:default}

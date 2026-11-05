@@ -44,6 +44,7 @@
     document.getElementById('story-view-title').textContent=item.title||'Личная сториз';document.getElementById('story-view-caption').textContent=item.description||item.caption||'';document.getElementById('story-view-credit').textContent=item.archive?(item.credit+' / '+item.id+' / '+date(item.createdAt)):'Опубликовано в твоем личном архиве';
     document.getElementById('story-profile').hidden=!item.archive||!crew.some(person=>person.id===item.profile);
     viewTags.replaceChildren(...(item.own?window.missionStoryTags.generate(item.caption):[]).map(tag=>make('span','story-tag',tag)));
+    if(item.own)void window.missionStoryTags.suggest(item.caption).then(tags=>{if(version===viewVersion&&viewer.open)viewTags.replaceChildren(...tags.map(tag=>make('span','story-tag',tag)));});
     window.missionStoryHealth.render(healthView,item.health,{legacy:!item.archive});
     sourceLink.hidden=!item.archive;if(item.archive)sourceLink.href=item.source;else sourceLink.removeAttribute('href');document.getElementById('story-remove').hidden=!item.own;
     progress.replaceChildren(...group.map(()=>{const bar=make('span');bar.append(make('i'));return bar}));for(let i=0;i<index;i++)progress.children[i].firstChild.style.width='100%';

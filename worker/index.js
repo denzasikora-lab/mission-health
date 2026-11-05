@@ -175,6 +175,7 @@ export default {
       const actiwatchMatch=url.pathname.match(/^\/api\/actiwatch(?:\/([a-f0-9-]{36}))?$/i);if(actiwatchMatch)return await actiwatchRoute(request,env,user,actiwatchMatch[1]);
       if(url.pathname==='/api/activity')return await activityRoute(request,env,user);
       if(url.pathname==='/api/compose')return await composeRoute(request,env);
+      if(url.pathname==='/api/story-tags')return await storyTagsRoute(request,env,user);
       const tasksMatch=url.pathname.match(/^\/api\/tasks(?:\/([a-f0-9-]{36}))?$/i);if(tasksMatch)return await tasksRoute(request,env,user,tasksMatch[1]);
       if(url.pathname==='/api/chat')return await generalChatRoute(request,env,user,url);
       if(url.pathname==='/api/team-chat')return await teamChatRoute(request,env,user,url);
