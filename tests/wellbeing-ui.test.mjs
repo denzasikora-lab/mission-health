@@ -5,6 +5,7 @@ import {readFile} from 'node:fs/promises';
 import {webcrypto} from 'node:crypto';
 
 const source=await readFile(new URL('../public/personal-space.js',import.meta.url),'utf8');
+const gaugeSource=await readFile(new URL('../public/metric-gauge.js',import.meta.url),'utf8');
 const storySource=await readFile(new URL('../public/story-health.js',import.meta.url),'utf8');
 const clone=value=>JSON.parse(JSON.stringify(value));
 class Node{
@@ -22,6 +23,9 @@ function fixture(storage=new Map()){
   const document={getElementById:()=>null,createElement:()=>new Node(),querySelectorAll:()=>[]};
   const window={dispatchEvent:event=>events.push(event.type),missionActivity:{record:(kind,details)=>activity.push({kind,...details}),refresh:()=>{}}};
   const sandbox={window,document,personalProfileId:'personal',Map,Set,Date,Intl,Event,crypto:webcrypto,localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)},loadJournal:()=>{},journalApi:async(path,options)=>{const body=options?.body?JSON.parse(options.body):undefined;calls.push({path,body});if(!body)return path==='/api/favorites'?{items:[],hasMore:false,cursor:null}:{messages:[],hasMore:false,cursor:null};return {message:{id:body.id,content:body.content,wellbeing:body.wellbeing},reply:null};}};
+  // Инструменты ввода проверяются отдельно от хранения самооценки.
+  window.missionChatComposer={attach(){},refresh(){},contextChanged(){}};
+  vm.runInNewContext(gaugeSource,sandbox);
   // Инициализацию панелей отделяем от настоящих функций хранения, отправки и отображения.
   const setup=source.slice(0,source.indexOf('  const checkin=create('));
   vm.runInNewContext(setup+'window.test={choose,restoreScore,selection,currentReport,badge,canonicalReport,label,hue,store,send,retryChat,panel,setKind,setIdentity:value=>identity=value,addWidget:value=>sliders.push(value)};})();',sandbox);
@@ -54,12 +58,12 @@ test('Границы 1 и 100 доступны, дробные и выходящ
 });
 test('Ползунок показывает актуальную оценку, цвет и доступную подпись из 100',()=>{
   const f=fixture(),widget={root:new Node(),input:new Node(),value:new Node(),label:new Node(),mouth:new Node(),time:new Node(),reset:new Node()};f.api.addWidget(widget);f.api.choose(76);
-  assert.equal(widget.input.value,76);assert.equal(widget.value.textContent,'76 / 100');assert.equal(widget.label.textContent,'Хорошо');assert.equal(widget.input.attributes['aria-valuetext'],'76 из 100 / Хорошо');assert.equal(widget.root.properties['--mood-hue'],f.api.hue(76));assert.equal(widget.reset.hidden,false);
-  f.api.choose(77);assert.notEqual(widget.mouth.attributes.d,'M7 14 Q12 20 17 14');assert.equal(widget.value.textContent,'77 / 100');
+  assert.equal(widget.input.value,76);assert.match(widget.value.innerHTML,/aria-valuenow="76"/);assert.match(widget.value.innerHTML,/stroke-dashoffset="24.000"/);assert.equal(widget.label.textContent,'Хорошо');assert.equal(widget.input.attributes['aria-valuetext'],'76 из 100 / Хорошо');assert.equal(widget.root.properties['--mood-hue'],f.api.hue(76));assert.equal(widget.reset.hidden,false);
+  f.api.choose(77);assert.notEqual(widget.mouth.attributes.d,'M7 14 Q12 20 17 14');assert.match(widget.value.innerHTML,/aria-valuenow="77"/);
 });
 test('Старый бейдж сохраняет шкалу10, новый бейдж использует шкалу100',()=>{
   const f=fixture(),old=f.api.badge({score:8,label:'Хорошо'}),current=f.api.badge({score:80,label:'Хорошо',wellbeingScale:100});
-  assert.equal(old.textContent,'8 / 10 · Хорошо');assert.equal(current.textContent,'80 / 100 · Хорошо');assert.equal(old.properties['--mood-hue'],current.properties['--mood-hue']);
+  assert.match(old.innerHTML,/aria-valuemax="10" aria-valuenow="8"/);assert.match(current.innerHTML,/aria-valuemax="100" aria-valuenow="80"/);assert.match(old.innerHTML,/stroke-dashoffset="20.000"/);assert.match(current.innerHTML,/stroke-dashoffset="20.000"/);assert.equal(old.children[0].textContent,'Хорошо');assert.equal(old.properties['--mood-hue'],current.properties['--mood-hue']);
 });
 test('Отправка в дневник и чат передает явную шкалу100',async()=>{
   for(const kind of ['diary','chat']){
@@ -78,14 +82,14 @@ test('Сториз сохраняет новую шкалу, а архивная
     const host=new Node();f.window.missionStoryHealth.render(host,{...snapshot,wellbeing});assert.ok(host.children.some(child=>child.textContent===expected));
   }
 });
-test('В окне записи доступны NasaGPT, Избранное и Запланировано, клавиатура переключает вкладки',()=>{
+test('В окне записи доступны четыре вкладки, клавиатура переключает их по кругу',()=>{
   const calls=[],compact=new Node(),sandbox={modalKind:'chat',compact,modalView:{},setKind:(_view,kind)=>calls.push(kind),create:(_tag,_class,text)=>{const node=new Node();node.textContent=text;return node;}};
   const start=source.indexOf("  const tabs=create('div','personal-tabs')"),end=source.indexOf('  checkin.append(tabs);',start);
   assert.ok(start>=0&&end>start);vm.runInNewContext(source.slice(start,end)+'globalThis.actualTabs=tabs;',sandbox);
-  const tabs=sandbox.actualTabs;assert.deepEqual(Array.from(tabs.children,node=>node.textContent),['NasaGPT','Избранное','Запланировано']);
+  const tabs=sandbox.actualTabs;assert.deepEqual(Array.from(tabs.children,node=>node.textContent),['NasaGPT','Избранное','Запланировано','Общий чат']);
   assert.equal(tabs.children[0].attributes['aria-selected'],'true');assert.equal(sandbox.modalKind,'chat');
-  tabs.children[0].events.keydown({key:'ArrowLeft',preventDefault(){}});assert.equal(sandbox.modalKind,'scheduler');assert.equal(tabs.children[2].focused,true);assert.equal(compact.attributes['aria-labelledby'],'media-personal-tab-scheduler');
-  tabs.children[1].events.keydown({key:'Home',preventDefault(){}});assert.equal(sandbox.modalKind,'chat');assert.deepEqual(calls,['scheduler','chat']);
+  tabs.children[0].events.keydown({key:'ArrowLeft',preventDefault(){}});assert.equal(sandbox.modalKind,'team');assert.equal(tabs.children[3].focused,true);assert.equal(compact.attributes['aria-labelledby'],'media-personal-tab-team');
+  tabs.children[1].events.keydown({key:'Home',preventDefault(){}});assert.equal(sandbox.modalKind,'chat');assert.deepEqual(calls,['team','chat']);
 });
 test('Избранное открывается внутри чата и возвращает несохраненный текст без перехода к книге',async()=>{
   const f=fixture(),host=new Node(),changes=[];f.api.store('chat').draft='Текст останется в чате';

@@ -24,7 +24,6 @@
     dialog.hidden=!visible;dialog.dataset.active=String(visible);document.body.dataset.diary=String(visible);
     dialog.dataset.mode='combined';
     for(const panel of Object.values(panels))panel.hidden=false;
-    dialog.querySelector('[data-diary-video-analysis]').hidden=false;
     if(visible===active)return;
     active=visible;
     recordings.clear();dialog.dataset.recording='false';

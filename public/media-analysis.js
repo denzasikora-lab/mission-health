@@ -1,7 +1,7 @@
 (() => {
   const states=new Map(),queue=[];let processing=false;
   for(const kind of ['audio','video']){
-    const host=document.querySelector(kind==='audio'?'#voice-dialog':'#video-log-dialog .log-capture'),root=document.createElement('section');root.className='media-analysis-result';root.hidden=true;host.append(root);states.set(kind,{kind,root,jobs:[]});
+    const host=document.querySelector(kind==='audio'?'#voice-dialog':'#video-log-dialog .diary-visual-analysis'),root=document.createElement('section');root.className='media-analysis-result';root.hidden=true;host.append(root);states.set(kind,{kind,root,jobs:[]});
   }
   function updateQueue(){for(const [index,item]of queue.entries())item.status.textContent='В очереди анализа / '+(index+1);}
   async function pump(){

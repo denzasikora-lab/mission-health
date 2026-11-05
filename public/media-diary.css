@@ -37,3 +37,28 @@ body[data-display=phone] .media-diary[data-active=true][data-mode]{display:block
 body[data-diary=true] .mission-content .layout{grid-template-columns:minmax(0,1fr)}
 body[data-diary=true] .mission-content .main-column>:not(#media-diary-dialog),body[data-diary=true] .mission-content .insight-column{display:none!important}
 @container mission (max-width:700px){#media-diary-dialog.media-diary{padding:12px 10px}}
+
+/* Две категории записи и отдельная беседа имеют собственный контур. */
+#media-diary-dialog.media-diary{padding:0;border:0;background:transparent}
+#media-diary-dialog .diary-panel{min-width:0;max-width:100%;margin:0;padding:16px;border:1px solid #315b61;border-radius:16px;background:#081317;overflow:visible}
+#media-diary-dialog .diary-panel+.diary-panel{margin-top:16px}
+#media-diary-dialog .diary-category-heading{display:flex;align-items:center;min-width:0;padding-bottom:12px;margin-bottom:14px;border-bottom:1px solid #27424b}
+#media-diary-dialog .diary-category-heading h3{margin:0;font-size:1rem;line-height:1.4;color:#d3edf0}
+#media-diary-dialog .diary-visual-analysis{display:grid;gap:16px;min-width:0}
+#media-diary-dialog .diary-visual-analysis>.appearance-panel{border:0;padding:0;border-radius:0;background:none}
+#media-diary-dialog .diary-visual-analysis>.apparent-age-panel{margin:0;padding:0;border-top:0}
+#media-diary-dialog>.media-checkin{min-width:0;max-width:100%;padding:16px;margin-top:16px;border:1px solid #315b61;border-radius:16px;background:#081317}
+#media-diary-dialog>.media-checkin>.personal-tabs{margin-top:0}
+#media-diary-dialog :is(.diary-panel,.media-checkin) :is(h3,p,small,strong,summary){overflow-wrap:break-word}
+#media-diary-dialog .voice-readings strong{white-space:normal;overflow-wrap:anywhere}
+#media-diary-dialog .voice-analysis-panel>header{flex-wrap:wrap;align-items:baseline}
+#media-diary-dialog .voice-analysis-state{max-width:100%;text-align:start}
+#media-diary-dialog .voice-analysis-metrics strong:has(>.metric-gauge){display:block;line-height:1}
+#media-diary-dialog .voice-analysis-metrics .metric-gauge{--gauge-size:64px}
+@container media-diary (max-width:450px){
+  #media-diary-dialog :is(.diary-panel,.media-checkin){padding:12px}
+  #media-diary-dialog .media-checkin .personal-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #media-diary-dialog .personal-tabs button{overflow-wrap:normal}
+  #media-diary-dialog .voice-analysis-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #media-diary-dialog .apparent-age-reference{flex-wrap:wrap}
+}

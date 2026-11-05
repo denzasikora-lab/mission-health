@@ -35,7 +35,7 @@
     const chosen=selection();
     for(const widget of sliders){
       const score=chosen?.score||50;widget.input.value=score;widget.root.style.setProperty('--mood-hue',hue(score));widget.root.style.setProperty('--mood-value',(score-1)/99);widget.root.dataset.chosen=String(Boolean(chosen));
-      widget.value.textContent=chosen?score+' / 100':'- / 100';widget.label.textContent=chosen?label(score):'Выбери свое самочувствие';widget.input.setAttribute('aria-valuetext',chosen?score+' из 100 / '+label(score):'Самочувствие еще не выбрано');
+      widget.value.innerHTML=window.missionGauge.markup({value:chosen?score:null,label:'Самочувствие',compact:true});widget.label.textContent=chosen?label(score):'Выбери свое самочувствие';widget.input.setAttribute('aria-valuetext',chosen?score+' из 100 / '+label(score):'Самочувствие еще не выбрано');
       widget.mouth.setAttribute('d','M7 14 Q12 '+(9+(score-1)/99*11).toFixed(2)+' 17 14');
       widget.time.textContent=chosen?'Твоя оценка / '+new Date(chosen.at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):'Самооценка, не показание датчика';
       widget.reset.hidden=!chosen;
@@ -49,7 +49,7 @@
     const reset=create('button','wellbeing-reset','Сбросить оценку');reset.type='button';reset.hidden=true;reset.addEventListener('click',()=>{selections.delete(profile());try{if(identity)localStorage.removeItem(storageKey());}catch{}renderScores();window.dispatchEvent(new Event('mission-wellbeing-change'));});root.append(reset);
     sliders.push({root,input,reset,value:root.querySelector('strong'),label:root.querySelector('.wellbeing-readout span'),mouth:root.querySelector('path'),time:root.querySelector('.wellbeing-time')});renderScores();return root;
   }
-  function badge(report){const scale=report.wellbeingScale===100?100:10,score=canonicalReport(report).score;const node=create('span','wellbeing-badge',report.score+' / '+scale+' · '+(report.label||label(score)));node.style.setProperty('--mood-hue',hue(score));return node;}
+  function badge(report){const scale=report.wellbeingScale===100?100:10,score=canonicalReport(report).score;const node=create('span','wellbeing-badge');node.innerHTML=window.missionGauge.markup({value:report.score,max:scale,label:'Самочувствие',compact:true});node.append(create('span','',report.label||label(score)));node.style.setProperty('--mood-hue',hue(score));return node;}
   function store(kind){const key=kind==='diary'?'diary:'+profile():kind;if(!cache.has(key))cache.set(key,{kind,profile:profile(),messages:[],loaded:false,loading:false,cursor:null,more:false,draft:'',files:[],pending:null,busy:false,notice:''});return cache.get(key);}
   function favoriteFor(type,id){return favoriteItems.find(item=>item.sourceType===type&&item.sourceId===id);}
   function star(entry,type='diary',id=profile()){

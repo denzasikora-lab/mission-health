@@ -53,7 +53,7 @@ function renderBidmc(){
 function renderBidmcDynamic(){
   const record=researchState.records.get(researchState.record);if(!record||!$('bidmc-cards'))return;
   const t=researchText(),cursor=Math.min(researchState.cursor,record.numerics.length-1),current=record.numerics[cursor],key=researchState.numeric,column=bidmcColumns[key],reference=researchMath.reference(record.numerics,key,column),offset=record.numerics[0][0];
-  $('bidmc-cards').innerHTML=Object.entries(bidmcColumns).map(([name,col])=>{const valid=researchMath.valid(current[col],name),ref=researchMath.reference(record.numerics,name,col);return `<button class="metric-card glass" type="button" data-research-numeric="${name}" aria-pressed="${name===key}"><span class="metric-label">${t[name]}</span><span class="metric-value"><bdi>${valid?researchNumber(current[col]):t.missing}</bdi><span class="metric-unit">${researchVitalUnit(name)}</span></span><span class="metric-trend">${ref?t.reference+': '+researchNumber(ref.median):t.notEnough}</span></button>`}).join('');
+  $('bidmc-cards').innerHTML=Object.entries(bidmcColumns).map(([name,col])=>{const valid=researchMath.valid(current[col],name),ref=researchMath.reference(record.numerics,name,col);return `<button class="metric-card glass" type="button" data-research-numeric="${name}" aria-pressed="${name===key}"><span class="metric-label">${t[name]}</span><span class="metric-value">${name==='spo2'?window.missionGauge.markup({value:valid?current[col]:null,label:t[name],unit:'%',digits:1}):`<bdi>${valid?researchNumber(current[col]):t.missing}</bdi><span class="metric-unit">${researchVitalUnit(name)}</span>`}</span><span class="metric-trend">${ref?t.reference+': '+researchNumber(ref.median):t.notEnough}</span></button>`}).join('');
   $('bidmc-title').textContent=t[key]+' · '+researchVitalUnit(key);
   const displayed=record.numerics.slice(researchState.window==='all'?0:Math.max(0,cursor-60),cursor+1),points=displayed.map(row=>({label:researchTime(row[0]-offset),value:researchMath.valid(row[column],key)?row[column]:null}));
   $('bidmc-chart').innerHTML=researchChart(points,reference?.median,null,researchVitalUnit(key),t[key]+' · BIDMC '+record.id);
@@ -74,7 +74,7 @@ function renderResearch(){
   window.missionDesign?.render();
   if(!active){researchStop();return}
   $('research-sidebar-title').textContent=t.datasets;$('research-sidebar-note').textContent=t.sidebar;
-  $('research-datasets').innerHTML=[['nasa','01','NASA OSD-575',t.nasaSub],['bidmc','02','BIDMC',t.bidmcSub],['library','03',t.library,t.librarySub]].map(([id,symbol,title,subtitle])=>`<button type="button" class="dataset-button" data-dataset="${id}" aria-pressed="${researchState.dataset===id}"><span class="dataset-symbol" aria-hidden="true">${symbol}</span><span><strong>${title}</strong><small>${subtitle}</small></span></button>`).join('');
+  $('research-datasets').innerHTML=[['nasa','01','NASA <span class="dataset-code">OSD-575</span>',t.nasaSub],['bidmc','02','BIDMC',t.bidmcSub],['library','03',t.library,t.librarySub]].map(([id,symbol,title,subtitle])=>`<button type="button" class="dataset-button" data-dataset="${id}" aria-pressed="${researchState.dataset===id}"><span class="dataset-symbol" aria-hidden="true">${symbol}</span><span class="dataset-copy"><strong>${title}</strong><small>${subtitle}</small></span></button>`).join('');
   $('research-main').innerHTML=researchState.dataset==='nasa'?renderNasa():researchState.dataset==='bidmc'?renderBidmc():renderResearchLibrary();
   if(researchState.dataset==='bidmc')renderBidmcDynamic();
 }

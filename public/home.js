@@ -22,14 +22,14 @@
     recovery:['Расчетный индекс'],steps:['Astroskin / акселерометр',astroskin],activity:['Actiwatch Plus',nasa],light:['Actiwatch Plus / датчик света',nasa]
   };
   function setSource(key,label,url){
-    const note=home.querySelector('[data-home-metric='+key+'] small');
+    const note=home.querySelector('[data-home-metric='+key+'] > small');
     if(!note)return;
     note.replaceChildren();
     if(url){const link=make('a','home-instrument',label);link.href=url;link.target='_blank';link.rel='noopener';link.title='Описание прибора: '+label;note.append(link);}
     else note.textContent=label;
   }
   const demoValues={hr:['72','уд/мин'],spo2:['98','%'],temp:['36,7','°C'],sleep:['7','ч 40 мин'],hrv:['46','мс'],respiration:['14','/мин'],pressure:['118/76','мм рт. ст.'],recovery:['86','/100'],steps:['6240','шагов'],activity:['66 218','counts'],light:['187,3','лк']};
-  for(const [key,[value,unit]]of Object.entries(demoValues)){const card=home.querySelector('[data-home-metric='+key+']'),number=card.querySelector('strong');number.textContent=value;number.append(make('span','home-vital-unit',unit));setSource(key,...instruments[key]);card.dataset.source='demo';}
+  for(const [key,[value,unit]]of Object.entries(demoValues)){const card=home.querySelector('[data-home-metric='+key+']'),number=card.querySelector('strong');if(['spo2','recovery'].includes(key))number.innerHTML=window.missionGauge.markup({value:Number(value),label:key==='spo2'?'SpO₂':'Восстановление',unit:key==='spo2'?'%':undefined});else{number.textContent=value;number.append(make('span','home-vital-unit',unit));}setSource(key,...instruments[key]);card.dataset.source='demo';}
   function render(){
     const isHome=state.workspace==='crew'&&state.view==='health'&&!state.visiting;
     document.querySelector('.mission-heading').hidden=isHome||state.workspace==='crew'&&state.view==='diary';
@@ -41,7 +41,7 @@
       if(chat.parentElement!==home)home.querySelector('.home-checkin').after(chat);
     }else if(chat.parentElement!==legacy.parentElement)legacy.before(chat);
     friendProfile.classList.toggle('friend-profile',true);
-    const report=window.missionCheckin.current(),vital=home.querySelector('[data-home-metric=wellbeing]');vital.querySelector('strong').textContent=(report?report.score:80)+' / 100';vital.querySelector('small').textContent=report?'Твоя самооценка':'Шкала самочувствия';vital.dataset.source=report?'self_report':'demo';
+    const report=window.missionCheckin.current(),vital=home.querySelector('[data-home-metric=wellbeing]');vital.querySelector('strong').innerHTML=window.missionGauge.markup({value:report?report.score:80,label:'Самочувствие'});vital.querySelector(':scope > small').textContent=report?'Твоя самооценка':'Шкала самочувствия';vital.dataset.source=report?'self_report':'demo';
     if(state.workspace==='crew'&&state.view==='health'&&state.visiting){document.getElementById('mission-heading-title').textContent='В гостях / '+crew[state.crew].name;document.getElementById('mission-heading-description').textContent='Показатели профиля друга';}
   }
   window.missionHome={render,setSource};window.addEventListener('mission-profile-change',render);window.addEventListener('mission-wellbeing-change',render);render();

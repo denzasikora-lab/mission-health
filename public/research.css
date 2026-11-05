@@ -2,23 +2,52 @@
 @container mission (max-width:1100px){.research-layout{grid-template-columns:190px minmax(0,1fr)}.research-stats,.research-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.research-heading{display:block}.research-badge{margin-top:15px}.research-notes{grid-template-columns:1fr}.research-wave-grid{grid-template-columns:1fr}.research-wave svg{height:130px}}
 @container mission (max-width:780px){.research-layout{grid-template-columns:1fr}.research-sidebar{position:static;display:flex;flex-wrap:wrap;gap:6px;padding:12px}.research-sidebar h2,.research-sidebar-note{display:none}.dataset-button{width:auto;flex:1;margin:0;padding:10px;min-width:120px}.dataset-symbol{width:30px;height:36px;font-size:.8rem}.dataset-button small{display:none}.research-heading,.research-chart,.research-table-panel{padding:22px}.research-controls{padding:18px;gap:12px}.research-heading h2{font-size:1.5rem}.research-svg{min-height:190px}.research-library{grid-template-columns:1fr}.workspace-switch{width:100%;margin-inline:0}.workspace-switch button{flex:1;padding:11px 12px;font-size:.85rem}.research-stats{gap:10px}.research-stat{padding:16px}.research-playback{gap:9px}.research-playback output{min-width:85px}.research-metric-grid .metric-card{min-height:140px}.research-chart-head{display:block}.research-note{padding:20px 22px}}
 
-/* Переносы зависят от ширины выбранного устройства, а не окна браузера. */
-.research-content>*{min-width:0;max-width:100%}
-.research-heading>div,.research-chart-head>div{min-width:0}
-.research-heading h2,.research-heading p,.research-heading .tiny-label,.research-stat span,.research-metric-grid .metric-label,.research-note,.research-library article,.research-source-line a{overflow-wrap:anywhere}
-.research-badge{max-width:100%;white-space:normal;line-height:1.5}
-.research-badge::before{flex:none}
-.research-stat,.research-metric-grid .metric-card{min-width:0}
-.research-controls label{min-width:min(140px,100%);max-width:100%}
-.research-controls select{min-width:0;max-width:100%}
-.research-action{max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:center}
-.research-table-scroll{min-width:0;max-width:100%}
-@container mission (max-width:780px){
-  #research-datasets{display:flex;flex-wrap:wrap;gap:8px;min-width:0;width:100%}
-  .research-heading{display:block}
-  .research-heading,.research-chart,.research-table-panel{padding:18px}
-  .research-heading .research-badge{margin-top:14px}
-  .research-stats,.research-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .research-stat{padding:16px 14px}
-  .research-notes,.research-library,.research-wave-grid{grid-template-columns:minmax(0,1fr)}
+/* Сетки учитывают доступную ширину блока, включая узкий режим компьютера. */
+.mission-content #research-workspace{grid-template-columns:240px minmax(0,1fr)}
+#research-workspace{min-width:0;max-width:100%}
+#research-workspace .research-sidebar{container:research-navigation/inline-size;min-width:0;max-width:100%}
+#research-datasets{display:grid;grid-template-columns:minmax(0,1fr);grid-auto-rows:1fr;gap:8px;min-width:0;width:100%}
+#research-datasets .dataset-button{display:flex;align-items:center;gap:12px;width:100%;min-width:0;max-width:100%;margin:0;padding:12px;text-align:start;white-space:normal}
+#research-datasets .dataset-copy{min-width:0;flex:1}
+#research-datasets strong{font-size:.9rem;line-height:1.4;word-break:normal;overflow-wrap:break-word}
+#research-datasets .dataset-code{white-space:nowrap}
+#research-datasets small{overflow-wrap:break-word}
+#research-main{container:research-content/inline-size}
+#research-main>*{min-width:0;max-width:100%}
+#research-main :is(.research-heading,.research-chart-head){display:flex;flex-wrap:wrap;align-items:start;gap:16px}
+#research-main :is(.research-heading,.research-chart-head)>div{flex:1 1 22rem;min-width:0}
+#research-main :is(h2,h3,h4,p,.tiny-label,.research-stat span,.metric-label,.metric-trend,.research-note,.research-tag,.research-source-line){overflow-wrap:break-word;word-break:normal}
+#research-main .research-badge{flex:0 1 auto;min-width:0;max-width:100%;margin:0;white-space:normal;line-height:1.5}
+#research-main .research-badge::before{flex:none}
+#research-main :is(.research-stats,.research-metric-grid){display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr));gap:12px}
+#research-main :is(.research-stat,.metric-card){min-width:0;max-width:100%;height:auto}
+#research-main .research-stat{padding:18px 16px}
+#research-main .metric-value{font-size:1.5rem;line-height:1.25;overflow-wrap:anywhere}
+#research-main .metric-unit{font-size:.75rem;line-height:1.4}
+#research-main .metric-trend{font-size:.7rem;line-height:1.5}
+#research-main .research-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr));align-items:end;gap:14px}
+#research-main .research-controls label{min-width:0;max-width:100%;line-height:1.5}
+#research-main :is(select,.research-action){min-width:0;max-width:100%}
+#research-main .research-action{white-space:normal;overflow-wrap:break-word;text-align:center}
+#research-main .research-table-scroll{min-width:0;max-width:100%;overscroll-behavior-inline:contain}
+#research-main :is(.research-notes,.research-library){display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,19rem),1fr))}
+#research-main .research-wave-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,14rem),1fr))}
+#research-main :is(.research-legend span,.research-source-line a){min-width:0;max-width:100%}
+#research-main .research-legend i{flex:none}
+#research-main .research-source-line a{overflow-wrap:anywhere}
+#research-main .research-playback>*{min-width:0;max-width:100%}
+#research-main .research-playback input{flex:1 1 10rem}
+@container research-navigation (min-width:680px){
+  #research-datasets{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@container mission (max-width:1250px){
+  .mission-content #research-workspace{grid-template-columns:minmax(0,1fr)}
+  #research-workspace .research-sidebar{position:static}
+}
+@container research-content (max-width:600px){
+  #research-main :is(.research-heading,.research-chart,.research-table-panel,.research-note,.research-controls,.research-library article){padding:18px}
+  #research-main .research-heading h2{font-size:1.4rem;line-height:1.3}
+  #research-main .research-heading p{font-size:.875rem}
+  #research-main .research-stat{padding:16px 14px}
+  #research-main .research-svg{min-height:0}
 }
