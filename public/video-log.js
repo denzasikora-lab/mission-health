@@ -289,6 +289,7 @@
     const mimeType = types.find(type => MediaRecorder.isTypeSupported(type));
     if (!mimeType) { message('Подходящий формат записи не найден. Попробуй другой браузер.', true); return; }
     const chunks = [];
+    const ageContext = window.missionAppearance?.ageContext?.();
     try {
       recordedStream = new MediaStream(stream.getTracks().map(track => track.clone()));
       recorder = new MediaRecorder(recordedStream, { mimeType, videoBitsPerSecond: 900000, audioBitsPerSecond: 96000 });
@@ -297,6 +298,7 @@
       recording.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
       recording.onerror = () => { failed = true; stopCamera(); if (phase !== 'finishing') phase = 'idle'; renderControls(); message('Не удалось завершить запись. Повтори после подключения камеры.', true); };
       recording.onstop = () => {
+        const ageInput = window.missionAppearance?.ageSnapshot?.(ageContext);
         window.missionSpeech?.stop('video');
         recordedStream?.getTracks().forEach(track => track.stop()); recordedStream = null;
         stopCamera(); recorder = null;
@@ -306,7 +308,7 @@
         entry++;
         try { localStorage.setItem(storageKey('entry'), String(entry)); } catch {}
         phase = 'idle'; renderControls(); message('Запись передана на анализ.');
-        void window.missionMedia.submit('video',blob,duration);
+        void window.missionMedia.submit('video',blob,duration,ageInput);
       };
       recordingStarted = performance.now(); phase = 'recording';
       recording.start(250); clearTimeout(cameraTimer);

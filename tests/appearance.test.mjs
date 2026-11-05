@@ -56,7 +56,7 @@ function environment(storage=new Map()){
   const tick=async(time)=>{now=time;const callbacks=[...frames.values()];frames.clear();for(const cb of callbacks)cb(time);await Promise.resolve();};
   const api=window.missionAppearance;
   function begin(owner='owner-a',name='Egor Fedosov',device='camera-a'){api.setIdentity({storageScope:owner,name});api.start(input,{deviceId:device});workers.at(-1).emit({type:'ready'});}
-  function sample(value=measured(),timestamp=now+333){now=timestamp;workers.at(-1).emit({type:'measurement',measurement:clone(value),timestamp});}
+  function sample(value=measured(),timestamp=now+333,ageFrame=null){now=timestamp;workers.at(-1).emit({type:'measurement',measurement:clone(value),timestamp,ageFrame});}
   function collect(){for(let i=0;i<24;i++)sample();}
   return {api,node,workers,frames,timers,input,tick,sample,begin,collect,storage,setBitmap:p=>pendingBitmap=p,blockStorage:()=>blockStorage=true};
 }
@@ -79,3 +79,6 @@ test('Сжатый WASM возвращается с правильными за�
   const sandbox={URL,Request,Response,TextEncoder,DataView,Uint8Array,crypto:webcrypto,atob,assets:{'/test.wasm':{type:'application/wasm',encoding:'gzip',data:gzipSync(bytes).toString('base64')}}};vm.runInNewContext(server.replace('export default','globalThis.app ='),sandbox);
   const response=await sandbox.app.fetch(new Request('https://example.test/test.wasm'),{},{});assert.equal(response.status,200);assert.equal(response.headers.get('content-type'),'application/wasm');assert.equal(response.headers.get('content-encoding'),'gzip');assert.deepEqual(gunzipSync(Buffer.from(await response.arrayBuffer())),bytes);
 });
+
+test('Кадры видимого возраста остаются у своей записи и доступны после остановки камеры',()=>{const e=environment();e.begin();const context=e.api.ageContext();e.sample(measured(),1000,{id:1});e.sample(measured(),2000,{id:2});e.sample(measured(),3000,{id:3});e.sample(measured(),4000,{id:4});e.api.stop();const snapshot=e.api.ageSnapshot(context);assert.deepEqual(clone(snapshot.frames),[{id:2},{id:3},{id:4}]);assert.ok(snapshot.conditions.distance>0);e.begin('owner-b');assert.equal(e.api.ageSnapshot(context),null);});
+test('Неподходящие лица и несопоставимый свет не попадают в оценку возраста',()=>{const e=environment();e.begin();const context=e.api.ageContext();e.sample({valid:false,reason:'Два лица'},1000,{id:1});assert.equal(e.api.ageSnapshot(context).frames.length,0);e.sample(measured(),2000,{id:2});const other=measured();other.light.l+=12;e.sample(other,3000,{id:3});assert.equal(e.api.ageSnapshot(context).frames.length,0);});

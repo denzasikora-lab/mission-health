@@ -7,6 +7,8 @@
   let epoch=0,engine,ready=false,busy=false,active=false,frame=0,lastSent=0,timer,frameTimer,video,identity,scope='',cameraKey='',reference,collecting=false;
   let samples=[],recent=[],streaks={},lastValid=0,lastMeasurement=0,storageOk=true;
   const storagePrefix='mission-appearance-v2:';
+  const frameInput=document.createElement('canvas'),frameContext=frameInput.getContext('2d');
+  let ageFrames=[],ageSession=0;
   function mark(text,state='idle'){if(status.textContent!==text)status.textContent=text;root.dataset.state=state;}
   function neutral(reason){for(const [key,card] of cards){card.node.dataset.level='neutral';card.value.textContent='-';card.label.textContent=reason||labels.neutral;card.node.setAttribute('aria-label',core.metrics.find(metric=>metric.key===key).title+': '+card.label.textContent);card.bar.style.setProperty('--signal',0);}streaks={};}
   for(const metric of core.metrics){
@@ -36,11 +38,11 @@
   function setIdentity(value){
     const next=value?.storageScope&&value.name?.trim()?{storageScope:value.storageScope,name:value.name.trim()}:null;
     if(next&&identity?.storageScope===next.storageScope&&identity?.name===next.name)return;
-    const wasActive=active||Boolean(video?.srcObject),input=video,device=cameraKey;stop();identity=next;scope=next?key():'';reference=null;
+    const wasActive=active||Boolean(video?.srcObject),input=video,device=cameraKey;stop();identity=next;scope=next?key():'';reference=null;ageFrames=[];ageSession++;
     if(wasActive&&next)start(input,{key:device});
   }
   function start(input,device={}){
-    stop();video=input;device||={};cameraKey=device.key||JSON.stringify([device.deviceId||'',input.videoWidth,input.videoHeight]);
+    stop();ageFrames=[];ageSession++;video=input;device||={};cameraKey=device.key||JSON.stringify([device.deviceId||'',input.videoWidth,input.videoHeight]);
     if(!identity){mark('Нужно имя профиля');hint.textContent='Не удалось прочитать профиль. Обнови страницу.';return;}
     if(!window.Worker||!window.OffscreenCanvas||!window.createImageBitmap){mark('Анализ недоступен');hint.textContent='Браузер не поддерживает обработчик кадров.';return;}
     active=true;scope=key();load();
@@ -49,7 +51,7 @@
     else if(reference)hint.textContent='Тот же свет и ракурс. Сравнение идет на паузах речи.';
     mark('Загрузка модели','loading');
     const attempt=epoch;
-    try{engine=new Worker('/appearance-worker.js?v=20261030-dense12');}catch{stop();mark('Анализ недоступен');hint.textContent='Не удалось создать обработчик камеры.';return;}const worker=engine;
+    try{engine=new Worker('/appearance-worker.js?v=20261105-age1');}catch{stop();mark('Анализ недоступен');hint.textContent='Не удалось создать обработчик камеры.';return;}const worker=engine;
     const failed=()=>{if(attempt!==epoch)return;stop();mark('Не удалось запустить анализ');hint.textContent='Проверь загрузку модели и повторно включи камеру. Запись видео доступна.';};
     timer=setTimeout(failed,45000);
     worker.onerror=failed;
@@ -58,7 +60,10 @@
       if(data.type==='ready'){clearTimeout(timer);ready=true;resetButton.disabled=false;mark('Наведи камеру на лицо','scanning');frame=requestAnimationFrame(tick);}
       else if(data.type==='measurement'){
         busy=false;clearTimeout(frameTimer);lastMeasurement=performance.now();
-        try{consume(data.measurement,data.timestamp);}catch{failed();}
+        try{
+          if(data.measurement.valid&&data.ageFrame){ageFrames.push({blob:data.ageFrame,time:data.timestamp,light:data.measurement.light.l,distance:data.measurement.distance});if(ageFrames.length>3)ageFrames.shift();}
+          consume(data.measurement,data.timestamp);
+        }catch{failed();}
       }else if(data.type==='error')failed();
     };
     worker.postMessage({type:'init'});
@@ -66,7 +71,9 @@
   async function send(time){
     const attempt=epoch,worker=engine;busy=true;lastSent=time;
     try{
-      const ratio=Math.min(1,960/video.videoWidth),bitmap=await createImageBitmap(video,{resizeWidth:Math.round(video.videoWidth*ratio),resizeHeight:Math.round(video.videoHeight*ratio)});
+      const ratio=Math.min(1,960/video.videoWidth);frameInput.width=Math.round(video.videoWidth*ratio);frameInput.height=Math.round(video.videoHeight*ratio);
+      frameContext.drawImage(video,0,0,frameInput.width,frameInput.height);
+      const bitmap=await createImageBitmap(frameInput);
       if(attempt!==epoch||worker!==engine||!active){bitmap.close();return;}
       frameTimer=setTimeout(()=>{if(attempt!==epoch)return;stop();mark('Анализ приостановлен');hint.textContent='Обработчик не отвечает. Повторно включи камеру.';},10000);
       worker.postMessage({type:'frame',bitmap,timestamp:time},[bitmap]);
@@ -124,5 +131,12 @@
   }
   resetButton.addEventListener('click',()=>{if(active&&ready)resetCapture();});
   document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
-  window.missionAppearance={start,stop,setIdentity};
+  function ageContext(){return identity?{scope,session:ageSession,since:performance.now()}:null;}
+  function ageSnapshot(context){
+    if(!context||context.scope!==scope||context.session!==ageSession)return null;
+    const selected=ageFrames.filter(item=>item.time>=context.since);
+    const valid=selected.length>0&&selected.every(item=>Math.abs(item.light-selected[0].light)<=8&&Math.abs(item.distance/selected[0].distance-1)<=.2);
+    return{context:{...context},frames:valid?selected.map(item=>item.blob):[],conditions:valid?{light:selected.reduce((s,v)=>s+v.light,0)/selected.length,distance:selected.reduce((s,v)=>s+v.distance,0)/selected.length}:null};
+  }
+  window.missionAppearance={start,stop,setIdentity,ageContext,ageSnapshot};
 })();

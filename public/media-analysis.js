@@ -24,18 +24,18 @@
       return result;
     }finally{input.pause();input.removeAttribute('src');input.load();URL.revokeObjectURL(url);}
   }
-  async function submit(kind,blob,duration){
+  async function submit(kind,blob,duration,ageInput=null){
     const state=states.get(kind),root=document.createElement('article'),heading=document.createElement('header'),status=document.createElement('p'),answer=document.createElement('div'),retry=document.createElement('button');root.className='media-analysis-job';
     const createdAt=new Date().toISOString();heading.textContent=(kind==='audio'?'Аудио':'Видео')+' / '+new Date(createdAt).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'});status.setAttribute('role','status');answer.className='media-analysis-answer';retry.type='button';retry.textContent='Повторить анализ';retry.hidden=true;root.append(heading,status,answer,retry);state.root.append(root);state.root.hidden=false;
     // Речь и самооценка относятся к остановленной записи, независимо от следующих записей.
     const transcriptTask=Promise.resolve(window.missionSpeech?.finish?.(kind==='audio'?'voice':'video')).catch(()=>'');
-    const job={kind,root,status,answer,retry,phase:'new',payload:{id:crypto.randomUUID(),kind,blob,duration,createdAt,frames:null,features:undefined,transcript:'',transcriptTask,report:window.missionCheckin?.current()||null}};state.jobs.push(job);retry.addEventListener('click',()=>void enqueue(job));return enqueue(job);
+    const job={kind,root,status,answer,retry,phase:'new',payload:{id:crypto.randomUUID(),kind,blob,duration,createdAt,frames:null,features:undefined,ageInput,transcript:'',transcriptTask,report:window.missionCheckin?.current()||null}};state.jobs.push(job);retry.addEventListener('click',()=>void enqueue(job));return enqueue(job);
   }
   async function send(job){
     try{
       const item=job.payload;job.status.textContent='Подготавливаю запись для анализа...';
       if(item.kind==='video'&&!item.frames)item.frames=await frames(item.blob,item.duration);
-      if(item.features===undefined)item.features=await window.missionVoiceAnalysis?.analyze(item.kind,item.blob,item.frames||[]);
+      if(item.features===undefined)item.features=await window.missionVoiceAnalysis?.analyze(item.kind,item.blob,item.frames||[],item.ageInput);
       if(!item.transcript)item.transcript=await item.transcriptTask||'';
       window.missionVoiceAnalysis?.transcript(item.kind,item.transcript);
       const form=new FormData();if(item.features)form.set('features',JSON.stringify(item.features));for(const key of ['id','kind','duration','transcript','createdAt'])form.set(key,String(item[key]));form.set('file',item.blob,'recording.'+(item.blob.type.includes('mp4')?'mp4':'webm'));for(const frame of item.frames||[])form.append('frame',frame,'frame.jpg');

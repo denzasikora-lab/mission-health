@@ -21,7 +21,7 @@ class Element{
 }
 function track(kind){return{kind,readyState:'live',enabled:true,stopped:false,stop(){this.stopped=true;this.readyState='ended';},clone(){return track(kind);},addEventListener(){},getSettings(){return{};}};}
 function media(){const tracks=[track('video'),track('audio')];return{tracks,getTracks:()=>tracks,getAudioTracks:()=>tracks.filter(t=>t.kind==='audio'),getVideoTracks:()=>tracks.filter(t=>t.kind==='video'),addTrack(t){tracks.push(t);}};}
-function fixture({background='room',permission,profile,unsupported=false,analysisBusy=false,bitmapFailure=false}={}){
+function fixture({background='room',permission,profile,unsupported=false,analysisBusy=false,bitmapFailure=false,ageMetadata=null}={}){
   const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);};
   node('media-diary-dialog').open=true;node('video-log-background').value=background;
   const drawing=[],bitmaps=[],timeouts=new Map();let animation;
@@ -46,7 +46,7 @@ function fixture({background='room',permission,profile,unsupported=false,analysi
   }
   const document={hidden:false,getElementById:node,createElement:()=>({getContext:()=>context}),querySelectorAll:()=>[],addEventListener(){}};
   const incoming=media(),storage=new Map();
-  const window={MediaStream:CloneStream,missionMedia:{busy:()=>analysisBusy,meter:()=>({prepare(){},attach(){},stop(){}}),submit:(...args)=>submissions.push(args)},MediaRecorder:Recorder,Worker:BackgroundWorker,OffscreenCanvas:class{},createImageBitmap(){},addEventListener(){},missionDiary:{register(_mode,value){engine=value;},lock(_mode,value){locks.push(value);},open(){}},missionSpeech:{stop(){},reset(){},start(){}},missionAppearance:{stop(){},start(){},setIdentity(){}}};
+  const window={MediaStream:CloneStream,missionMedia:{busy:()=>analysisBusy,meter:()=>({prepare(){},attach(){},stop(){}}),submit:(...args)=>submissions.push(args)},MediaRecorder:Recorder,Worker:BackgroundWorker,OffscreenCanvas:class{},createImageBitmap(){},addEventListener(){},missionDiary:{register(_mode,value){engine=value;},lock(_mode,value){locks.push(value);},open(){}},missionSpeech:{stop(){},reset(){},start(){}},missionAppearance:{stop(){},start(){},setIdentity(){},ageContext(){return{session:1};},ageSnapshot(){return ageMetadata;}}};
   class ClipURL extends URL{static createObjectURL(){return 'blob:recorded-clip';}static revokeObjectURL(){}}
   vm.runInNewContext(source,{document,window,createImageBitmap:async input=>{bitmaps.push(input);if(bitmapFailure)throw new Error('unsupported_video_bitmap');return{close(){}};},Image:class{},MediaStream:CloneStream,Worker:BackgroundWorker,MediaRecorder:Recorder,Blob,URL:ClipURL,URLSearchParams,location:{search:''},Intl,Date,performance:{now:()=>clock},navigator:{mediaDevices:{getUserMedia(options){requests.push(options);return permission?.promise||Promise.resolve(incoming);}}},fetch:()=>profile?.promise||Promise.resolve({ok:true,json:async()=>({researcherId:'local-test',name:'Тестовый участник'})}),localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)},setTimeout:(callback,delay)=>{timeouts.set(++timer,{callback,at:clock+delay});return timer;},clearTimeout:id=>timeouts.delete(id),setInterval:callback=>{intervals.set(++timer,callback);return timer;},clearInterval:id=>intervals.delete(id),requestAnimationFrame:callback=>{animation=callback;return 1;},cancelAnimationFrame(){}});
   engine.enter();
@@ -91,6 +91,7 @@ test('Ошибка преобразования кадра не выключае
 test('Зависший кадр освобождает обработчик и возвращает исходную камеру',async()=>{
   const f=fixture({background:'lab'});await f.start();f.workers[0].emit({type:'ready'});f.workers[0].emit({type:'frame',bitmap:{close(){}}});f.draw();await settle();f.advance(5000);assert.equal(f.workers[0].terminated,true);assert.equal(f.node('video-log-screen').dataset.preview,'camera');assert.equal(f.recorders[0].state,'recording');
 });
+test('Видеозапись передает свой снимок кадров возраста вместе с исходным роликом',async()=>{const metadata={context:{scope:'owner/camera',session:1},frames:[{id:1},{id:2}],conditions:{light:50,distance:.3}},f=fixture({ageMetadata:metadata});await f.start();f.node('video-log-camera').emit('click');await settle();assert.equal(f.submissions[0][3],metadata);});
 test('Лимит двух минут отправляет автоматическую запись на анализ',async()=>{
   const f=fixture();await f.start();f.advance(120000);await settle();assert.equal(f.recorders[0].state,'inactive');assert.equal(f.submissions.length,1);assert.equal(f.submissions[0][2],120);assert.ok(f.incoming.getTracks().every(t=>t.stopped));
 });
