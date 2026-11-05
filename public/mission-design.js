@@ -72,21 +72,21 @@
     document.getElementById('mission-heading-description').textContent = state.workspace === 'research' ? 'NASA OSD-575 / BIDMC / открытые исследования' : 'Ключевые показатели выбранного профиля';
     window.missionBook?.render();
     window.missionConversations?.render(state.view);
-    const active = state.workspace === 'research' ? researchState.dataset === 'library' ? 'sources' : 'observations' : state.view === 'journal' ? 'archive' : ['chat','favorites'].includes(state.view)?state.view:'overview';
+    const active = state.workspace === 'research' ? researchState.dataset === 'library' ? 'sources' : 'observations' : state.view === 'journal' ? 'archive' : ['chat','favorites','diary'].includes(state.view)?state.view:'overview';
     if(active==='chat'||active==='favorites'){heading.querySelector('h1').textContent=active==='chat'?'NasaGPT':'Избранное';document.getElementById('mission-heading-description').textContent=active==='chat'?'Разговор с NasaGPT':'Важные записи и ответы в одном месте';}
     navigation.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.missionNav===active&&!(active==='overview'&&state.visiting))));
-    window.missionHome?.render();window.missionActivity?.render();
+    window.missionHome?.render();window.missionDiary.render();window.missionActivity?.render();
     themeGroup.querySelectorAll('[data-theme-choice]').forEach(button=>{button.setAttribute('aria-pressed',String(button.dataset.themeChoice===themeMode));if(button.dataset.themeChoice==='system'){button.setAttribute('aria-label','Системная тема');button.title='Системная тема';}});
   }
   function navigate(section) {
-    if(section==='diary'){window.missionDiary.open();return;}
     void window.missionActivity?.record('navigation',{target:section});
     state.visiting=false;
     researchStop(); state.workspace = section === 'observations' || section === 'sources' ? 'research' : 'crew';
     if (section === 'sources') researchState.dataset = 'library';
     else if (section === 'observations' && researchState.dataset === 'library') researchState.dataset = 'nasa';
-    state.view = section === 'archive' ? 'journal' : ['chat','favorites'].includes(section)?section:'health';
+    state.view = section === 'archive' ? 'journal' : ['chat','favorites','diary'].includes(section)?section:'health';
     window.research.render(); renderJournal(); render();
+    if(section==='diary')window.scrollTo({top:0,behavior:'auto'});
     if (section === 'archive') { void loadJournal();window.missionBook?.refresh(); document.getElementById('mission-book')?.scrollIntoView({behavior:'smooth',block:'start'}); }
   }
   navigation.addEventListener('click',event=>{const button=event.target.closest('[data-mission-nav]');if(button)navigate(button.dataset.missionNav)});

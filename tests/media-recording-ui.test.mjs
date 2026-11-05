@@ -46,7 +46,7 @@ function fixture({background='room',permission,profile,unsupported=false,analysi
   }
   const document={hidden:false,getElementById:node,createElement:()=>({getContext:()=>context}),querySelectorAll:()=>[],addEventListener(){}};
   const incoming=media(),storage=new Map();
-  const window={MediaStream:CloneStream,missionMedia:{busy:()=>analysisBusy,meter:()=>({prepare(){},attach(){},stop(){}}),submit:(...args)=>submissions.push(args)},MediaRecorder:Recorder,Worker:BackgroundWorker,OffscreenCanvas:class{},createImageBitmap(){},addEventListener(){},missionDiary:{register(_mode,value){engine=value;},lock(_mode,value){locks.push(value);},open(){}},missionSpeech:{stop(){},reset(){},start(){}},missionAppearance:{stop(){},start(){},setIdentity(){},ageContext(){return{session:1};},ageSnapshot(){return ageMetadata;}}};
+  const window={MediaStream:CloneStream,missionMedia:{busy:()=>analysisBusy,meter:()=>({prepare(){},attach(){},stop(){}}),submit:(...args)=>submissions.push(args)},MediaRecorder:Recorder,Worker:BackgroundWorker,OffscreenCanvas:class{},createImageBitmap(){},addEventListener(){},missionDiary:{get active(){return node('media-diary-dialog').open;},register(_mode,value){engine=value;},lock(_mode,value){locks.push(value);},open(){}},missionSpeech:{stop(){},reset(){},start(){}},missionAppearance:{stop(){},start(){},setIdentity(){},ageContext(){return{session:1};},ageSnapshot(){return ageMetadata;}}};
   class ClipURL extends URL{static createObjectURL(){return 'blob:recorded-clip';}static revokeObjectURL(){}}
   vm.runInNewContext(source,{document,window,createImageBitmap:async input=>{bitmaps.push(input);if(bitmapFailure)throw new Error('unsupported_video_bitmap');return{close(){}};},Image:class{},MediaStream:CloneStream,Worker:BackgroundWorker,MediaRecorder:Recorder,Blob,URL:ClipURL,URLSearchParams,location:{search:''},Intl,Date,performance:{now:()=>clock},navigator:{mediaDevices:{getUserMedia(options){requests.push(options);return permission?.promise||Promise.resolve(incoming);}}},fetch:()=>profile?.promise||Promise.resolve({ok:true,json:async()=>({researcherId:'local-test',name:'Тестовый участник'})}),localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)},setTimeout:(callback,delay)=>{timeouts.set(++timer,{callback,at:clock+delay});return timer;},clearTimeout:id=>timeouts.delete(id),setInterval:callback=>{intervals.set(++timer,callback);return timer;},clearInterval:id=>intervals.delete(id),requestAnimationFrame:callback=>{animation=callback;return 1;},cancelAnimationFrame(){}});
   engine.enter();
@@ -122,7 +122,7 @@ function voiceFixture({permission,resume,unsupported=false,analysisBusy=false}={
   }
   class ClipURL extends URL{static createObjectURL(){return 'blob:audio-clip';}static revokeObjectURL(){}}
   const document={hidden:false,getElementById:node,querySelectorAll:()=>[],addEventListener(){}};
-  const window={missionMedia:{busy:()=>analysisBusy,submit:(...args)=>submissions.push(args)},AudioContext:AudioEngine,MediaRecorder:Recorder,devicePixelRatio:1,addEventListener:(name,handler)=>windowEvents.set(name,handler),missionDiary:{register(_mode,value){engine=value;},lock(_mode,value){locks.push(value);},open(){}},missionSpeech:{stop(){},start(){}}};
+  const window={missionMedia:{busy:()=>analysisBusy,submit:(...args)=>submissions.push(args)},AudioContext:AudioEngine,MediaRecorder:Recorder,devicePixelRatio:1,addEventListener:(name,handler)=>windowEvents.set(name,handler),missionDiary:{get active(){return node('media-diary-dialog').open;},register(_mode,value){engine=value;},lock(_mode,value){locks.push(value);},open(){}},missionSpeech:{stop(){},start(){}}};
   vm.runInNewContext(voiceSource,{window,document,MediaRecorder:Recorder,Blob,URL:ClipURL,URLSearchParams,Date,location:{search:''},matchMedia:()=>({matches:false}),localStorage:{getItem(){return null;},setItem(){}},performance:{now:()=>1000},navigator:{mediaDevices:{getUserMedia:()=>permission?.promise||Promise.resolve(incoming)}},setTimeout:callback=>{timers.set(++timer,callback);return timer;},clearTimeout:id=>timers.delete(id),requestAnimationFrame:()=>1,cancelAnimationFrame(){},ResizeObserver:class{observe(){}}});
   engine.enter();
   return{node,label,incoming,recorders,engines,locks,submissions,engine,start:async()=>{node('voice-mic').emit('click');await settle();},expire(){for(const callback of [...timers.values()])callback();}};
@@ -177,9 +177,12 @@ test('Завершение старого запроса не меняет со�
 const diarySource=await readFile(new URL('../public/media-diary.js',import.meta.url),'utf8');
 function diaryFixture(){
   const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);};
-  const dialog=node('media-diary-dialog');dialog.open=false;dialog.querySelectorAll=()=>[];dialog.querySelector=()=>node('analysis-caption');dialog.showModal=()=>{dialog.open=true;};dialog.close=()=>{dialog.open=false;dialog.emit('close');};
+  const dialog=node('media-diary-dialog'),state={workspace:'crew',view:'health'},events=[],navigation=[];
+  dialog.hidden=true;dialog.querySelectorAll=()=>[];dialog.querySelector=()=>node('analysis-caption');dialog.showModal=()=>{throw new Error('Не должно открываться отдельное окно');};
   node('video-log-background').closest=()=>null;node('voice-dialog').querySelector=()=>null;
-  let api;const sandbox={window:{missionActivity:{record(){}},},document:{getElementById:node,querySelectorAll:()=>[]},MutationObserver:class{observe(){}}};vm.runInNewContext(diarySource,sandbox);api=sandbox.window.missionDiary;return{api,node,dialog};
+  let api;const window={missionActivity:{record(){}},dispatchEvent:event=>events.push(event.type),scrollTo(){},missionDesign:{navigate(section){navigation.push(section);state.workspace='crew';state.view=section==='diary'?'diary':'health';api.render();}}};
+  const document={body:{dataset:{}},getElementById:node,querySelector:selector=>selector==='.main-column'?node('main-column'):null,querySelectorAll:()=>[]};
+  vm.runInNewContext(diarySource,{window,document,state,Event,MutationObserver:class{observe(){}}});api=window.missionDiary;return{api,node,dialog,state,events,navigation,document};
 }
 test('Дневник одновременно показывает Видео и Аудио без переключателя',()=>{
   const f=diaryFixture(),starts=[],stops=[];for(const kind of ['audio','video'])f.api.register(kind,{enter(){starts.push(kind);},leave(){stops.push(kind);}});
@@ -189,8 +192,19 @@ test('Дневник одновременно показывает Видео и
 test('Остановка одного формата сохраняет состояние записи другого',()=>{
   const f=diaryFixture();f.api.open();f.api.lock('video',true);f.api.lock('audio',true);f.api.lock('audio',false);assert.equal(f.dialog.dataset.recording,'true');f.api.lock('video',false);assert.equal(f.dialog.dataset.recording,'false');
 });
-test('Закрытие общего дневника освобождает оба формата записи',()=>{
-  const f=diaryFixture(),stops=[];for(const kind of ['audio','video'])f.api.register(kind,{enter(){},leave(){stops.push(kind);}});f.api.open('audio');f.api.lock('video',true);f.api.lock('audio',true);f.dialog.close();assert.deepEqual(stops,['audio','video']);assert.equal(f.dialog.dataset.recording,'false');assert.equal(f.dialog.open,false);
+test('Выход из раздела дневника освобождает оба формата записи',()=>{
+  const f=diaryFixture(),stops=[];for(const kind of ['audio','video'])f.api.register(kind,{enter(){},leave(){stops.push(kind);}});f.api.open('audio');f.api.lock('video',true);f.api.lock('audio',true);f.api.close();assert.deepEqual(stops,['audio','video']);assert.equal(f.dialog.dataset.recording,'false');assert.equal(f.dialog.hidden,true);assert.equal(f.api.active,false);
+});
+
+test('Дневник занимает основную область страницы без модального окна и выделяет свой раздел',()=>{
+  const f=diaryFixture();assert.equal(f.dialog.hidden,true);assert.ok(f.node('main-column').children.includes(f.dialog));f.api.open();assert.equal(f.dialog.hidden,false);assert.equal(f.api.active,true);assert.equal(f.state.view,'diary');assert.equal(f.document.body.dataset.diary,'true');assert.deepEqual(f.navigation,['diary']);assert.deepEqual(f.events,['mission-diary-open']);
+});
+test('Переход в исследования останавливает движки один раз, возврат использует прежние панели',()=>{
+  const f=diaryFixture(),starts=[],stops=[],video=f.node('video-log-dialog');for(const kind of ['audio','video'])f.api.register(kind,{enter(){starts.push(kind);},leave(){stops.push(kind);}});
+  f.api.open();f.state.workspace='research';f.api.render();f.api.render();assert.equal(f.api.active,false);assert.equal(f.dialog.hidden,true);assert.deepEqual(stops,['audio','video']);assert.equal(f.document.body.dataset.diary,'false');f.api.open();assert.equal(f.node('video-log-dialog'),video);assert.deepEqual(starts,['audio','video','audio','video']);assert.deepEqual(f.events,['mission-diary-open','mission-diary-close','mission-diary-open']);
+});
+test('Повторный показ дневника не сбрасывает запись и не перезапускает движки',()=>{
+  const f=diaryFixture();let starts=0;f.api.register('video',{enter(){starts++;},leave(){}});f.api.open();f.api.lock('video',true);f.api.render();f.api.open('video');assert.equal(starts,1);assert.equal(f.dialog.dataset.recording,'true');
 });
 
 test('Новая запись не подменяет расшифровку старой записи',async()=>{const speech=await readFile(new URL('../public/speech.js',import.meta.url),'utf8'),part=speech.slice(speech.indexOf('  async function finish('),speech.indexOf('  window.missionSpeech=')),state={version:1,processing:true,queue:[],transcript:'Старый голос'},context={states:new Map([['voice',state]]),stop(){},Date,setTimeout(callback){state.version++;state.processing=false;state.transcript='Новый голос';callback();}};vm.runInNewContext(part+'globalThis.finish=finish;',context);assert.equal(await context.finish('voice'),'');});

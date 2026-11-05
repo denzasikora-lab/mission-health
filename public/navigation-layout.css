@@ -21,6 +21,4 @@
   .shell .mission-frame .mission-nav>button{display:grid;justify-items:center;justify-content:center;align-content:center;gap:5px;width:100%;min-width:0;padding:7px 2px;font-size:clamp(.49rem,2cqw,.74rem)}
   .shell .mission-frame .mission-nav>button>span{white-space:nowrap}
   .shell .mission-frame .mission-nav>[data-mission-nav=overview]{display:none}
-  body[data-display=desktop] .shell .mission-frame .mission-nav{grid-template-columns:1fr}
-  body[data-display=desktop] .shell .mission-frame .mission-nav>[data-mission-nav=overview]{display:flex}
 }

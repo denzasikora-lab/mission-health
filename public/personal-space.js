@@ -141,7 +141,7 @@
     view.input.addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();view.form.requestSubmit();}});
     view.more.addEventListener('click',()=>void load(view.kind,true));view.refresh.addEventListener('click',()=>void load(view.kind));
     host.querySelector('[data-personal-favorites]').addEventListener('click',()=>setKind(view,view.kind==='favorites'?'chat':'favorites'));
-    host.querySelector('[data-personal-search]').addEventListener('click',()=>{if(modal.open)modal.close();window.missionDesign.navigate('archive');document.getElementById('book-search-open').click();});
+    host.querySelector('[data-personal-search]').addEventListener('click',()=>{window.missionDesign.navigate('archive');document.getElementById('book-search-open').click();});
     window.missionChatComposer.attach(view,{store,render:renderViews});views.push(view);setKind(view,kind,false);return view;
   }
   function setKind(view,kind,fetch=true){
@@ -166,15 +166,15 @@
   window.addEventListener('mission-tasks-change',renderViews);
   window.addEventListener('mission-tasks-open',()=>{sidebarTabs.querySelector('[data-sidebar-tab=scheduler]').click();sidebar.scrollIntoView({behavior:'smooth',block:'start'});});
   setInterval(()=>{if(!document.hidden&&views.some(view=>view.kind==='team'&&view.host.getClientRects().length))void load('team',false,true);},5000);
-  modal.addEventListener('close',()=>window.missionChatComposer.stopWithin(modal));
+  window.addEventListener('mission-diary-close',()=>window.missionChatComposer.stopWithin(modal));
   function render(section=state.view){
     const active=state.workspace==='crew'&&(section==='chat'||section==='favorites');main.hidden=!active;document.body.dataset.personalSection=active?section:'';
-    if(profileSeen!==profile()){profileSeen=profile();restoreScore();if(modal.open){const s=store(modalKind);if(modalKind!=='favorites'&&!s.loaded)void load(modalKind);}}
+    if(profileSeen!==profile()){profileSeen=profile();restoreScore();if(window.missionDiary.active){const s=store(modalKind);if(modalKind!=='favorites'&&!s.loaded)void load(modalKind);}}
     if(active)setKind(mainView,section==='favorites'?'favorites':mainKind);renderScores();renderViews();
   }
   function onOpen(){void prepare();setKind(modalView,modalKind);if(!favoriteLoaded)void favorites();renderScores();}
-  new MutationObserver(()=>{if(modal.open)onOpen();}).observe(modal,{attributes:true,attributeFilter:['open']});
+  window.addEventListener('mission-diary-open',onOpen);
   window.missionCheckin={widget:slider,current:currentReport};
   window.missionFavorites={button:star,badge,refresh:favorites};window.missionConversations={render,refreshDiary:()=>load('diary')};
-  void prepare();void load('chat');render();if(modal.open)onOpen();
+  void prepare();void load('chat');render();if(window.missionDiary.active)onOpen();
 })();

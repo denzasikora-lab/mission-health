@@ -1,7 +1,7 @@
 (() => {
   const dialog = document.getElementById('media-diary-dialog');
   const panel = document.getElementById('video-log-dialog');
-  const visible = () => dialog.open && !panel.hidden;
+  const visible = () => window.missionDiary.active && !panel.hidden;
   const canvas = document.getElementById('video-log-canvas');
   const screen = document.getElementById('video-log-screen');
   const context = canvas.getContext('2d');
@@ -372,5 +372,5 @@
   window.addEventListener('pagehide', stopCamera);
   const query=new URLSearchParams(location.search);
   if(['lab','orbit','helmet','room'].includes(query.get('background')))backgroundChoice.value=query.get('background');
-  if (query.get('log') === '1') open();
+  if (query.get('log') === '1') document.addEventListener('DOMContentLoaded',open,{once:true});
 })();

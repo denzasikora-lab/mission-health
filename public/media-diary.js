@@ -2,6 +2,8 @@
   const dialog=document.getElementById('media-diary-dialog');
   const panels={audio:document.getElementById('voice-dialog'),video:document.getElementById('video-log-dialog')};
   const engines=new Map(),recordings=new Set();
+  let active=false;
+  document.querySelector('.main-column').append(dialog);
   const backgroundChoice=document.getElementById('video-log-background')?.closest('label');
   if(backgroundChoice){backgroundChoice.classList.add('diary-background-choice');panels.video.querySelector('.log-controls').prepend(backgroundChoice);}
   const voiceViews=panels.audio.querySelector('.voice-view-control'),voiceActions=panels.audio.querySelector('.voice-actions');
@@ -18,32 +20,37 @@
     syncLabel();new MutationObserver(syncLabel).observe(button,{childList:true,subtree:true,characterData:true});
   }
   function render(){
+    const visible=state.workspace==='crew'&&state.view==='diary';
+    dialog.hidden=!visible;dialog.dataset.active=String(visible);document.body.dataset.diary=String(visible);
     dialog.dataset.mode='combined';
     for(const panel of Object.values(panels))panel.hidden=false;
     dialog.querySelector('[data-diary-video-analysis]').hidden=false;
+    if(visible===active)return;
+    active=visible;
+    recordings.clear();dialog.dataset.recording='false';
+    if(active){
+      for(const engine of engines.values()){engine.prepare?.();engine.enter();}
+      void window.missionActivity?.record('media_open',{mode:'video'});
+      window.dispatchEvent(new Event('mission-diary-open'));
+    }else{
+      for(const engine of engines.values())engine.leave();
+      window.dispatchEvent(new Event('mission-diary-close'));
+    }
   }
   function open(mode='video'){
     if(!panels[mode])return;
-    render();
-    if(!dialog.open){
-      recordings.clear();dialog.dataset.recording='false';dialog.showModal();
-      void window.missionActivity?.record('media_open',{mode});
-      for(const engine of engines.values()){engine.prepare?.();engine.enter();}
-    }
+    if(!active)window.missionDesign.navigate('diary');
+    else render();
     // Переход к аудио не прерывает уже работающую камеру.
     if(mode==='audio')panels.audio.scrollIntoView({behavior:'smooth',block:'start'});
-    else dialog.scrollTop=0;
+    else window.scrollTo({top:0,behavior:'auto'});
   }
-  function register(mode,engine){engines.set(mode,engine);if(dialog.open){engine.prepare?.();engine.enter();}}
+  function close(){if(active)window.missionDesign.navigate('overview');}
+  function register(mode,engine){engines.set(mode,engine);if(active){engine.prepare?.();engine.enter();}}
   function lock(mode,value){
     if(value)recordings.add(mode);else recordings.delete(mode);
     dialog.dataset.recording=String(recordings.size>0);
   }
-  dialog.addEventListener('close',()=>{
-    for(const engine of engines.values())engine.leave();
-    recordings.clear();dialog.dataset.recording='false';render();
-  });
-  document.getElementById('diary-close').addEventListener('click',()=>dialog.close());
   document.querySelectorAll('[data-open-media-diary]').forEach(button=>button.addEventListener('click',()=>open('video')));
-  window.missionDiary={open,register,lock};render();
+  window.missionDiary={open,close,render,register,lock,get active(){return active;}};render();
 })();

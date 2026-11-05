@@ -32,7 +32,7 @@
   for(const [key,[value,unit]]of Object.entries(demoValues)){const card=home.querySelector('[data-home-metric='+key+']'),number=card.querySelector('strong');number.textContent=value;number.append(make('span','home-vital-unit',unit));setSource(key,...instruments[key]);card.dataset.source='demo';}
   function render(){
     const isHome=state.workspace==='crew'&&state.view==='health'&&!state.visiting;
-    document.querySelector('.mission-heading').hidden=isHome;
+    document.querySelector('.mission-heading').hidden=isHome||state.workspace==='crew'&&state.view==='diary';
     const homeButton=document.getElementById('mission-home-button');homeButton.setAttribute('aria-pressed',String(isHome));
     document.querySelectorAll('[data-crew]').forEach(button=>button.setAttribute('aria-pressed',String(state.visiting&&Number(button.dataset.crew)===state.crew)));
     document.body.dataset.home=String(isHome);document.body.dataset.visiting=String(Boolean(state.visiting));home.hidden=!isHome;

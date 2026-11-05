@@ -1,7 +1,7 @@
 (() => {
   const dialog = document.getElementById('media-diary-dialog');
   const panel = document.getElementById('voice-dialog');
-  const visible = () => dialog.open && !panel.hidden;
+  const visible = () => window.missionDiary.active && !panel.hidden;
   const stage = document.getElementById('voice-stage');
   const canvas = document.getElementById('voice-canvas');
   const context = canvas.getContext('2d');
@@ -287,5 +287,5 @@
   });
   window.addEventListener('pagehide', () => { stopSignal(); });
   new ResizeObserver(resize).observe(stage);
-  if (new URLSearchParams(location.search).get('voice') === '1') open();
+  if (new URLSearchParams(location.search).get('voice') === '1') document.addEventListener('DOMContentLoaded',open,{once:true});
 })();
