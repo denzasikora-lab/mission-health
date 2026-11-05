@@ -6,3 +6,23 @@
 
 .legacy-journal-archive{display:none!important}.nasagpt-sidebar{padding:18px 15px;min-height:580px;display:flex;flex-direction:column}.nasagpt-sidebar .personal-section-title{font-size:1.2rem}.nasagpt-sidebar .personal-messages{flex:1;min-height:270px;max-height:390px}.nasagpt-sidebar .personal-message{min-width:0;max-width:97%;padding:11px 12px;font-size:.76rem}.nasagpt-sidebar .personal-send-hint{display:none}.nasagpt-sidebar .personal-message header{flex-wrap:wrap;gap:5px}.nasagpt-sidebar .personal-composer textarea{font-size:.8rem}.nasagpt-media-tools{display:flex;gap:6px}.nasagpt-media-tools button{display:grid;place-items:center;padding:7px;width:34px;height:34px;background:none}.nasagpt-media-tools svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.5}.nasagpt-sidebar .personal-composer footer{gap:8px}.nasagpt-sidebar .personal-composer button[type=submit]{padding:8px 12px}
 .personal-tabs{width:100%}.personal-tabs button{flex:1;min-width:0;padding-inline:8px}.sidebar-personal-tabs{order:-1;margin-top:0}.scheduler-content{display:flex;flex-direction:column;gap:8px}.scheduler-note{margin:0;color:var(--muted);font-size:.6rem}.scheduler-group{margin:10px 0 2px;font-size:.67rem;font-weight:500;color:var(--muted)}.scheduler-task{display:flex;align-items:flex-start;gap:10px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--inset);color:var(--text)}.scheduler-details{display:grid;gap:5px;flex:1;min-width:0}.scheduler-details strong{font-size:.8rem;font-weight:500;overflow-wrap:anywhere}.scheduler-details time{font-size:.62rem;color:var(--muted)}.scheduler-check{flex:none;width:24px;height:24px;min-height:24px;padding:0;border:1px solid var(--border);background:transparent;border-radius:7px;color:var(--accent)}.scheduler-cancel{flex:none;border:0;background:transparent;color:var(--muted);font-size:1rem;line-height:1;padding:3px}.scheduler-task[data-status=done]{opacity:.6}.scheduler-task[data-status=done] strong{text-decoration:line-through}.scheduler-task[data-due=true]{border-color:#d8b66b88}.scheduler-due{font-size:.59rem;color:#d8b66b}.scheduler-reminder{padding:10px 12px;border:1px solid #d8b66b88;border-radius:10px;background:#d8b66b12;color:var(--text);text-align:left;font:inherit;font-size:.7rem;margin-bottom:10px;cursor:pointer}.scheduler-reminder[hidden]{display:none}.scheduler-error{font-size:.7rem;color:#e99c87}.nasagpt-sidebar:has([data-sidebar-tab=scheduler][aria-selected=true]) .personal-section-caption{display:none}
+
+/* Общие инструменты доступны в медиадневнике, боковой и основной беседе. */
+.personal-composer textarea{resize:none;overflow-y:auto;transition:none}
+.personal-conversation .personal-composer>footer{flex-wrap:wrap;gap:8px}
+.personal-composer .personal-send-hint{display:none}
+.chat-composer-tools{display:flex;align-items:center;gap:6px;margin-inline-end:auto;flex:none}
+.chat-composer-tools[hidden],.chat-pending-files[hidden]{display:none!important}
+.personal-composer .chat-composer-tools button,.media-diary .personal-composer .chat-composer-tools button{display:grid;place-items:center;width:34px;min-width:34px;height:36px;min-height:36px;padding:7px;border-radius:9px;background:transparent;line-height:1}
+.chat-composer-tools svg,.chat-pending-file svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.chat-composer-tools button[aria-pressed=true]{color:#ff9b91;border-color:#bc625b;background:#9c383322}
+.chat-composer-tools button[aria-expanded=true]{background:var(--selected)}
+.chat-pending-files{display:grid;gap:6px;margin-bottom:8px}.chat-pending-files:empty{display:none}
+.chat-pending-file{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:.65rem;min-width:0}.chat-pending-file>span{flex:1;min-width:0;overflow-wrap:anywhere}
+.personal-composer .chat-pending-file button{display:grid;place-items:center;flex:none;width:28px;height:28px;padding:4px;background:none}
+.chat-file-link{display:block;max-width:100%;margin-top:8px;overflow-wrap:anywhere;font-size:.72rem;text-decoration:underline}
+.personal-composer .compose-tab-hint{flex-basis:100%;margin:0;justify-content:flex-end}
+.personal-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%;gap:3px}
+.personal-tabs button,.media-diary .personal-tabs button{min-width:0;min-height:44px;padding:7px 4px;font-size:.65rem;line-height:1.35;white-space:normal;overflow-wrap:anywhere}
+
+.personal-composer[data-expanded=true] textarea{min-height:160px;max-height:min(400px,60dvh)}

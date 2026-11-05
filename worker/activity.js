@@ -10,7 +10,7 @@ async function activityRoute(request,env,user){
   const input=await personalInput(request);if(!input||typeof input.id!=='string'||!/^[a-f0-9-]{36}$/i.test(input.id))fail('invalid_input',400);
   const sections={overview:'Домой',observations:'Здоровье',chat:'NasaGPT',diary:'Дневник',archive:'Архив',favorites:'Избранное',sources:'Исследования'};
   const people={'jessica-meir':'Jessica Meir','jack-hathaway':'Jack Hathaway','christina-koch':'Christina Koch'};
-  const areas={chat:'NasaGPT',diary:'дневнике',caption:'подписи сториз'};
+  const areas={team:'общем чате',chat:'NasaGPT',diary:'дневнике',caption:'подписи сториз'};
   let summary;
   if(input.kind==='navigation'&&Object.hasOwn(sections,input.target)&&sections[input.target])summary='Открыл раздел «'+sections[input.target]+'»';
   if(input.kind==='friend_visit'&&Object.hasOwn(people,input.profile)&&people[input.profile])summary='Зашел в гости / '+people[input.profile];

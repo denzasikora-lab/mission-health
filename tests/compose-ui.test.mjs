@@ -52,7 +52,7 @@ test('Tab принимает только показанное продолже�
   assert.equal(f.state.hint.hidden,false);const event=f.key('Tab');assert.equal(event.defaultPrevented,true);assert.equal(f.input.value,'Сегодня чувствую себя хорошо');assert.equal(draft,f.input.value);assert.equal(f.input.selectionStart,f.input.value.length);assert.equal(submits,0);assert.equal(f.state.hint.hidden,true);
 });
 test('Tab без подсказки и Shift+Tab сохраняют обычное поведение',async()=>{
-  const f=fixture();assert.equal(f.key('Tab').defaultPrevented,false);f.type('Сегодня');f.advance(700);f.calls[0].resolve({completion:' хорошая погода'});await settle();assert.equal(f.key('Tab',{shiftKey:true}).defaultPrevented,false);assert.equal(f.input.value,'Сегодня');
+  const f=fixture();f.key('Escape');assert.equal(f.key('Tab').defaultPrevented,false);f.type('Сегодня');f.advance(700);f.calls[0].resolve({completion:' хорошая погода'});await settle();assert.equal(f.key('Tab',{shiftKey:true}).defaultPrevented,false);assert.equal(f.input.value,'Сегодня');
 });
 test('Enter не принимает продолжение и не мешает существующему обработчику отправки',async()=>{
   const f=fixture();let sent='';f.input.addEventListener('keydown',event=>{if(event.key==='Enter')sent=f.input.value;});f.type('Сегодня');f.advance(700);f.calls[0].resolve({completion:' хорошая погода'});await settle();

@@ -50,7 +50,7 @@
     sliders.push({root,input,reset,value:root.querySelector('strong'),label:root.querySelector('.wellbeing-readout span'),mouth:root.querySelector('path'),time:root.querySelector('.wellbeing-time')});renderScores();return root;
   }
   function badge(report){const scale=report.wellbeingScale===100?100:10,score=canonicalReport(report).score;const node=create('span','wellbeing-badge',report.score+' / '+scale+' · '+(report.label||label(score)));node.style.setProperty('--mood-hue',hue(score));return node;}
-  function store(kind){const key=kind==='diary'?'diary:'+profile():kind;if(!cache.has(key))cache.set(key,{kind,profile:profile(),messages:[],loaded:false,loading:false,cursor:null,more:false,draft:'',pending:null,busy:false,notice:''});return cache.get(key);}
+  function store(kind){const key=kind==='diary'?'diary:'+profile():kind;if(!cache.has(key))cache.set(key,{kind,profile:profile(),messages:[],loaded:false,loading:false,cursor:null,more:false,draft:'',files:[],pending:null,busy:false,notice:''});return cache.get(key);}
   function favoriteFor(type,id){return favoriteItems.find(item=>item.sourceType===type&&item.sourceId===id);}
   function star(entry,type='diary',id=profile()){
     const b=create('button','personal-star');b.type='button';b.dataset.favoriteSource=type;b.dataset.favoriteId=entry.id;
@@ -77,22 +77,22 @@
     }catch{for(const view of views)view.status.textContent='Не удалось изменить избранное. Попробуй еще раз.';}
     finally{favoriteBusy.delete(key);updateStars();}
   }
-  async function load(kind,older=false){
+  async function load(kind,older=false,quiet=false){
     if(kind==='favorites'){await favorites(older);return;}
     if(kind==='scheduler'){await window.missionScheduler.refresh();return;}
-    const s=store(kind);if(s.loading)return;s.loading=true;s.notice='';renderViews();
+    const s=store(kind);if(s.loading||s.polling||s.busy)return;if(quiet)s.polling=true;else{s.loading=true;s.notice='';renderViews();}let changed=!quiet;
     try{
       const suffix=older&&s.cursor?'?cursor='+encodeURIComponent(s.cursor):'';
-      const data=await api(kind==='chat'?'/api/chat'+suffix:'/api/astronauts/'+s.profile+'/book'+suffix);
-      const items=kind==='chat'?data.messages:data.entries.filter(entry=>entry.role==='note').reverse();
-      s.messages=older?[...items.filter(item=>!s.messages.some(old=>old.id===item.id)),...s.messages]:items;s.cursor=data.cursor;s.more=data.hasMore;s.loaded=true;
+      const data=await api(kind==='team'?'/api/team-chat'+suffix:kind==='chat'?'/api/chat'+suffix:'/api/astronauts/'+s.profile+'/book'+suffix);
+      const items=['chat','team'].includes(kind)?data.messages:data.entries.filter(entry=>entry.role==='note').reverse();if(quiet)changed=items.some(item=>!s.messages.some(old=>old.id===item.id));
+      s.messages=older?[...items.filter(item=>!s.messages.some(old=>old.id===item.id)),...s.messages]:quiet?[...s.messages,...items.filter(item=>!s.messages.some(old=>old.id===item.id))]:items;s.cursor=data.cursor;s.more=data.hasMore;s.loaded=true;
     }catch{s.notice='История не загрузилась. Нажми «Обновить», текст останется в поле.';}
-    finally{s.loading=false;renderViews();}
+    finally{if(quiet)s.polling=false;else s.loading=false;if(changed)renderViews();}
   }
   function messageNode(entry,kind,id){
-    const item=create('article','personal-message '+(entry.role==='assistant'?'assistant':'user'));
-    const header=create('header'),name=create('span','',kind==='diary'?'Твоя запись':entry.role==='assistant'?'NasaGPT':'Ты');header.append(name,create('time','',stamp(entry.createdAt)),star(entry,kind,id));
-    item.append(header,create('p','',entry.content));if(entry.wellbeing)item.append(badge(entry.wellbeing));
+    const item=create('article','personal-message '+(kind==='team'&&!entry.isOwn||entry.role==='assistant'?'assistant':'user'));
+    const header=create('header'),name=create('span','',kind==='team'?(entry.authorName+(entry.isOwn?' / ты':'')):kind==='diary'?'Твоя запись':entry.role==='assistant'?'NasaGPT':'Ты');header.append(name,create('time','',stamp(entry.createdAt)));if(kind!=='team')header.append(star(entry,kind,id));
+    item.append(header);if(entry.content)item.append(create('p','',entry.content));if(kind!=='team'&&entry.wellbeing)item.append(badge(entry.wellbeing));for(const file of entry.attachments||[]){const link=create('a','chat-file-link',file.name+' / '+Math.max(1,Math.ceil(file.bytes/1024))+' КБ');link.href=file.url;link.download=file.name;item.append(link);}
     if(entry.pending&&kind==='chat'){const retry=create('button','personal-retry','Повторить запрос ответа');retry.type='button';retry.disabled=store('chat').busy;retry.addEventListener('click',()=>void retryChat(entry));item.append(retry);}
     return item;
   }
@@ -101,27 +101,28 @@
       if(view.host.hidden)continue;
       const kind=view.kind;
       if(kind==='scheduler'){view.form.hidden=true;view.more.hidden=true;window.missionScheduler.render(view.list);view.refresh.disabled=window.missionScheduler.loading;continue;}
-      const s=kind==='favorites'?null:store(kind);view.list.replaceChildren();
+      const s=kind==='favorites'?null:store(kind),scrollTop=view.list.scrollTop,atBottom=view.list.scrollHeight-view.list.scrollTop-view.list.clientHeight<40;view.list.replaceChildren();
       const items=kind==='favorites'?favoriteItems:s.messages;
-      if(!items.length)view.list.append(create('div','personal-empty',(kind==='favorites'?favoriteLoading:s.loading)?'Загружаю...':kind==='favorites'?'Сохраняй важные записи и ответы кнопкой со звездой.':kind==='diary'?'Расскажи, как прошел день. Запись и выбранное самочувствие попадут в дневник.':'Привет! Я NasaGPT. О чем поговорим?'));
+      if(!items.length)view.list.append(create('div','personal-empty',(kind==='favorites'?favoriteLoading:s.loading)?'Загружаю...':kind==='favorites'?'Сохраняй важные записи и ответы кнопкой со звездой.':kind==='diary'?'Расскажи, как прошел день. Запись и выбранное самочувствие попадут в дневник.':kind==='team'?'Здесь можно обсудить проект с командой Bug Busters. Сообщений пока нет.':'Привет! Я NasaGPT. О чем поговорим?'));
       for(const entry of items){
         if(kind==='favorites'){
           const card=create('article','personal-favorite'),header=create('header');header.append(create('span','',entry.sourceType==='diary'?'Архив':'NasaGPT'),create('time','',stamp(entry.createdAt)),star({...entry,id:entry.sourceId},entry.sourceType,entry.profile));card.append(header,create('p','',entry.content));if(entry.wellbeing)card.append(badge(entry.wellbeing));view.list.append(card);
         }else view.list.append(messageNode(entry,kind,s.profile));
       }
+      view.list.scrollTop=atBottom?view.list.scrollHeight:scrollTop;
       view.more.hidden=kind==='favorites'?!favoriteMore:!s.more;view.more.disabled=kind==='favorites'?favoriteLoading:s.loading;
       view.refresh.disabled=kind==='favorites'?favoriteLoading:s.loading;
-      if(view.form){view.form.hidden=kind==='favorites';if(kind!=='favorites'){if(view.input.value!==s.draft)view.input.value=s.draft;view.input.disabled=s.busy;view.send.disabled=s.busy||s.loading||!s.draft.trim();view.send.textContent=s.busy?kind==='chat'?'Ожидаю ответ...':'Сохраняю...':kind==='chat'?'Отправить':'В дневник';view.input.placeholder=kind==='chat'?'':'Что ты чувствуешь? Что сегодня изменилось?';view.status.textContent=s.notice;}}
+      if(view.form){view.form.hidden=kind==='favorites';if(kind!=='favorites'){if(view.input.value!==s.draft)view.input.value=s.draft;view.input.disabled=s.busy;view.send.disabled=s.busy||s.loading||s.dictating||s.files.some(file=>!file.id)||!s.draft.trim()&&!s.files.length;view.send.textContent=s.busy?kind==='chat'?'Ожидаю ответ...':'Сохраняю...':['chat','team'].includes(kind)?'Отправить':'В дневник';view.input.placeholder=kind==='team'?'Сообщение команде':['chat'].includes(kind)?'':'Что ты чувствуешь? Что сегодня изменилось?';view.status.textContent=s.notice;window.missionChatComposer.refresh(view);}}
     }
     updateStars();
   }
   async function send(kind){
-    const s=store(kind);if(s.busy||!s.draft.trim())return;s.busy=true;s.notice='';
-    s.pending||={id:crypto.randomUUID(),content:s.draft.trim(),wellbeing:currentReport(),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone};const input=s.pending;renderViews();
+    const s=store(kind);if(s.busy||s.dictating||s.files.some(file=>!file.id)||!s.draft.trim()&&!s.files.length)return;s.busy=true;s.notice='';
+    s.pending||={id:crypto.randomUUID(),content:s.draft.trim(),attachments:s.files.map(file=>file.id),...(kind==='team'?{}:{wellbeing:currentReport(),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone})};const input=s.pending;renderViews();
     try{
-      const result=await api(kind==='chat'?'/api/chat':'/api/astronauts/'+s.profile+'/messages',{method:'POST',body:JSON.stringify({...input,...(kind==='diary'?{mode:'diary',language:'ru',attachments:[]}:{} )})});
+      const result=await api(kind==='team'?'/api/team-chat':kind==='chat'?'/api/chat':'/api/astronauts/'+s.profile+'/messages',{method:'POST',body:JSON.stringify({...input,...(kind==='diary'?{mode:'diary',language:'ru',attachments:[]}:{} )})});
       for(const entry of [result.message,result.reply].filter(Boolean)){const index=s.messages.findIndex(item=>item.id===entry.id);if(index<0)s.messages.push(entry);else s.messages[index]=entry;}
-      void window.missionActivity?.refresh();s.draft='';s.pending=null;s.loaded=true;s.notice=kind==='diary'?'Запись сохранена в дневнике.':result.replyError?'NasaGPT пока не смог ответить. Попробуй повторить запрос.':'';
+      void window.missionActivity?.refresh();s.draft='';s.files=[];s.pending=null;s.loaded=true;s.notice=kind==='diary'?'Запись сохранена в дневнике.':result.replyError?'NasaGPT пока не смог ответить. Попробуй повторить запрос.':'';
       if(kind==='chat'&&result.tasks?.length){s.notice=(s.notice?s.notice+' ':'')+'В «Запланировано»: '+result.tasks.length+'.';void window.missionScheduler.refresh();}
       if(kind==='diary'){void window.missionBook?.refresh();void loadJournal();}
     }catch{s.notice='Не удалось завершить отправку. Текст сохранен здесь; можно повторить.';}
@@ -129,46 +130,43 @@
   }
   async function retryChat(entry){
     const s=store('chat');if(s.busy)return;s.busy=true;s.notice='';renderViews();
-    try{const data=await api('/api/chat',{method:'POST',body:JSON.stringify({id:entry.id,content:entry.content,wellbeing:canonicalReport(entry.wellbeing),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone})});for(const row of [data.message,data.reply].filter(Boolean)){const i=s.messages.findIndex(item=>item.id===row.id);if(i<0)s.messages.push(row);else s.messages[i]=row;}if(data.tasks?.length)void window.missionScheduler.refresh();s.notice=data.replyError?'NasaGPT пока не смог ответить. Попробуй повторить запрос.':'';}catch{s.notice='Не удалось получить ответ. Попробуй еще раз.';}finally{s.busy=false;renderViews();}
+    try{const data=await api('/api/chat',{method:'POST',body:JSON.stringify({id:entry.id,content:entry.content,wellbeing:canonicalReport(entry.wellbeing),attachments:(entry.attachments||[]).map(file=>file.id),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone})});for(const row of [data.message,data.reply].filter(Boolean)){const i=s.messages.findIndex(item=>item.id===row.id);if(i<0)s.messages.push(row);else s.messages[i]=row;}if(data.tasks?.length)void window.missionScheduler.refresh();s.notice=data.replyError?'NasaGPT пока не смог ответить. Попробуй повторить запрос.':'';}catch{s.notice='Не удалось получить ответ. Попробуй еще раз.';}finally{s.busy=false;renderViews();}
   }
   function panel(host,kind,{favoriteShortcut=false,onKindChange}={}){
     const view={host,kind,favoriteShortcut,onKindChange};host.classList.add('personal-conversation');
     host.innerHTML='<header class="personal-conversation-heading"><div><span class="personal-section-title"></span><small class="personal-section-caption"></small></div><div><button type="button" data-personal-search>✧ NasaGPT</button><button type="button" data-personal-favorites hidden>Избранное</button><button type="button" data-personal-refresh aria-label="Обновить историю">↻</button></div></header><button type="button" class="personal-older" hidden>Ранние записи</button><div class="personal-messages" role="log" aria-live="polite"></div><form class="personal-composer"><label class="sr-only">Текст сообщения</label><textarea rows="2" maxlength="6000" aria-label="Текст сообщения"></textarea><footer><span class="personal-send-hint"></span><button type="submit"></button></footer></form><p class="personal-status" role="status"></p>';
-    Object.assign(view,{list:host.querySelector('.personal-messages'),form:host.querySelector('form'),input:host.querySelector('textarea'),send:host.querySelector('form button'),status:host.querySelector('.personal-status'),more:host.querySelector('.personal-older'),refresh:host.querySelector('[data-personal-refresh]')});
+    Object.assign(view,{list:host.querySelector('.personal-messages'),form:host.querySelector('form'),input:host.querySelector('textarea'),send:host.querySelector('button[type=submit]'),status:host.querySelector('.personal-status'),more:host.querySelector('.personal-older'),refresh:host.querySelector('[data-personal-refresh]')});
     view.form.addEventListener('submit',event=>{event.preventDefault();void send(view.kind);});
-    view.input.addEventListener('input',()=>{const s=store(view.kind);s.draft=view.input.value;s.pending=null;view.send.disabled=!s.draft.trim()||s.busy||s.loading;});
+    view.input.addEventListener('input',()=>{const s=store(view.kind);s.draft=view.input.value;s.pending=null;view.send.disabled=!s.draft.trim()&&!s.files.length||s.files.some(file=>!file.id)||s.busy||s.loading||s.dictating;});
     view.input.addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();view.form.requestSubmit();}});
     view.more.addEventListener('click',()=>void load(view.kind,true));view.refresh.addEventListener('click',()=>void load(view.kind));
     host.querySelector('[data-personal-favorites]').addEventListener('click',()=>setKind(view,view.kind==='favorites'?'chat':'favorites'));
     host.querySelector('[data-personal-search]').addEventListener('click',()=>{if(modal.open)modal.close();window.missionDesign.navigate('archive');document.getElementById('book-search-open').click();});
-    views.push(view);setKind(view,kind,false);return view;
+    window.missionChatComposer.attach(view,{store,render:renderViews});views.push(view);setKind(view,kind,false);return view;
   }
   function setKind(view,kind,fetch=true){
-    if(view.kind!==kind)view.status.textContent='';view.kind=kind;view.host.querySelector('.personal-section-title').textContent=kind==='diary'?'Твой дневник':kind==='chat'?'NasaGPT':kind==='scheduler'?'Запланировано':'Избранное';
+    if(view.kind!==kind){window.missionChatComposer.contextChanged(view);view.status.textContent='';}view.kind=kind;view.host.querySelector('.personal-section-title').textContent=kind==='diary'?'Твой дневник':kind==='chat'?'NasaGPT':kind==='scheduler'?'Запланировано':kind==='team'?'Общий чат':'Избранное';
     const shortcut=view.host.querySelector('[data-personal-favorites]');shortcut.hidden=!view.favoriteShortcut;shortcut.textContent=kind==='favorites'?'Назад в чат':'Избранное';view.onKindChange?.(kind);
-    view.input.dataset.activityArea=kind==='diary'?'diary':'chat';
-    view.host.querySelector('.personal-section-caption').textContent=kind==='diary'?'Личные наблюдения / отдельная история и поиск по смыслу':kind==='chat'?'Давай поговорим':kind==='scheduler'?'Задачи и напоминания из чата':'Важные записи и ответы';
+    view.input.dataset.activityArea=kind==='diary'?'diary':kind==='team'?'team':'chat';
+    view.host.querySelector('.personal-section-caption').textContent=kind==='diary'?'Личные наблюдения / отдельная история и поиск по смыслу':kind==='chat'?'Давай поговорим':kind==='scheduler'?'Задачи и напоминания из чата':kind==='team'?'Bug Busters / переписка участников':'Важные записи и ответы';
     view.host.querySelector('[data-personal-search]').hidden=kind!=='diary';view.host.querySelector('.personal-send-hint').textContent=kind==='diary'?'Enter / сохранить · Shift+Enter / новая строка':'Enter / отправить · Shift+Enter / новая строка';view.form.hidden=kind==='favorites'||kind==='scheduler';
     renderViews();window.missionCompose?.refresh(view.input);if(fetch){if(kind==='favorites'){if(!favoriteLoaded)void favorites();}else if(kind==='scheduler'){void window.missionScheduler.refresh();}else if(!store(kind).loaded)void load(kind);}
   }
   const checkin=create('section','media-checkin');
   const tabs=create('div','personal-tabs');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Личные разделы');
-  for(const [kind,title] of [['chat','NasaGPT'],['favorites','Избранное'],['scheduler','Запланировано']]){const b=create('button','',title);b.type='button';b.id='media-personal-tab-'+kind;b.dataset.personalTab=kind;b.setAttribute('role','tab');b.setAttribute('aria-controls','media-personal-conversation');b.setAttribute('aria-selected',String(kind==='chat'));b.tabIndex=kind==='chat'?0:-1;b.addEventListener('click',()=>{modalKind=kind;for(const tab of tabs.children){tab.setAttribute('aria-selected',String(tab===b));tab.tabIndex=tab===b?0:-1;}compact.setAttribute('aria-labelledby',b.id);setKind(modalView,kind);});b.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const list=[...tabs.children],i=list.indexOf(b),next=event.key==='Home'?0:event.key==='End'?list.length-1:(i+(event.key==='ArrowRight'?1:list.length-1))%list.length;list[next].click();list[next].focus();});tabs.append(b);}
+  for(const [kind,title] of [['chat','NasaGPT'],['favorites','Избранное'],['scheduler','Запланировано'],['team','Общий чат']]){const b=create('button','',title);b.type='button';b.id='media-personal-tab-'+kind;b.dataset.personalTab=kind;b.setAttribute('role','tab');b.setAttribute('aria-controls','media-personal-conversation');b.setAttribute('aria-selected',String(kind==='chat'));b.tabIndex=kind==='chat'?0:-1;b.addEventListener('click',()=>{modalKind=kind;for(const tab of tabs.children){tab.setAttribute('aria-selected',String(tab===b));tab.tabIndex=tab===b?0:-1;}compact.setAttribute('aria-labelledby',b.id);setKind(modalView,kind);});b.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const list=[...tabs.children],i=list.indexOf(b),next=event.key==='Home'?0:event.key==='End'?list.length-1:(i+(event.key==='ArrowRight'?1:list.length-1))%list.length;list[next].click();list[next].focus();});tabs.append(b);}
   checkin.append(tabs);const compact=create('div','');compact.id='media-personal-conversation';compact.setAttribute('role','tabpanel');compact.setAttribute('aria-labelledby','media-personal-tab-chat');checkin.append(compact);modal.querySelector('.log-identity').before(checkin);const modalView=panel(compact,'chat');
   const main=create('section','personal-workspace panel glass');main.id='personal-workspace';main.hidden=true;const mainHost=create('div','');main.append(mainHost);document.querySelector('.main-column').append(main);const mainView=panel(mainHost,'chat',{favoriteShortcut:true,onKindChange:kind=>{mainKind=kind;}});
   const sidebar=create('section','nasagpt-sidebar panel glass');sidebar.id='nasagpt-sidebar';
   const legacy=document.getElementById('journal-view');legacy.classList.add('legacy-journal-archive');legacy.before(sidebar);const sidebarView=panel(sidebar,'chat',{favoriteShortcut:true});
   const sidebarTabs=create('div','personal-tabs sidebar-personal-tabs');sidebarTabs.setAttribute('role','tablist');sidebarTabs.setAttribute('aria-label','Разделы NasaGPT');
   sidebar.id='nasagpt-sidebar';sidebarView.list.id='sidebar-personal-content';sidebarView.list.setAttribute('role','tabpanel');
-  for(const [kind,title] of [['chat','NasaGPT'],['favorites','Избранное'],['scheduler','Запланировано']]){const b=create('button','',title);b.type='button';b.id='sidebar-tab-'+kind;b.dataset.sidebarTab=kind;b.setAttribute('role','tab');b.setAttribute('aria-controls','sidebar-personal-content');b.setAttribute('aria-selected',String(kind==='chat'));b.tabIndex=kind==='chat'?0:-1;b.addEventListener('click',()=>{for(const tab of sidebarTabs.children){tab.setAttribute('aria-selected',String(tab===b));tab.tabIndex=tab===b?0:-1;}sidebarView.list.setAttribute('aria-labelledby',b.id);setKind(sidebarView,kind);});b.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const list=[...sidebarTabs.children],i=list.indexOf(b),next=event.key==='Home'?0:event.key==='End'?list.length-1:(i+(event.key==='ArrowRight'?1:list.length-1))%list.length;list[next].click();list[next].focus();});sidebarTabs.append(b);}
+  for(const [kind,title] of [['chat','NasaGPT'],['favorites','Избранное'],['scheduler','Запланировано'],['team','Общий чат']]){const b=create('button','',title);b.type='button';b.id='sidebar-tab-'+kind;b.dataset.sidebarTab=kind;b.setAttribute('role','tab');b.setAttribute('aria-controls','sidebar-personal-content');b.setAttribute('aria-selected',String(kind==='chat'));b.tabIndex=kind==='chat'?0:-1;b.addEventListener('click',()=>{for(const tab of sidebarTabs.children){tab.setAttribute('aria-selected',String(tab===b));tab.tabIndex=tab===b?0:-1;}sidebarView.list.setAttribute('aria-labelledby',b.id);setKind(sidebarView,kind);});b.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const list=[...sidebarTabs.children],i=list.indexOf(b),next=event.key==='Home'?0:event.key==='End'?list.length-1:(i+(event.key==='ArrowRight'?1:list.length-1))%list.length;list[next].click();list[next].focus();});sidebarTabs.append(b);}
   sidebar.prepend(sidebarTabs);sidebarView.list.setAttribute('aria-labelledby','sidebar-tab-chat');sidebar.querySelector('[data-personal-favorites]').hidden=true;sidebarView.favoriteShortcut=false;
   window.addEventListener('mission-tasks-change',renderViews);
   window.addEventListener('mission-tasks-open',()=>{sidebarTabs.querySelector('[data-sidebar-tab=scheduler]').click();sidebar.scrollIntoView({behavior:'smooth',block:'start'});});
-  const mediaTools=create('div','nasagpt-media-tools');
-  for(const [mode,title,icon] of [['video','Добавить фото или видео','<path d="m21.4 11.6-8.5 8.5a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/>'],['audio','Открыть микрофон','<rect x="8" y="2" width="8" height="13" rx="4"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4m-4 0h8"/>']]){
-    const button=create('button','');button.type='button';button.setAttribute('aria-label',title);button.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'+icon+'</svg>';button.addEventListener('click',()=>window.missionDiary.open(mode));mediaTools.append(button);
-  }
-  sidebarView.form.querySelector('footer').prepend(mediaTools);
+  setInterval(()=>{if(!document.hidden&&views.some(view=>view.kind==='team'&&view.host.getClientRects().length))void load('team',false,true);},5000);
+  modal.addEventListener('close',()=>window.missionChatComposer.stopWithin(modal));
   function render(section=state.view){
     const active=state.workspace==='crew'&&(section==='chat'||section==='favorites');main.hidden=!active;document.body.dataset.personalSection=active?section:'';
     if(profileSeen!==profile()){profileSeen=profile();restoreScore();if(modal.open){const s=store(modalKind);if(modalKind!=='favorites'&&!s.loaded)void load(modalKind);}}

@@ -85,6 +85,13 @@
       "when": 1793343100175,
       "tag": "0011_little_james_howlett",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1793899394147,
+      "tag": "0012_slim_tyrannus",
+      "breakpoints": true
     }
   ]
 }

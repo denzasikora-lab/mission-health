@@ -177,6 +177,8 @@ export default {
       if(url.pathname==='/api/compose')return await composeRoute(request,env);
       const tasksMatch=url.pathname.match(/^\/api\/tasks(?:\/([a-f0-9-]{36}))?$/i);if(tasksMatch)return await tasksRoute(request,env,user,tasksMatch[1]);
       if(url.pathname==='/api/chat')return await generalChatRoute(request,env,user,url);
+      if(url.pathname==='/api/team-chat')return await teamChatRoute(request,env,user,url);
+      const chatFileMatch=url.pathname.match(/^\/api\/chat-files(?:\/([a-f0-9-]{36}))?$/i);if(chatFileMatch)return await chatFilesRoute(request,env,user,chatFileMatch[1]);
       const favoritesMatch=url.pathname.match(/^\/api\/favorites(?:\/([a-f0-9-]{36}))?$/i);if(favoritesMatch)return await favoritesRoute(request,env,user,favoritesMatch[1],url);
       const trainingMatch=url.pathname.match(/^\/api\/astronauts\/([^/]+)\/training(?:\/([a-f0-9-]{36}))?$/i);if(trainingMatch&&astronautIds.has(trainingMatch[1]))return await trainingRoute(request,env,user,trainingMatch[1],trainingMatch[2]);
       const bookMatch=url.pathname.match(/^\/api\/astronauts\/([^/]+)\/(book|book-index|book-vectors|book-search|book-answer)$/);if(bookMatch&&astronautIds.has(bookMatch[1]))return await bookRoute(request,env,user,bookMatch[1],bookMatch[2],url);

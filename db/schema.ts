@@ -73,8 +73,16 @@ export const journalTrainingJobs=sqliteTable('journal_training_jobs',{
 },table=>[index('training_owner_profile_time').on(table.ownerId,table.astronautId,table.createdAt)]);
 
 export const generalChatMessages=sqliteTable('general_chat_messages',{
-  id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),role:text('role').notNull(),content:text('content').notNull(),createdAt:text('created_at').notNull(),replyTo:text('reply_to'),wellbeing:text('wellbeing_json')
+  id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),role:text('role').notNull(),content:text('content').notNull(),createdAt:text('created_at').notNull(),replyTo:text('reply_to'),wellbeing:text('wellbeing_json'),attachments:text('attachments_json').notNull().default('[]')
 },table=>[index('general_chat_owner_time').on(table.ownerId,table.createdAt,table.id),uniqueIndex('general_chat_owner_reply').on(table.ownerId,table.replyTo)]);
+
+export const teamChatMessages=sqliteTable('team_chat_messages',{
+  id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),authorName:text('author_name').notNull(),content:text('content').notNull(),attachments:text('attachments_json').notNull().default('[]'),createdAt:text('created_at').notNull()
+},table=>[index('team_chat_time').on(table.createdAt,table.id)]);
+
+export const chatFiles=sqliteTable('chat_files',{
+  id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),room:text('room').notNull(),filename:text('filename').notNull(),mime:text('mime').notNull(),bytes:integer('bytes').notNull(),objectKey:text('object_key').notNull(),createdAt:text('created_at').notNull()
+},table=>[index('chat_files_owner_room').on(table.ownerId,table.room)]);
 
 export const personalFavorites=sqliteTable('personal_favorites',{
   id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),sourceType:text('source_type').notNull(),sourceId:text('source_id').notNull(),profileId:text('profile_id'),content:text('content').notNull(),sourceCreatedAt:text('source_created_at').notNull(),createdAt:text('created_at').notNull(),wellbeing:text('wellbeing_json')

@@ -10,6 +10,7 @@ const migrations=await Promise.all((await readdir(new URL('drizzle/',root))).fil
 const model='embeddinggemma-2:daa72c51243991dfcaf9f9137d2c573d8f7790c0:q4:text:256:v1';
 function fixture(options={}){
   const sql=new DatabaseSync(':memory:');for(const migration of options.beforeHundred?migrations.slice(0,10):migrations)sql.exec(migration);
+  const objects=new Map(),PHOTOS={put:async(key,bytes)=>{objects.set(key,bytes);},get:async key=>objects.has(key)?{body:objects.get(key)}:null,delete:async key=>objects.delete(key)};
   const out=[],DB={prepare(query){
     const statement=sql.prepare(query);
     return {bind(...values){return {first:async()=>statement.get(...values)||null,all:async()=>({results:statement.all(...values)}),run:async()=>statement.run(...values)};}};
@@ -17,14 +18,14 @@ function fixture(options={}){
   let status=200,answer='Тестовый ответ по переданному контексту.';
   const scope={URL,Request,Response,FormData,Blob,Uint8Array,TextEncoder,DataView,AbortSignal,crypto:webcrypto,atob,console:{warn(){},error(){}},fetch:async(url,options)=>{out.push({url,body:JSON.parse(options.body)});if(String(url).startsWith('http://trainer.internal/'))return Response.json({id:JSON.parse(options.body).id});return status===200?Response.json({choices:[{message:{content:answer}}]}):new Response('unavailable',{status});}};
   vm.runInNewContext(source,scope);
-  const env={DB,LLM_API_KEY:'test-key',LLM_BASE_URL:'https://model.test/v1',LLM_MODEL:'test-model'};
-  const run=async(path,{owner='owner-a',method='GET',body,environment={},origin}={})=>{
-    const headers={'content-type':'application/json'};if(owner)headers['oai-authenticated-user-id']=owner;if(origin)headers.origin=origin;
-    const response=await scope.app.fetch(new Request('https://mission.test'+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body)}),{...env,...environment},{waitUntil(){}});
-    return {status:response.status,body:await response.json()};
+  const env={DB,PHOTOS,LLM_API_KEY:'test-key',LLM_BASE_URL:'https://model.test/v1',LLM_MODEL:'test-model'};
+  const run=async(path,{owner='owner-a',method='GET',body,environment={},origin,name}={})=>{
+    const headers=body instanceof FormData?{}:{'content-type':'application/json'};if(name)headers['oai-authenticated-user-full-name']=name;if(owner)headers['oai-authenticated-user-id']=owner;if(origin)headers.origin=origin;
+    const response=await scope.app.fetch(new Request('https://mission.test'+path,{method,headers,body:body===undefined?undefined:body instanceof FormData?body:JSON.stringify(body)}),{...env,...environment},{waitUntil(){}});
+    return {status:response.status,headers:response.headers,body:response.headers.get('content-type')?.includes('application/json')?await response.json():await response.text()};
   };
   const note=async(score=70,profile='jessica-meir',owner='owner-a',content='После тренировки усталость стала меньше.')=>run('/api/astronauts/'+profile+'/messages',{owner,method:'POST',body:{id:webcrypto.randomUUID(),content,language:'ru',mode:'diary',attachments:[],wellbeing:score===null?null:{score,wellbeingScale:100}}});
-  return {sql,out,run,note,migrateHundred:()=>sql.exec(migrations[10]),validateHealth:scope.validatedStoryHealth,provider:(code,text)=>{status=code;if(text)answer=text;}};
+  return {sql,out,objects,run,note,migrateHundred:()=>sql.exec(migrations[10]),validateHealth:scope.validatedStoryHealth,provider:(code,text)=>{status=code;if(text)answer=text;}};
 }
 test('Самооценка сохраняется у заметки, возвращается в книге и имеет серверные подпись и время',async()=>{const f=fixture(),saved=await f.note();assert.equal(saved.status,201);const report=saved.body.message.wellbeing;assert.equal(report.score,70);assert.equal(report.wellbeingScale,100);assert.equal(report.label,'Хорошо');assert.equal(report.source,'self_report');assert.ok(Number.isFinite(Date.parse(report.recordedAt)));const book=await f.run('/api/astronauts/jessica-meir/book');assert.deepEqual(book.body.entries[0].wellbeing,report);assert.equal(f.out.length,0);});
 test('Несуществующие и дробные оценки не сохраняются, отсутствие оценки не выдумывается',async()=>{const f=fixture();for(const score of [0,101,3.5,'80',null]){if(score===null){const saved=await f.note(null);assert.equal(saved.status,201);assert.equal(saved.body.message.wellbeing,undefined);}else assert.equal((await f.note(score)).status,400);}assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM journal_messages').get().n,1);});
@@ -148,4 +149,47 @@ test('Обучение получает нормализованную само�
   const result=await f.run('/api/astronauts/personal/training',{method:'POST',environment:{TRAINING_URL:'http://trainer.internal'},body:{id:webcrypto.randomUUID(),confirm:true}});
   assert.equal(result.status,202);assert.equal(f.out.length,1);const payload=f.out[0].body;assert.equal(payload.entries.length,20);assert.equal(payload.profile,'personal');assert.equal(payload.ownerId,'owner-a');assert.ok(payload.entries.every(entry=>entry.includes('80/100 / Хорошо')));assert.ok(payload.entries.every(entry=>!entry.includes('закрытые данные')));
   for(const note of original){const row=f.sql.prepare('SELECT content,wellbeing_json FROM journal_messages WHERE id=?').get(note.id);assert.equal(row.content,note.content);assert.equal(row.wellbeing_json,note.raw);}
+});
+
+
+test('Командный чат виден участникам сайта, не вызывает модель и не копирует личные данные',async()=>{
+  const f=fixture();await f.note(30,'personal','owner-a','Личная запись');await f.run('/api/chat',{method:'POST',body:{id:webcrypto.randomUUID(),content:'Личный NasaGPT'}});const calls=f.out.length;
+  const saved=await f.run('/api/team-chat',{method:'POST',name:'Egor',body:{id:webcrypto.randomUUID(),content:'Обсудим проект',wellbeing:{score:10},authorName:'Подмена'}});
+  assert.equal(saved.status,201);assert.equal(saved.body.message.authorName,'Egor');assert.equal(saved.body.message.isOwn,true);assert.equal(saved.body.message.wellbeing,undefined);
+  const team=await f.run('/api/team-chat',{owner:'owner-b'});assert.equal(team.body.messages.length,1);assert.equal(team.body.messages[0].isOwn,false);assert.equal(team.body.messages[0].content,'Обсудим проект');assert.equal(team.body.messages[0].ownerId,undefined);assert.equal(f.out.length,calls);
+  assert.equal((await f.run('/api/chat',{owner:'owner-b'})).body.messages.length,0);
+});
+test('Повтор командного сообщения не дублирует его, чужой ID и изменение текста отклоняются',async()=>{
+  const f=fixture(),body={id:webcrypto.randomUUID(),content:'Проверим сборку'};assert.equal((await f.run('/api/team-chat',{method:'POST',body})).status,201);assert.equal((await f.run('/api/team-chat',{method:'POST',body})).status,200);
+  assert.equal((await f.run('/api/team-chat',{owner:'owner-b',method:'POST',body})).status,409);assert.equal((await f.run('/api/team-chat',{method:'POST',body:{...body,content:'Другой текст'}})).status,409);assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM team_chat_messages').get().n,1);
+});
+test('Защита входа и происхождения работает для командного чата и файлов',async()=>{
+  const f=fixture();for(const path of ['/api/team-chat','/api/chat-files']){assert.equal((await f.run(path,{owner:null})).status,401);assert.equal((await f.run(path,{method:'POST',origin:'https://other.test',body:{}})).status,403);}
+});
+test('Командная пагинация сохраняет одинаковые отметки времени и не раскрывает внутренний ID владельца',async()=>{
+  const f=fixture();for(let i=0;i<45;i++)f.sql.prepare('INSERT INTO team_chat_messages (id,owner_id,author_name,content,created_at) VALUES (?,?,?,?,?)').run('00000000-0000-0000-0000-'+String(i).padStart(12,'0'),'owner-a','Egor','Сообщение '+i,'2026-11-05T00:00:00Z');
+  const first=await f.run('/api/team-chat'),next=await f.run('/api/team-chat?cursor='+encodeURIComponent(first.body.cursor));assert.equal(first.body.messages.length,40);assert.equal(next.body.messages.length,5);assert.equal(new Set([...first.body.messages,...next.body.messages].map(row=>row.id)).size,45);
+});
+async function uploadChatFile(f,room='private',owner='owner-a'){
+  const body=new FormData();body.set('room',room);body.set('file',new Blob(['Проверочный файл'],{type:'text/plain'}),'check.txt');return f.run('/api/chat-files',{method:'POST',owner,body});
+}
+test('Личный файл доступен только владельцу и прикрепляется к его сообщению NasaGPT',async()=>{
+  const f=fixture(),uploaded=await uploadChatFile(f);assert.equal(uploaded.status,201);const file=uploaded.body.file;
+  assert.equal((await f.run(file.url,{owner:'owner-b'})).status,404);const saved=await f.run('/api/chat',{method:'POST',body:{id:webcrypto.randomUUID(),content:'Документ',attachments:[file.id]}});assert.equal(saved.body.message.attachments[0].name,'check.txt');assert.equal((await f.run('/api/chat')).body.messages[0].attachments[0].id,file.id);
+  assert.equal((await f.run('/api/team-chat',{method:'POST',body:{id:webcrypto.randomUUID(),content:'Подмена области',attachments:[file.id]}})).status,404);
+  const downloaded=await f.run(file.url);assert.equal(downloaded.body,'Проверочный файл');assert.equal(downloaded.headers.get('content-type'),'application/octet-stream');assert.ok(downloaded.headers.get('content-disposition').startsWith('attachment;'));
+});
+test('Командный файл открывается другим участникам только после явной отправки в общий чат',async()=>{
+  const f=fixture(),file=(await uploadChatFile(f,'team')).body.file;assert.equal((await f.run(file.url,{owner:'owner-b'})).status,404);
+  assert.equal((await f.run('/api/team-chat',{owner:'owner-b',method:'POST',body:{id:webcrypto.randomUUID(),content:'Чужой файл',attachments:[file.id]}})).status,404);
+  const saved=await f.run('/api/team-chat',{method:'POST',body:{id:webcrypto.randomUUID(),content:'',attachments:[file.id]}});assert.equal(saved.status,201);assert.equal((await f.run(file.url,{owner:'owner-b'})).status,200);assert.equal((await f.run('/api/team-chat',{owner:'owner-b'})).body.messages[0].attachments[0].id,file.id);assert.equal(f.out.length,0);
+});
+test('Пустые сообщения, дубликаты вложений и неизвестные файлы не сохраняются',async()=>{
+  const f=fixture(),file=(await uploadChatFile(f,'team')).body.file;
+  for(const body of [{content:''},{content:'Текст',attachments:[file.id,file.id]},{content:'Текст',attachments:['не ID']},{content:'Текст',attachments:Array.from({length:5},()=>webcrypto.randomUUID())}])assert.equal((await f.run('/api/team-chat',{method:'POST',body:{id:webcrypto.randomUUID(),...body}})).status,400);
+  assert.equal((await f.run('/api/team-chat',{method:'POST',body:{id:webcrypto.randomUUID(),content:'Текст',attachments:[webcrypto.randomUUID()]}})).status,404);
+  assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM team_chat_messages').get().n,0);
+});
+test('Неудачная запись метаданных удаляет только что загруженный объект',async()=>{
+  const f=fixture();f.sql.exec('DROP TABLE chat_files');const result=await uploadChatFile(f);assert.equal(result.status,503);assert.equal(f.objects.size,0);
 });
