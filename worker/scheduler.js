@@ -38,24 +38,40 @@ async function planChatTasks(env,user,row,zone){
   if(tasks.length)await activityWrite(env,user,'tasks_planned','Добавлено в запланированное / '+tasks.length,'tasks:'+row.id);
   return (await db.prepare('SELECT * FROM personal_tasks WHERE owner_id=? AND source_message_id=? ORDER BY ordinal').bind(user,row.id).all()).results.map(plannedTask);
 }
+function editedTaskRow(previous,input){
+  const next={...previous};
+  if(Object.hasOwn(input,'title')){if(typeof input.title!=='string'||!input.title.trim()||input.title.trim().length>200)fail('invalid_input',400);next.title=input.title.trim();}
+  if(Object.hasOwn(input,'status')){if(!['planned','done','cancelled'].includes(input.status))fail('invalid_input',400);next.status=input.status;}
+  if(Object.hasOwn(input,'dueDate')){if(typeof input.dueDate!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(input.dueDate)||!Number.isFinite(Date.parse(input.dueDate+'T12:00:00Z'))||new Date(input.dueDate+'T12:00:00Z').toISOString().slice(0,10)!==input.dueDate)fail('invalid_input',400);next.due_date=input.dueDate;}
+  if(Object.hasOwn(input,'timeZone')){if(typeof input.timeZone!=='string'||!input.timeZone||input.timeZone.length>=80)fail('invalid_input',400);try{new Intl.DateTimeFormat('en',{timeZone:input.timeZone}).format();}catch{fail('invalid_input',400);}next.time_zone=input.timeZone;}
+  if(['dueDate','dueTime','timeZone'].some(key=>Object.hasOwn(input,key))){
+    let hour=null,minute=0;
+    if(Object.hasOwn(input,'dueTime')){if(input.dueTime!==null&&input.dueTime!==''){if(typeof input.dueTime!=='string'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(input.dueTime))fail('invalid_input',400);[hour,minute]=input.dueTime.split(':').map(Number);}}
+    else if(previous.due_at){const parts=taskDateParts(new Date(previous.due_at),previous.time_zone);hour=parts.hour;minute=parts.minute;}
+    next.due_at=hour===null?null:taskZonedInstant(next.due_date,hour,minute,next.time_zone);if(hour!==null&&!next.due_at)fail('invalid_input',400);
+  }
+  return next;
+}
 async function tasksRoute(request,env,user,id){
   const db=database(env);
   if(!id&&request.method==='GET'){const {results}=await db.prepare("SELECT * FROM personal_tasks WHERE owner_id=? AND status!='cancelled' ORDER BY CASE status WHEN 'planned' THEN 0 ELSE 1 END,due_date,due_at,created_at LIMIT 200").bind(user).all();return json({tasks:results.map(plannedTask)});}
+  if(!id&&request.method==='POST'){
+    const input=await personalInput(request),keys=['id','title','dueDate','dueTime','timeZone'];
+    if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(key=>!keys.includes(key))||!['id','title','dueDate','timeZone'].every(key=>Object.hasOwn(input,key))||typeof input.id!=='string'||!/^([a-f0-9]{8})-([a-f0-9]{4})-([1-8][a-f0-9]{3})-([89ab][a-f0-9]{3})-([a-f0-9]{12})$/i.test(input.id))fail('invalid_input',400);
+    const taskId=input.id.toLowerCase(),created=new Date().toISOString(),next=editedTaskRow({id:taskId,owner_id:user,source_message_id:'manual:'+taskId,ordinal:0,title:'',due_date:null,due_at:null,time_zone:'UTC',status:'planned',created_at:created,updated_at:created},input);
+    const matches=row=>row.source_message_id===next.source_message_id&&row.title===next.title&&row.due_date===next.due_date&&row.due_at===next.due_at&&row.time_zone===next.time_zone;
+    const existing=await db.prepare('SELECT * FROM personal_tasks WHERE owner_id=? AND id=?').bind(user,taskId).first();
+    if(existing){if(!matches(existing))fail('conflict',409);return json({task:plannedTask(existing)});}
+    await db.prepare('INSERT OR IGNORE INTO personal_tasks (id,owner_id,source_message_id,ordinal,title,due_date,due_at,time_zone,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)').bind(next.id,user,next.source_message_id,0,next.title,next.due_date,next.due_at,next.time_zone,'planned',created,created).run();
+    const saved=await db.prepare('SELECT * FROM personal_tasks WHERE owner_id=? AND id=?').bind(user,taskId).first();if(!saved||!matches(saved))fail('conflict',409);
+    await activityWrite(env,user,'tasks_planned','Добавлена задача / '+next.title,'task-created:'+taskId);
+    return json({task:plannedTask(saved)},201);
+  }
   if(id&&['PATCH','DELETE'].includes(request.method)){
     const previous=await db.prepare('SELECT * FROM personal_tasks WHERE owner_id=? AND id=?').bind(user,id).first();if(!previous)fail('not_found',404);
     const input=request.method==='DELETE'?{status:'cancelled'}:await personalInput(request),keys=['title','dueDate','dueTime','timeZone','status'];
     if(!input||typeof input!=='object'||Array.isArray(input)||!Object.keys(input).length||Object.keys(input).some(key=>!keys.includes(key)))fail('invalid_input',400);
-    const next={...previous};
-    if(Object.hasOwn(input,'title')){if(typeof input.title!=='string'||!input.title.trim()||input.title.trim().length>200)fail('invalid_input',400);next.title=input.title.trim();}
-    if(Object.hasOwn(input,'status')){if(!['planned','done','cancelled'].includes(input.status))fail('invalid_input',400);next.status=input.status;}
-    if(Object.hasOwn(input,'dueDate')){if(typeof input.dueDate!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(input.dueDate)||!Number.isFinite(Date.parse(input.dueDate+'T12:00:00Z'))||new Date(input.dueDate+'T12:00:00Z').toISOString().slice(0,10)!==input.dueDate)fail('invalid_input',400);next.due_date=input.dueDate;}
-    if(Object.hasOwn(input,'timeZone')){if(typeof input.timeZone!=='string'||!input.timeZone||input.timeZone.length>=80)fail('invalid_input',400);try{new Intl.DateTimeFormat('en',{timeZone:input.timeZone}).format();}catch{fail('invalid_input',400);}next.time_zone=input.timeZone;}
-    if(['dueDate','dueTime','timeZone'].some(key=>Object.hasOwn(input,key))){
-      let hour=null,minute=0;
-      if(Object.hasOwn(input,'dueTime')){if(input.dueTime!==null&&input.dueTime!==''){if(typeof input.dueTime!=='string'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(input.dueTime))fail('invalid_input',400);[hour,minute]=input.dueTime.split(':').map(Number);}}
-      else if(previous.due_at){const parts=taskDateParts(new Date(previous.due_at),previous.time_zone);hour=parts.hour;minute=parts.minute;}
-      next.due_at=hour===null?null:taskZonedInstant(next.due_date,hour,minute,next.time_zone);if(hour!==null&&!next.due_at)fail('invalid_input',400);
-    }
+    const next=editedTaskRow(previous,input);
     next.updated_at=new Date().toISOString();
     await db.prepare('UPDATE personal_tasks SET title=?,due_date=?,due_at=?,time_zone=?,status=?,updated_at=? WHERE owner_id=? AND id=?').bind(next.title,next.due_date,next.due_at,next.time_zone,next.status,next.updated_at,user,id).run();
     return json({task:plannedTask(next)});

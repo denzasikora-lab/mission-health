@@ -13,7 +13,7 @@ test('Относительное время и следующий день не�
 test('Вопросы, прошлые действия, отрицания и обычная беседа не создают задачи',()=>{for(const message of ['Какое завтра давление?','Вчера нужно было проверить пульс','Не надо завтра в 10 напоминать','Каждый день в 8 нужно проверить пульс','Завтра будет солнце','Нужно читать про посредника'])assert.deepEqual(parse(message),[]);});
 test('Недопустимая дата и несуществующее время при смене часового пояса отбрасываются',()=>{assert.deepEqual(parse('31.02.2027 нужно проверить пульс'),[]);assert.deepEqual(parse('2027-03-14 at 02:30 need to check pulse','2027-03-13T00:00:00Z','America/New_York'),[]);assert.equal(parse('2027-03-14 at 03:30 need to check pulse','2027-03-13T00:00:00Z','America/New_York')[0].dueAt,'2027-03-14T07:30:00.000Z');});
 const migrations=await Promise.all((await readdir(new URL('drizzle',root))).filter(n=>n.endsWith('.sql')).sort().map(n=>readFile(new URL('drizzle/'+n,root),'utf8')));
-function fixture(){const sql=new DatabaseSync(':memory:');migrations.forEach(m=>sql.exec(m));const DB={prepare(query){const q=sql.prepare(query);return{bind(...values){return{all:async()=>({results:q.all(...values)}),first:async()=>q.get(...values),run:async()=>q.run(...values)}}}}};const context={crypto:webcrypto,Intl,Date,database:e=>e.DB,activityWrite:async()=>{},json:Response.json,personalInput:r=>r.json(),fail:(code,status)=>{throw Object.assign(new Error(code),{status})}};vm.runInNewContext(source,context);return{sql,plan:(owner,row,zone)=>context.planChatTasks({DB},owner,row,zone),route:(owner,id,input,method=id?'PATCH':'GET')=>context.tasksRoute(new Request('https://test/api/tasks'+(id?'/'+id:''),{method,body:method==='PATCH'?JSON.stringify(typeof input==='string'?{status:input}:input):undefined,headers:{'content-type':'application/json'}}),{DB},owner,id)};}
+function fixture(){const sql=new DatabaseSync(':memory:');migrations.forEach(m=>sql.exec(m));const DB={prepare(query){const q=sql.prepare(query);return{bind(...values){return{all:async()=>({results:q.all(...values)}),first:async()=>q.get(...values),run:async()=>q.run(...values)}}}}};const context={crypto:webcrypto,Intl,Date,database:e=>e.DB,activityWrite:async()=>{},json:(value,status=200)=>Response.json(value,{status}),personalInput:r=>r.json(),fail:(code,status)=>{throw Object.assign(new Error(code),{status})}};vm.runInNewContext(source,context);return{sql,plan:(owner,row,zone)=>context.planChatTasks({DB},owner,row,zone),route:(owner,id,input,method=id?'PATCH':'GET')=>context.tasksRoute(new Request('https://test/api/tasks'+(id?'/'+id:''),{method,body:['PATCH','POST'].includes(method)?JSON.stringify(typeof input==='string'?{status:input}:input):undefined,headers:{'content-type':'application/json'}}),{DB},owner,id)};}
 test('Повтор чата не дублирует задачу и не меняет ее срок',async()=>{const f=fixture(),row={id:webcrypto.randomUUID(),content:'Завтра в 10:00 нужно измерить пульс',created_at:'2026-10-30T18:00:00Z'},first=await f.plan('a',row,'Europe/Istanbul'),second=await f.plan('a',row,'UTC');assert.equal(first[0].id,second[0].id);assert.equal(second[0].dueAt,'2026-10-31T07:00:00.000Z');assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM personal_tasks').get().n,1);});
 test('Задачи изолированы по владельцу, выполнение и отмена сохраняются',async()=>{const f=fixture(),tasks=await f.plan('a',{id:webcrypto.randomUUID(),content:'Завтра нужно отдохнуть',created_at:'2026-10-30T18:00:00Z'},'UTC'),id=tasks[0].id;assert.deepEqual((await(await f.route('b')).json()).tasks,[]);await assert.rejects(f.route('b',id,'done'),e=>e.status===404);assert.equal((await(await f.route('a',id,'done')).json()).task.status,'done');assert.equal((await(await f.route('a',id,'planned')).json()).task.status,'planned');await f.route('a',id,'cancelled');assert.equal((await(await f.route('a')).json()).tasks.length,0);assert.equal(f.sql.prepare('SELECT status FROM personal_tasks').get().status,'cancelled');});
 
@@ -61,6 +61,38 @@ test('Невозможный местный час при переходе на 
   assert.deepEqual((await(await f.route('a')).json()).tasks,[task]);
 });
 
+const manualTaskInput=(extra={})=>({id:webcrypto.randomUUID(),title:'Проверить часы',dueDate:'2026-11-07',dueTime:'09:30',timeZone:'Europe/Istanbul',...extra});
+test('Ручная задача сохраняет местную дату, время и отдельный источник',async()=>{
+  const f=fixture(),input=manualTaskInput({title:' Проверить часы '}),response=await f.route('a',null,input,'POST'),task=(await response.json()).task;
+  assert.equal(response.status,201);assert.equal(task.id,input.id);assert.equal(task.title,'Проверить часы');assert.equal(task.dueDate,input.dueDate);assert.equal(task.dueAt,'2026-11-07T06:30:00.000Z');assert.equal(task.timeZone,input.timeZone);assert.equal(task.status,'planned');assert.equal(task.sourceMessageId,'manual:'+input.id);
+  assert.deepEqual((await(await f.route('a')).json()).tasks,[task]);assert.deepEqual((await(await f.route('b')).json()).tasks,[]);
+});
+test('Ручная задача без времени остается задачей на весь день',async()=>{
+  const f=fixture();for(const dueTime of ['',null,undefined]){const input=manualTaskInput({dueTime}),task=(await(await f.route('a',null,input,'POST')).json()).task;assert.equal(task.dueAt,null);assert.equal(task.dueDate,input.dueDate);}
+});
+test('Повтор создания с тем же UUID не дублирует задачу и сохраняет последующий статус',async()=>{
+  const f=fixture(),input=manualTaskInput(),first=(await(await f.route('a',null,input,'POST')).json()).task;
+  await f.route('a',first.id,{status:'done'});const second=(await(await f.route('a',null,{...input,id:input.id.toUpperCase()},'POST')).json()).task;
+  assert.equal(second.id,first.id);assert.equal(second.createdAt,first.createdAt);assert.equal(second.status,'done');assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM personal_tasks').get().n,1);
+});
+test('Тот же UUID с измененным содержимым возвращает конфликт и не теряет правки',async()=>{
+  const f=fixture(),input=manualTaskInput(),first=(await(await f.route('a',null,input,'POST')).json()).task;
+  for(const changed of [{title:'Другая задача'},{dueDate:'2026-11-08'},{dueTime:'10:00'},{timeZone:'UTC'}])await assert.rejects(f.route('a',null,{...input,...changed},'POST'),error=>error.status===409);
+  await f.route('a',first.id,{title:'Изменено после создания'});await assert.rejects(f.route('a',null,input,'POST'),error=>error.status===409);
+  assert.equal((await(await f.route('a')).json()).tasks[0].title,'Изменено после создания');assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM personal_tasks').get().n,1);
+});
+test('Коллизия UUID другого владельца и задачи из чата не возвращает чужую запись',async()=>{
+  const f=fixture(),input=manualTaskInput();await f.route('a',null,input,'POST');await assert.rejects(f.route('b',null,input,'POST'),error=>error.status===409);assert.deepEqual((await(await f.route('b')).json()).tasks,[]);
+  const chat=await sampleTask(f);await assert.rejects(f.route('a',null,{...input,id:chat.id,title:chat.title,dueDate:chat.dueDate,dueTime:'10:00'},'POST'),error=>error.status===409);
+});
+test('Создание отвергает неполные данные, неверные UUID, даты, время и часовой пояс',async()=>{
+  const f=fixture(),valid=manualTaskInput(),inputs=[null,[],{},...['id','title','dueDate','timeZone'].map(key=>{const input={...valid};delete input[key];return input;}),...[
+    {id:'bad-id'},{id:'11111111-1111-1111-1111-111111111111'},{title:''},{title:' '.repeat(5)},{title:'x'.repeat(201)},{dueDate:'2026-02-30'},{dueTime:'24:00'},{dueTime:12},{timeZone:'Invalid/Zone'},{timeZone:''},{status:'done'},{dueAt:'2026-11-07T10:00:00Z'},{dueDate:'2027-03-14',dueTime:'02:30',timeZone:'America/New_York'}
+  ].map(patch=>({...valid,...patch}))];
+  for(const input of inputs)await assert.rejects(f.route('a',null,input,'POST'),error=>error.status===400);
+  assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM personal_tasks').get().n,0);
+});
+
 const schedulerUiSource=await readFile(new URL('public/scheduler.js',root),'utf8');
 class SchedulerNode{
   constructor(tag){this.tagName=tag;this.children=[];this.dataset={};this.attributes={};this.events={};this.value='';this.classList={add:()=>{}};}
@@ -74,13 +106,15 @@ class SchedulerNode{
   reportValidity(){return !this.validationMessage;}
 }
 function schedulerUiFixture(initial){
-  const host=new SchedulerNode('div'),handlers=new Map(),calls=[];let rows=structuredClone(initial),fail=false,ui;
+  const host=new SchedulerNode('div'),handlers=new Map(),calls=[];let rows=structuredClone(initial),fail=false,loseNextCreate=false,ui;
   const window={addEventListener(name,callback){handlers.set(name,callback);},dispatchEvent(event){if(event.type==='mission-tasks-change')ui?.render(host);},missionActivity:{refresh:async()=>{}}};
   const document={createElement:tag=>new SchedulerNode(tag),getElementById:()=>null,addEventListener(){},hidden:false};
-  const journalApi=async(path,options={})=>{calls.push({path,...options});if(!options.method)return {tasks:structuredClone(rows.filter(task=>task.status!=='cancelled'))};if(fail)throw new Error('offline');const id=path.split('/').at(-1),task=rows.find(row=>row.id===id);if(options.method==='DELETE')task.status='cancelled';else{const patch=JSON.parse(options.body);Object.assign(task,patch);if(Object.hasOwn(patch,'dueTime'))task.dueAt=patch.dueTime?patch.dueDate+'T'+patch.dueTime+':00.000Z':null;}return {task:structuredClone(task)};};
-  vm.runInNewContext(schedulerUiSource,{window,document,journalApi,Intl,Date,Event,setTimeout:()=>0,setInterval:()=>0,clearInterval(){}});ui=window.missionScheduler;
+  const journalApi=async(path,options={})=>{calls.push({path,...options});if(!options.method)return {tasks:structuredClone(rows.filter(task=>task.status!=='cancelled'))};if(fail)throw new Error('offline');
+    if(options.method==='POST'){const input=JSON.parse(options.body);let task=rows.find(row=>row.id===input.id);if(!task){task={...input,status:'planned',dueAt:input.dueTime?input.dueDate+'T'+input.dueTime+':00.000Z':null};rows.push(task);}if(loseNextCreate){loseNextCreate=false;throw new Error('response_lost');}return {task:structuredClone(task)};}
+    const id=path.split('/').at(-1),task=rows.find(row=>row.id===id);if(options.method==='DELETE')task.status='cancelled';else{const patch=JSON.parse(options.body);Object.assign(task,patch);if(Object.hasOwn(patch,'dueTime'))task.dueAt=patch.dueTime?patch.dueDate+'T'+patch.dueTime+':00.000Z':null;}return {task:structuredClone(task)};};
+  vm.runInNewContext(schedulerUiSource,{window,document,journalApi,Intl,Date,Event,crypto:webcrypto,setTimeout:()=>0,setInterval:()=>0,clearInterval(){}});ui=window.missionScheduler;
   const all=()=>{const result=[];const visit=node=>{result.push(node);node.children.forEach(visit);};visit(host);return result;};
-  return {ui,host,calls,all,byLabel:prefix=>all().find(node=>node.attributes['aria-label']?.startsWith(prefix)),field:key=>all().find(node=>node.dataset.taskField===key),button:text=>all().find(node=>node.tagName==='button'&&node.textContent===text),fail:()=>{fail=true;},get rows(){return rows;}};
+  return {ui,host,calls,all,byLabel:prefix=>all().find(node=>node.attributes['aria-label']?.startsWith(prefix)),field:key=>all().find(node=>node.dataset.taskField===key),button:text=>all().find(node=>node.tagName==='button'&&node.textContent===text),fail:()=>{fail=true;},recover:()=>{fail=false;},loseCreateResponse:()=>{loseNextCreate=true;},get rows(){return rows;}};
 }
 const uiTask={id:'task-1',title:'Проверить пульс',dueDate:'2026-11-06',dueAt:'2026-11-06T10:00:00.000Z',timeZone:'UTC',status:'planned'};
 test('Редактор сохраняет введенные поля при обновлении задач и отправляет местное время',async()=>{
@@ -99,4 +133,24 @@ test('Удаление последней задачи показывает во
   const f=schedulerUiFixture([{...uiTask,status:'done'}]);await f.ui.refresh();await f.byLabel('Удалить задачу:').trigger('click');
   assert.equal(f.rows[0].status,'cancelled');assert.ok(f.button('Восстановить'));assert.equal(f.byLabel('Редактировать задачу:'),undefined);
   await f.button('Восстановить').trigger('click');assert.equal(f.rows[0].status,'done');assert.ok(f.byLabel('Редактировать задачу:'));assert.equal(f.button('Восстановить'),undefined);
+});
+
+test('Пустой список дает форму создания с сегодняшней датой и без выдуманной задачи',async()=>{
+  const f=schedulerUiFixture([]);await f.ui.refresh();assert.ok(f.button('+ Добавить задачу'));assert.equal(f.byLabel('Редактировать задачу:'),undefined);
+  await f.button('+ Добавить задачу').trigger('click');const now=new Date(),expectedDate=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  assert.equal(f.field('title').value,'');assert.equal(f.field('date').value,expectedDate);assert.equal(f.field('time').value,'');assert.ok(f.button('Добавить'));assert.equal(f.rows.length,0);assert.equal(f.calls.some(call=>call.method==='POST'),false);
+  await f.button('Отмена').trigger('click');assert.equal(f.field('title'),undefined);assert.equal(f.rows.length,0);assert.ok(f.button('+ Добавить задачу'));
+});
+test('Создание из пустого списка показывает настоящую задачу и подписанные действия',async()=>{
+  const f=schedulerUiFixture([]);await f.ui.refresh();await f.button('+ Добавить задачу').trigger('click');
+  for(const [key,value] of [['title','Проверить часы'],['date','2026-11-09'],['time','12:20']]){const field=f.field(key);field.value=value;await field.trigger('input');}
+  await f.all().find(node=>node.tagName==='form').trigger('submit');const request=f.calls.find(call=>call.method==='POST'),input=JSON.parse(request.body);
+  assert.equal(request.path,'/api/tasks');assert.match(input.id,/^[a-f0-9-]{36}$/);assert.equal(input.title,'Проверить часы');assert.equal(input.dueDate,'2026-11-09');assert.equal(input.dueTime,'12:20');assert.equal(input.timeZone,Intl.DateTimeFormat().resolvedOptions().timeZone);assert.equal(f.rows.length,1);assert.equal(f.field('title'),undefined);
+  assert.ok(f.byLabel('Редактировать задачу: Проверить часы'));assert.ok(f.byLabel('Удалить задачу: Проверить часы'));assert.ok(f.all().some(node=>node.tagName==='span'&&node.textContent==='Изменить'));assert.ok(f.all().some(node=>node.tagName==='span'&&node.textContent==='Удалить'));
+});
+test('Потерянный ответ создания сохраняет поля и UUID для повтора без дублей',async()=>{
+  const f=schedulerUiFixture([]);await f.ui.refresh();await f.button('+ Добавить задачу').trigger('click');f.field('title').value='Не потерять задачу';await f.field('title').trigger('input');
+  f.loseCreateResponse();await f.all().find(node=>node.tagName==='form').trigger('submit');assert.equal(f.rows.length,1);assert.equal(f.field('title').value,'Не потерять задачу');const date=f.field('date').value;
+  await f.ui.refresh();assert.equal(f.field('date').value,date);await f.all().find(node=>node.tagName==='form').trigger('submit');
+  const requests=f.calls.filter(call=>call.method==='POST').map(call=>JSON.parse(call.body));assert.equal(requests.length,2);assert.deepEqual(requests[0],requests[1]);assert.equal(f.rows.length,1);assert.equal(f.field('title'),undefined);
 });
