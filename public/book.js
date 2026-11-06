@@ -15,7 +15,7 @@
   document.body.append(editor);
   const $b=id=>document.getElementById(id),B={profile:null,entries:[],pages:[],index:0,cover:true,hasMore:false,cursor:null,version:0,loading:false,loaded:false,demo:false,name:'Мой архив'};
   let saveId=null,saving=false;
-  let worker=null,job=null,searchVersion=0,controller=null,searching=false,turnTimer,identity;
+  let worker=null,job=null,searchVersion=0,controller=null,searching=false,turnTimer;
   const demoEntries=[
     {id:'demo-sleep',createdAt:'2026-10-26T07:10:00Z',content:'Сон и тишина\n\nСпал шесть часов. Ночью несколько раз просыпался из-за шума вентилятора. Утром было трудно сосредоточиться. Хочу сравнить самочувствие с более спокойной ночью.'},
     {id:'demo-exercise',createdAt:'2026-10-27T17:30:00Z',content:'После тренировки\n\nЗакончил обычную тренировку на велотренажере. Сделал паузу, выпил воды и записал ощущения. К вечеру усталость стала меньше. Завтра хочу начать с легкой разминки.'},
@@ -146,8 +146,7 @@
   $b('book-spread').addEventListener('keydown',event=>{if(event.target!==$b('book-spread'))return;if(['ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();void turn(event.key==='ArrowRight'?1:-1)}});
   let touch; $b('book-spread').addEventListener('pointerdown',event=>{if(event.target.closest('button,video,a'))return;touch={x:event.clientX,y:event.clientY};});$b('book-spread').addEventListener('pointerup',event=>{if(!touch)return;const dx=event.clientX-touch.x,dy=event.clientY-touch.y;touch=null;if(Math.abs(dx)>70&&Math.abs(dx)>Math.abs(dy)*1.5)void turn(dx<0?1:-1)});$b('book-spread').addEventListener('pointercancel',()=>touch=null);
   new ResizeObserver(()=>{if(visible())draw()}).observe($b('book-stage'));
-  async function author(){try{if(window.missionProfileName){identity=await window.missionProfileName.load();B.name=identity.name||'Мой архив';}else{identity||=await journalApi('/api/me');B.name=localStorage.getItem('mission-health-log-'+identity.researcherId+'-name')||identity.name||'Мой архив';}draw()}catch{}}
-  window.addEventListener('mission-profile-change',()=>void author());window.addEventListener('pagehide',cancelSearch);
-  window.missionBook={render,refresh:()=>{if(visible()&&!B.demo)void load()}};void author();render();
+  window.addEventListener('pagehide',cancelSearch);
+  window.missionBook={render,refresh:()=>{if(visible()&&!B.demo)void load()}};render();
   if(new URLSearchParams(location.search).get('book')==='1')window.missionDesign.navigate('archive');
 })();

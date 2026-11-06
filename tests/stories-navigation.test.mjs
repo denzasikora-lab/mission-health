@@ -81,7 +81,7 @@ test('Переход назад из начала ленты открывает 
 });
 
 test('Личные сториз включены в общий цикл вперед и назад без пропусков',async()=>{
-  const f=await fixture({mine:[personal('mine-1'),personal('mine-2')]});f.open(0);assert.equal(f.current().src,'/mine-1.jpg');f.next();assert.equal(f.current().src,'/mine-2.jpg');f.next();assert.equal(f.title(),'jessica-1');f.prev();assert.equal(f.current().src,'/mine-2.jpg');f.prev();f.prev();assert.equal(f.title(),'christina-2');f.next();assert.equal(f.current().src,'/mine-1.jpg');assert.equal(f.author(),'Алексей Орлов');
+  const f=await fixture({mine:[personal('mine-1'),personal('mine-2')]});f.open(0);assert.equal(f.current().src,'/mine-1.jpg');f.next();assert.equal(f.current().src,'/mine-2.jpg');f.next();assert.equal(f.title(),'jessica-1');f.prev();assert.equal(f.current().src,'/mine-2.jpg');f.prev();f.prev();assert.equal(f.title(),'christina-2');f.next();assert.equal(f.current().src,'/mine-1.jpg');assert.equal(f.author(),'Astronaut');assert.equal(f.row.children[0].children[0].title,'Моя сториз');
 });
 
 test('Прогресс остается внутри текущего автора и сбрасывается при переходе к следующему',async()=>{

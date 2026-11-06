@@ -24,34 +24,30 @@
   let phase = 'idle', epoch = 0, stream, worker, workerReady = false, workerBusy = false;
   let portrait, frame = 0, lastDraw = 0, lastSegmentation = 0;
   let recorder, recordedStream, recordingStarted = 0, recordingTimer, cameraTimer, workerTimer, autoRecordAttempt = -1;
-  let entry = 1, identity, identityPromise, nameDirty = false, ownProfileChange = false;
+  let entry = 1, identity, identityPromise, identityEpoch = 0;
   const microphoneMeter = window.missionMedia.meter('video-log');
   const earthStation = () => locationName.dataset.station || 'HOUSTON / JOHNSON';
   const storageKey = suffix => 'mission-health-log-' + (identity?.researcherId || 'local') + '-' + suffix;
   function normalized(value) { return String(value || '').replaceAll('\u0451', '\u0435').replaceAll('\u0401', '\u0415').replace(/[\u2013\u2014]/g, '-'); }
   function filmName(value) { return normalized(value).trim().replace(/\s+/g, ' ') || 'Участник'; }
   async function loadIdentity() {
+    const ticket = ++identityEpoch;
     try {
-      if(window.missionProfileName)identity=await window.missionProfileName.load();
-      else{const response = await fetch('/api/me', { cache: 'no-store' });if (!response.ok) throw new Error('identity_unavailable');identity = await response.json();}
-      try {
-        entry = Math.max(1, Number(localStorage.getItem(storageKey('entry'))) || 1);
-        if (!nameDirty) researcher.value = normalized(window.missionProfileName?identity.name:localStorage.getItem(storageKey('name')) || identity.name || '');
-      } catch { if (!nameDirty) researcher.value = normalized(identity.name || ''); }
-      if (!nameDirty) {
-        const parts = researcher.value.trim().split(/\s+/);
-        firstName.value = parts.length > 1 ? parts.slice(0, -1).join(' ') : parts[0] || '';
-        lastName.value = parts.length > 1 ? parts.at(-1) : '';
-        updateSignature();
-      } else saveSignature();
-      renderControls();
-    } catch { message('Не удалось прочитать профиль. Обнови страницу после входа в аккаунт.', true); }
+      const response = await fetch('/api/me', { cache: 'no-store' });
+      if (!response.ok) throw new Error('identity_unavailable');
+      const incoming = await response.json();
+      if (ticket !== identityEpoch) return;
+      identity = incoming;
+      try { entry = Math.max(1, Number(localStorage.getItem(storageKey('entry'))) || 1); } catch {}
+      firstName.value = 'Astronaut'; lastName.value = '';
+      updateSignature(); renderControls();
+    } catch { if (ticket === identityEpoch) message('Не удалось прочитать профиль. Обнови страницу после входа в аккаунт.', true); }
   }
 
   function updateSignature() {
-    researcher.value = normalized([firstName.value.trim(), lastName.value.trim()].filter(Boolean).join(' '));
-    document.getElementById('video-log-title').textContent = researcher.value ? 'Дневник / ' + researcher.value : 'Личный дневник';
-    window.missionAppearance?.setIdentity({storageScope:identity?.storageScope,name:researcher.value});
+    researcher.value = 'Astronaut';
+    document.getElementById('video-log-title').textContent = 'Дневник';
+    window.missionAppearance?.setIdentity({storageScope:identity?.storageScope,name:'Astronaut'});
   }
 
   function message(value, error = false) { notice.textContent = value; notice.dataset.error = String(error); }
@@ -347,24 +343,14 @@
     renderControls();
     if (stream) void recordWhenReady(epoch);
   });
-  function saveSignature() {
-    updateSignature();
-    if (!identity) return;
-    try {
-      localStorage.setItem(storageKey('name'), researcher.value);
-      ownProfileChange = true; window.dispatchEvent(new Event('mission-profile-change')); ownProfileChange = false;
-    } catch { message('Браузер не разрешил сохранить имя на устройстве.', true); }
-  }
-  for (const node of [firstName, lastName]) node.addEventListener('input', () => { nameDirty = true; saveSignature(); });
   identityForm.addEventListener('submit', event => event.preventDefault());
   window.addEventListener('mission-profile-change', () => {
-    if(ownProfileChange||phase==='recording')return;
-    if(window.missionProfileName){nameDirty=false;void loadIdentity();return;}
-    if (!identity) return;
-    try {
-      const saved = localStorage.getItem(storageKey('name'));
-      if (saved) { const parts = saved.trim().split(/\s+/); firstName.value = parts.length > 1 ? parts.slice(0, -1).join(' ') : parts[0]; lastName.value = parts.length > 1 ? parts.at(-1) : ''; updateSignature(); }
-    } catch {}
+    const nextScope = window.missionProfileName?.identity?.storageScope;
+    if (!nextScope || identity?.storageScope === nextScope || (!identity && !identityPromise)) return;
+    stopCamera(); identity = undefined; identityEpoch++;
+    window.missionAppearance?.setIdentity(null);
+    if (phase !== 'finishing') phase = 'idle';
+    identityPromise = loadIdentity(); renderControls();
   });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {

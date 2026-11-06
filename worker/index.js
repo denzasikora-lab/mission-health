@@ -38,10 +38,7 @@ async function profileIdentityRoute(request,env,user){
   return json(await videoLogIdentity(request,user,env));
 }
 async function videoLogIdentity(request,user,env){
-  let name=request.headers.get('oai-authenticated-user-full-name')||'';
-  if(request.headers.get('oai-authenticated-user-full-name-encoding')==='percent-encoded-utf-8')try{name=decodeURIComponent(name)}catch{name=''}
-  if(!name.trim())name=(request.headers.get('oai-authenticated-user-email')||'').split('@')[0];
-  name=(await savedProfileName(env,user))?.display_name||name;
+  const name=(await savedProfileName(env,user))?.display_name||'Astronaut';
   // Идентификатор подписи связан с аккаунтом, исходный идентификатор не передается клиенту.
   const digest=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(user)));
   const digits=String(new DataView(digest.buffer).getUint32(0)%1000000000).padStart(9,'0');

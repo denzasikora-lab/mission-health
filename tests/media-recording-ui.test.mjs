@@ -21,7 +21,7 @@ class Element{
 }
 function track(kind){return{kind,readyState:'live',enabled:true,stopped:false,stop(){this.stopped=true;this.readyState='ended';},clone(){return track(kind);},addEventListener(){},getSettings(){return{};}};}
 function media(){const tracks=[track('video'),track('audio')];return{tracks,getTracks:()=>tracks,getAudioTracks:()=>tracks.filter(t=>t.kind==='audio'),getVideoTracks:()=>tracks.filter(t=>t.kind==='video'),addTrack(t){tracks.push(t);}};}
-function fixture({background='room',permission,profile,unsupported=false,analysisBusy=false,bitmapFailure=false,ageMetadata=null}={}){
+function fixture({background='room',permission,profile,profileFetch,unsupported=false,analysisBusy=false,bitmapFailure=false,ageMetadata=null}={}){
   const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);};
   node('media-diary-dialog').open=true;node('video-log-background').value=background;
   const drawing=[],bitmaps=[],timeouts=new Map();let animation;
@@ -29,7 +29,7 @@ function fixture({background='room',permission,profile,unsupported=false,analysi
   node('video-log-canvas').getContext=()=>context;
   Object.assign(node('video-log-canvas'),{width:1280,height:720});
   Object.assign(node('video-log-input'),{readyState:2,videoWidth:1280,videoHeight:720});
-  const captured=[],recorders=[],workers=[],requests=[],locks=[],submissions=[],intervals=new Map();let timer=0,clock=0,engine;
+  const captured=[],recorders=[],workers=[],requests=[],locks=[],submissions=[],intervals=new Map(),windowEvents=new Map(),profileRequests=[],appearanceIdentities=[],hud=[];let timer=0,clock=0,engine;
   node('video-log-canvas').captureStream=()=>{const stream=media();stream.tracks.splice(1);captured.push(stream);return stream;};
   class CloneStream{constructor(tracks){this.tracks=tracks;captured.push(this);}getTracks(){return this.tracks;}getAudioTracks(){return this.tracks.filter(t=>t.kind==='audio');}}
   class Recorder{
@@ -46,12 +46,29 @@ function fixture({background='room',permission,profile,unsupported=false,analysi
   }
   const document={hidden:false,getElementById:node,createElement:()=>({getContext:()=>context}),querySelectorAll:()=>[],addEventListener(){}};
   const incoming=media(),storage=new Map();
-  const window={MediaStream:CloneStream,missionMedia:{busy:()=>analysisBusy,meter:()=>({prepare(){},attach(){},stop(){}}),submit:(...args)=>submissions.push(args)},MediaRecorder:Recorder,Worker:BackgroundWorker,OffscreenCanvas:class{},createImageBitmap(){},addEventListener(){},missionDiary:{get active(){return node('media-diary-dialog').open;},register(_mode,value){engine=value;},lock(_mode,value){locks.push(value);},open(){}},missionSpeech:{stop(){},reset(){},start(){}},missionAppearance:{stop(){},start(){},setIdentity(){},ageContext(){return{session:1};},ageSnapshot(){return ageMetadata;}}};
+  const window={MediaStream:CloneStream,missionMedia:{busy:()=>analysisBusy,meter:()=>({prepare(){},attach(){},stop(){}}),submit:(...args)=>submissions.push(args)},MediaRecorder:Recorder,Worker:BackgroundWorker,OffscreenCanvas:class{},createImageBitmap(){},addEventListener:(name,handler)=>windowEvents.set(name,handler),missionDiary:{get active(){return node('media-diary-dialog').open;},register(_mode,value){engine=value;},lock(_mode,value){locks.push(value);},open(){}},missionSpeech:{stop(){},reset(){},start(){}},missionAppearance:{stop(){},start(){},setIdentity:value=>appearanceIdentities.push(value),ageContext(){return{session:1};},ageSnapshot(){return ageMetadata;}},missionHelmet:{backdrop(){},portrait(){},hud:(_context,value)=>hud.push(value)}};
   class ClipURL extends URL{static createObjectURL(){return 'blob:recorded-clip';}static revokeObjectURL(){}}
-  vm.runInNewContext(source,{document,window,createImageBitmap:async input=>{bitmaps.push(input);if(bitmapFailure)throw new Error('unsupported_video_bitmap');return{close(){}};},Image:class{},MediaStream:CloneStream,Worker:BackgroundWorker,MediaRecorder:Recorder,Blob,URL:ClipURL,URLSearchParams,location:{search:''},Intl,Date,performance:{now:()=>clock},navigator:{mediaDevices:{getUserMedia(options){requests.push(options);return permission?.promise||Promise.resolve(incoming);}}},fetch:()=>profile?.promise||Promise.resolve({ok:true,json:async()=>({researcherId:'local-test',name:'Тестовый участник'})}),localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)},setTimeout:(callback,delay)=>{timeouts.set(++timer,{callback,at:clock+delay});return timer;},clearTimeout:id=>timeouts.delete(id),setInterval:callback=>{intervals.set(++timer,callback);return timer;},clearInterval:id=>intervals.delete(id),requestAnimationFrame:callback=>{animation=callback;return 1;},cancelAnimationFrame(){}});
+  vm.runInNewContext(source,{document,window,createImageBitmap:async input=>{bitmaps.push(input);if(bitmapFailure)throw new Error('unsupported_video_bitmap');return{close(){}};},Image:class{},MediaStream:CloneStream,Worker:BackgroundWorker,MediaRecorder:Recorder,Blob,URL:ClipURL,URLSearchParams,location:{search:''},Intl,Date,performance:{now:()=>clock},navigator:{mediaDevices:{getUserMedia(options){requests.push(options);return permission?.promise||Promise.resolve(incoming);}}},fetch:(...args)=>{profileRequests.push(args);return profileFetch?profileFetch(...args):profile?.promise||Promise.resolve({ok:true,json:async()=>({researcherId:'local-test',storageScope:'owner-a',name:'Тестовый участник'})});},localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)},setTimeout:(callback,delay)=>{timeouts.set(++timer,{callback,at:clock+delay});return timer;},clearTimeout:id=>timeouts.delete(id),setInterval:callback=>{intervals.set(++timer,callback);return timer;},clearInterval:id=>intervals.delete(id),requestAnimationFrame:callback=>{animation=callback;return 1;},cancelAnimationFrame(){}});
   engine.enter();
-  return{node,incoming,captured,recorders,workers,requests,locks,submissions,engine,bitmaps,drawing,start:async()=>{node('video-log-camera').emit('click');await settle();},draw(time=100){animation(time);},advance(ms){clock+=ms;for(const callback of [...intervals.values()])callback();for(const [id,t] of [...timeouts])if(t.at<=clock){timeouts.delete(id);t.callback();}}};
+  return{node,incoming,captured,recorders,workers,requests,locks,submissions,engine,bitmaps,drawing,profileRequests,appearanceIdentities,hud,profileChanged(identity){window.missionProfileName={identity};windowEvents.get('mission-profile-change')?.();},start:async()=>{node('video-log-camera').emit('click');await settle();},draw(time=100){animation(time);},advance(ms){clock+=ms;for(const callback of [...intervals.values()])callback();for(const [id,t] of [...timeouts])if(t.at<=clock){timeouts.delete(id);t.callback();}}};
 }
+
+test('Переименование NasaGPT сохраняет нейтральный дневник, HUD и область анализа камеры',async()=>{
+  const identity={researcherId:'local-test',storageScope:'a'.repeat(64),name:'crown-bobby'},f=fixture({background:'helmet',profileFetch:async()=>({ok:true,json:async()=>identity})});
+  await f.start();f.draw();const updates=f.appearanceIdentities.length;
+  assert.equal(f.node('video-log-title').textContent,'Дневник');assert.equal(f.node('video-log-researcher').value,'Astronaut');assert.equal(f.hud.at(-1).name,'Astronaut');assert.equal(f.appearanceIdentities.at(-1).storageScope,identity.storageScope);assert.equal(f.appearanceIdentities.at(-1).name,'Astronaut');
+  f.profileChanged({...identity,name:'Другое имя для NasaGPT'});await settle();f.draw(200);
+  assert.equal(f.profileRequests.length,1);assert.equal(f.appearanceIdentities.length,updates);assert.equal(f.node('video-log-title').textContent,'Дневник');assert.equal(f.hud.at(-1).name,'Astronaut');assert.equal(f.recorders[0].state,'recording');assert.ok(f.incoming.getTracks().every(item=>!item.stopped));
+});
+test('Смена аккаунта освобождает камеру и не принимает запоздавший профиль прежнего владельца',async()=>{
+  const first={researcherId:'first',storageScope:'a'.repeat(64),name:'Первый'},second={researcherId:'second',storageScope:'b'.repeat(64),name:'Второй'},latest={researcherId:'latest',storageScope:'c'.repeat(64),name:'Третий'},pendingSecond=deferred(),pendingLatest=deferred();let calls=0;
+  const f=fixture({profileFetch:()=>++calls===1?Promise.resolve({ok:true,json:async()=>first}):calls===2?pendingSecond.promise:pendingLatest.promise});
+  await f.start();f.profileChanged(second);assert.equal(f.recorders[0].state,'inactive');assert.ok(f.incoming.getTracks().every(item=>item.stopped));assert.equal(f.appearanceIdentities.at(-1),null);await settle();
+  f.profileChanged(latest);assert.equal(f.profileRequests.length,3);pendingLatest.resolve({ok:true,json:async()=>latest});await settle();
+  assert.equal(f.appearanceIdentities.at(-1).storageScope,latest.storageScope);assert.equal(f.appearanceIdentities.at(-1).name,'Astronaut');const updates=f.appearanceIdentities.length;
+  pendingSecond.resolve({ok:true,json:async()=>second});await settle();
+  assert.equal(f.appearanceIdentities.length,updates);assert.equal(f.appearanceIdentities.at(-1).storageScope,latest.storageScope);assert.equal(f.node('video-log-title').textContent,'Дневник');assert.equal(f.node('video-log-camera').attributes['aria-pressed'],'false');assert.equal(f.recorders.length,1);
+});
 
 test('Камера сразу начинает запись с клонированной дорожкой голоса',async()=>{
   const f=fixture();await f.start();assert.equal(f.recorders.length,1);assert.equal(f.recorders[0].state,'recording');assert.equal(f.recorders[0].stream.getAudioTracks().length,1);assert.notEqual(f.recorders[0].stream.getAudioTracks()[0],f.incoming.getAudioTracks()[0]);assert.equal(f.node('video-log-camera').textContent,'Остановить запись');assert.equal(f.node('video-log-background').disabled,true);assert.equal(f.locks.at(-1),true);

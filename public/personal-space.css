@@ -54,3 +54,5 @@
 .wellbeing-checkin>.wellbeing-time{grid-column:1;grid-row:4}
 .wellbeing-checkin>.wellbeing-reset{grid-column:2;grid-row:4;justify-self:end}
 @container mission (max-width:500px){.wellbeing-readout>span{max-inline-size:13ch}.wellbeing-readout{gap:7px}}
+
+.profile-name-form[hidden]{display:none}

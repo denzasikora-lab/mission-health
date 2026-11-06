@@ -19,16 +19,23 @@ function fixture(options={}){
   const scope={URL,Request,Response,FormData,Blob,Uint8Array,TextEncoder,DataView,AbortSignal,crypto:webcrypto,atob,console:{warn(){},error(){}},fetch:async(url,options)=>{out.push({url,body:JSON.parse(options.body)});if(String(url).startsWith('http://trainer.internal/'))return Response.json({id:JSON.parse(options.body).id});return status===200?Response.json({choices:[{message:{content:answer}}]}):new Response('unavailable',{status});}};
   vm.runInNewContext(source,scope);
   const env={DB,PHOTOS,LLM_API_KEY:'test-key',LLM_BASE_URL:'https://model.test/v1',LLM_MODEL:'test-model'};
-  const run=async(path,{owner='owner-a',method='GET',body,environment={},origin,name,expectedScope}={})=>{
-    const headers=body instanceof FormData?{}:{'content-type':'application/json'};if(name)headers['oai-authenticated-user-full-name']=name;if(owner)headers['oai-authenticated-user-id']=owner;if(origin)headers.origin=origin;if(expectedScope!==undefined)headers['x-mission-profile-scope']=expectedScope;
+  const run=async(path,{owner='owner-a',method='GET',body,environment={},origin,name,email,nameEncoding,expectedScope}={})=>{
+    const headers=body instanceof FormData?{}:{'content-type':'application/json'};if(name)headers['oai-authenticated-user-full-name']=name;if(email)headers['oai-authenticated-user-email']=email;if(nameEncoding)headers['oai-authenticated-user-full-name-encoding']=nameEncoding;if(owner)headers['oai-authenticated-user-id']=owner;if(origin)headers.origin=origin;if(expectedScope!==undefined)headers['x-mission-profile-scope']=expectedScope;
     const response=await scope.app.fetch(new Request('https://mission.test'+path,{method,headers,body:body===undefined?undefined:body instanceof FormData?body:JSON.stringify(body)}),{...env,...environment},{waitUntil(){}});
     return {status:response.status,headers:response.headers,body:response.headers.get('content-type')?.includes('application/json')?await response.json():await response.text()};
   };
   const note=async(score=70,profile='jessica-meir',owner='owner-a',content='После тренировки усталость стала меньше.')=>run('/api/astronauts/'+profile+'/messages',{owner,method:'POST',body:{id:webcrypto.randomUUID(),content,language:'ru',mode:'diary',attachments:[],wellbeing:score===null?null:{score,wellbeingScale:100}}});
   return {sql,out,objects,run,note,migrateHundred:()=>{for(const migration of migrations.slice(10))sql.exec(migration);},validateHealth:scope.validatedStoryHealth,provider:(code,text)=>{status=code;if(text)answer=text;}};
 }
-test('Полное имя сохраняется в профиле владельца, нормализуется и повторная запись идемпотентна',async()=>{
-  const f=fixture(),initial=await f.run('/api/me',{name:'Account Name'});assert.equal(initial.body.name,'Account Name');
+test('Новый посетитель получает Astronaut без имени и почты учетной записи',async()=>{
+  const f=fixture();
+  for(const headers of [{},{name:'crown-bobby'},{email:'crown-bobby@example.test'},{name:'%D0%95%D0%B3%D0%BE%D1%80',nameEncoding:'percent-encoded-utf-8',email:'private@example.test'}]){
+    const result=await f.run('/api/me',headers);assert.equal(result.status,200);assert.equal(result.body.name,'Astronaut');assert.match(result.body.storageScope,/^[a-f0-9]{64}$/);assert.match(result.body.researcherId,/^\d{3} \d{3} \d{3}$/);
+  }
+  assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM personal_profiles').get().n,0);
+});
+test('Имя NasaGPT сохраняется отдельно, нормализуется и повторная запись идемпотентна',async()=>{
+  const f=fixture(),initial=await f.run('/api/me',{name:'Account Name'});assert.equal(initial.body.name,'Astronaut');
   const saved=await f.run('/api/me',{method:'PUT',name:'Account Name',body:{name:'  Egor   Fedosov  '}});assert.equal(saved.status,200);assert.equal(saved.body.name,'Egor Fedosov');assert.equal(saved.body.storageScope,initial.body.storageScope);assert.equal(saved.body.researcherId,initial.body.researcherId);
   assert.equal((await f.run('/api/me',{name:'Old Account Name'})).body.name,'Egor Fedosov');
   f.sql.prepare('UPDATE personal_profiles SET updated_at=? WHERE owner_id=?').run('2000-01-01T00:00:00.000Z','owner-a');
@@ -36,7 +43,7 @@ test('Полное имя сохраняется в профиле владел�
   const normalized=await f.run('/api/me',{method:'PUT',body:{name:'Федор \u0451\u0401 \u2013 \u2014'}});assert.equal(normalized.body.name,'Федор еЕ - -');assert.equal(f.out.length,0);
 });
 test('Изменение имени изолировано по аккаунту и защищено входом и происхождением',async()=>{
-  const f=fixture();await f.run('/api/me',{method:'PUT',body:{name:'Первый пользователь'}});assert.equal((await f.run('/api/me',{owner:'owner-b',name:'Second User'})).body.name,'Second User');
+  const f=fixture();await f.run('/api/me',{method:'PUT',body:{name:'Первый пользователь'}});assert.equal((await f.run('/api/me',{owner:'owner-b',name:'Second User'})).body.name,'Astronaut');
   await f.run('/api/me',{owner:'owner-b',method:'PUT',body:{name:'Второй пользователь'}});assert.equal((await f.run('/api/me')).body.name,'Первый пользователь');assert.equal((await f.run('/api/me',{owner:'owner-b'})).body.name,'Второй пользователь');
   for(const method of ['GET','PUT'])assert.equal((await f.run('/api/me',{owner:null,method,...(method==='PUT'?{body:{name:'Подмена'}}:{})})).status,401);
   assert.equal((await f.run('/api/me',{method:'PUT',origin:'https://other.test',body:{name:'Подмена'}})).status,403);assert.equal((await f.run('/api/me',{method:'PUT',body:{name:'Подмена',owner_id:'owner-b'}})).status,400);assert.equal((await f.run('/api/me')).body.name,'Первый пользователь');
@@ -44,7 +51,7 @@ test('Изменение имени изолировано по аккаунту
 test('Запоздалая вкладка другого аккаунта не сохраняет старое имя при смене авторизации',async()=>{
   const f=fixture(),first=(await f.run('/api/me')).body,second=(await f.run('/api/me',{owner:'owner-b',name:'Second Account'})).body;
   assert.equal((await f.run('/api/me',{method:'PUT',expectedScope:first.storageScope,body:{name:'Имя первого аккаунта'}})).status,200);
-  const stale=await f.run('/api/me',{owner:'owner-b',method:'PUT',expectedScope:first.storageScope,body:{name:'Старый черновик'}});assert.equal(stale.status,409);assert.equal(stale.body.error,'profile_changed');assert.equal((await f.run('/api/me',{owner:'owner-b',name:'Second Account'})).body.name,'Second Account');
+  const stale=await f.run('/api/me',{owner:'owner-b',method:'PUT',expectedScope:first.storageScope,body:{name:'Старый черновик'}});assert.equal(stale.status,409);assert.equal(stale.body.error,'profile_changed');assert.equal((await f.run('/api/me',{owner:'owner-b',name:'Second Account'})).body.name,'Astronaut');
   assert.equal((await f.run('/api/me',{method:'PUT',expectedScope:second.storageScope,body:{name:'Подмена'}})).status,409);assert.equal((await f.run('/api/me')).body.name,'Имя первого аккаунта');assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM personal_profiles').get().n,1);
 });
 test('Пустые, длинные, управляющие и некорректные имена не изменяют профиль',async()=>{
@@ -53,22 +60,25 @@ test('Пустые, длинные, управляющие и некоррект
   for(const body of [{},[],null,'Name',{name:'Name',extra:true}])assert.equal((await f.run('/api/me',{method:'PUT',body})).status,400);
   assert.equal((await f.run('/api/me')).body.name,'Сохраненное имя');assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM personal_profiles').get().n,1);
 });
-test('Переименование обновляет подпись общего чата без переписывания исторического автора и сообщений',async()=>{
-  const f=fixture(),id=webcrypto.randomUUID(),body={id,content:'Исходный текст автора'};await f.run('/api/team-chat',{method:'POST',name:'Original Author',body});
-  await f.run('/api/team-chat',{owner:'owner-b',method:'POST',name:'Other Author',body:{id:webcrypto.randomUUID(),content:'Другой участник'}});
-  await f.run('/api/me',{method:'PUT',body:{name:'Новое полное имя'}});
-  const visible=(await f.run('/api/team-chat',{owner:'owner-b'})).body.messages;assert.equal(visible.find(item=>item.id===id).authorName,'Новое полное имя');assert.equal(visible.find(item=>item.id!==id).authorName,'Other Author');
+test('Имя NasaGPT не меняет своих и чужих авторов общего чата и не переписывает историю',async()=>{
+  const f=fixture(),id=webcrypto.randomUUID(),other=webcrypto.randomUUID(),body={id,content:'Исходный текст автора'};
+  const insert=f.sql.prepare('INSERT INTO team_chat_messages (id,owner_id,author_name,content,attachments_json,created_at) VALUES (?,?,?,?,?,?)');
+  insert.run(id,'owner-a','Original Author',body.content,'[]','2026-11-05T10:00:00Z');insert.run(other,'owner-b','Jessica Meir','Реплика астронавта','[]','2026-11-05T10:01:00Z');
+  await f.run('/api/me',{method:'PUT',body:{name:'Новое имя NasaGPT'}});await f.run('/api/me',{owner:'owner-b',method:'PUT',body:{name:'Чужое имя NasaGPT'}});
+  const visible=(await f.run('/api/team-chat')).body.messages;assert.equal(visible.find(item=>item.id===id).authorName,'Astronaut');assert.equal(visible.find(item=>item.id===other).authorName,'Jessica Meir');
+  const foreign=(await f.run('/api/team-chat',{owner:'owner-b'})).body.messages;assert.equal(foreign.find(item=>item.id===id).authorName,'Original Author');assert.equal(foreign.find(item=>item.id===other).authorName,'Astronaut');
   const original=f.sql.prepare('SELECT author_name,content FROM team_chat_messages WHERE id=?').get(id);assert.equal(original.author_name,'Original Author');assert.equal(original.content,body.content);
-  const retry=await f.run('/api/team-chat',{method:'POST',body});assert.equal(retry.status,200);assert.equal(retry.body.message.authorName,'Новое полное имя');
-  const fresh=await f.run('/api/team-chat',{method:'POST',name:'Stale Header Name',body:{id:webcrypto.randomUUID(),content:'Новое сообщение'}});assert.equal(fresh.body.message.authorName,'Новое полное имя');assert.equal(f.sql.prepare('SELECT author_name FROM team_chat_messages WHERE id=?').get(fresh.body.message.id).author_name,'Новое полное имя');assert.equal(f.out.length,0);
+  const retry=await f.run('/api/team-chat',{method:'POST',body});assert.equal(retry.status,200);assert.equal(retry.body.message.authorName,'Astronaut');
+  const fresh=await f.run('/api/team-chat',{method:'POST',name:'Stale Header Name',body:{id:webcrypto.randomUUID(),content:'Новое сообщение'}});assert.equal(fresh.body.message.authorName,'Astronaut');assert.equal(f.sql.prepare('SELECT author_name FROM team_chat_messages WHERE id=?').get(fresh.body.message.id).author_name,'Astronaut');assert.equal(f.out.length,0);
 });
-test('Свое имя в сториз обновляется без изменения подписи, исходного автора и чужой истории',async()=>{
+test('Личные сториз используют Astronaut, имя NasaGPT не меняет подписи и сохраненных авторов',async()=>{
   const f=fixture(),id=webcrypto.randomUUID(),other=webcrypto.randomUUID(),insert=f.sql.prepare('INSERT INTO personal_stories (id,owner_id,author_name,caption,media_kind,object_key,mime,bytes,width,height,digest,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)');
   insert.run(id,'owner-a','Original Author','Исходная подпись Original Author','photo','old-story','image/jpeg',128,32,32,'old-digest','2026-11-05T10:00:00Z');insert.run(other,'owner-b','Other Author','Чужая подпись','photo','other-story','image/jpeg',128,32,32,'other-digest','2026-11-05T10:00:00Z');
-  await f.run('/api/me',{method:'PUT',body:{name:'Новое полное имя'}});const story=(await f.run('/api/stories')).body.stories[0];assert.equal(story.author,'Новое полное имя');assert.equal(story.caption,'Исходная подпись Original Author');
-  const stored=f.sql.prepare('SELECT author_name,caption FROM personal_stories WHERE id=?').get(id);assert.equal(stored.author_name,'Original Author');assert.equal(stored.caption,story.caption);const foreign=(await f.run('/api/stories',{owner:'owner-b'})).body.stories;assert.equal(foreign.length,1);assert.equal(foreign[0].author,'Other Author');assert.equal(foreign[0].id,other);
+  await f.run('/api/me',{method:'PUT',body:{name:'Новое имя NasaGPT'}});const story=(await f.run('/api/stories')).body.stories[0];assert.equal(story.author,'Astronaut');assert.equal(story.caption,'Исходная подпись Original Author');
+  const stored=f.sql.prepare('SELECT author_name,caption FROM personal_stories WHERE id=?').get(id);assert.equal(stored.author_name,'Original Author');assert.equal(stored.caption,story.caption);const foreign=(await f.run('/api/stories',{owner:'owner-b'})).body.stories;assert.equal(foreign.length,1);assert.equal(foreign[0].author,'Astronaut');assert.equal(foreign[0].caption,'Чужая подпись');assert.equal(foreign[0].id,other);assert.equal(f.sql.prepare('SELECT author_name FROM personal_stories WHERE id=?').get(other).author_name,'Other Author');
   const form=new FormData(),bytes=new Uint8Array(128);bytes.set([255,216,255]);for(const [key,value]of Object.entries({id:webcrypto.randomUUID(),author:'Подмененная подпись автора',caption:'Новая подпись',kind:'photo',width:32,height:32}))form.set(key,String(value));form.set('file',new Blob([bytes],{type:'image/jpeg'}),'story.jpg');
-  const fresh=await f.run('/api/stories',{method:'POST',body:form});assert.equal(fresh.status,201);assert.equal(fresh.body.story.author,'Новое полное имя');assert.equal(f.sql.prepare('SELECT author_name FROM personal_stories WHERE id=?').get(fresh.body.story.id).author_name,'Новое полное имя');
+  const fresh=await f.run('/api/stories',{method:'POST',body:form});assert.equal(fresh.status,201);assert.equal(fresh.body.story.author,'Astronaut');assert.equal(f.sql.prepare('SELECT author_name FROM personal_stories WHERE id=?').get(fresh.body.story.id).author_name,'Astronaut');
+  const retry=await f.run('/api/stories',{method:'POST',body:form});assert.equal(retry.status,200);assert.equal(retry.body.story.author,'Astronaut');assert.equal((await f.run('/api/me')).body.name,'Новое имя NasaGPT');
 });
 test('Самооценка сохраняется у заметки, возвращается в книге и имеет серверные подпись и время',async()=>{const f=fixture(),saved=await f.note();assert.equal(saved.status,201);const report=saved.body.message.wellbeing;assert.equal(report.score,70);assert.equal(report.wellbeingScale,100);assert.equal(report.label,'Хорошо');assert.equal(report.source,'self_report');assert.ok(Number.isFinite(Date.parse(report.recordedAt)));const book=await f.run('/api/astronauts/jessica-meir/book');assert.deepEqual(book.body.entries[0].wellbeing,report);assert.equal(f.out.length,0);});
 test('Несуществующие и дробные оценки не сохраняются, отсутствие оценки не выдумывается',async()=>{const f=fixture();for(const score of [0,101,3.5,'80',null]){if(score===null){const saved=await f.note(null);assert.equal(saved.status,201);assert.equal(saved.body.message.wellbeing,undefined);}else assert.equal((await f.note(score)).status,400);}assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM journal_messages').get().n,1);});
@@ -198,7 +208,7 @@ test('Обучение получает нормализованную само�
 test('Командный чат виден участникам сайта, не вызывает модель и не копирует личные данные',async()=>{
   const f=fixture();await f.note(30,'personal','owner-a','Личная запись');await f.run('/api/chat',{method:'POST',body:{id:webcrypto.randomUUID(),content:'Личный NasaGPT'}});const calls=f.out.length;
   const saved=await f.run('/api/team-chat',{method:'POST',name:'Egor',body:{id:webcrypto.randomUUID(),content:'Обсудим проект',wellbeing:{score:10},authorName:'Подмена'}});
-  assert.equal(saved.status,201);assert.equal(saved.body.message.authorName,'Egor');assert.equal(saved.body.message.isOwn,true);assert.equal(saved.body.message.wellbeing,undefined);
+  assert.equal(saved.status,201);assert.equal(saved.body.message.authorName,'Astronaut');assert.equal(saved.body.message.isOwn,true);assert.equal(saved.body.message.wellbeing,undefined);
   const team=await f.run('/api/team-chat',{owner:'owner-b'});assert.equal(team.body.messages.length,1);assert.equal(team.body.messages[0].isOwn,false);assert.equal(team.body.messages[0].content,'Обсудим проект');assert.equal(team.body.messages[0].ownerId,undefined);assert.equal(f.out.length,calls);
   assert.equal((await f.run('/api/chat',{owner:'owner-b'})).body.messages.length,0);
 });
