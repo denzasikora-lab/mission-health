@@ -22,6 +22,7 @@
     light:{name:'Освещенность',unit:'лк',digits:1,spread:40,bounds:[0,120000],offset:[.4,2.5,3.2,1.8,2.7,1.4]}
   };
   const levels={green:{name:'Зеленый',description:'внутри двух стандартных отклонений'},amber:{name:'Желтый',description:'от двух до трех стандартных отклонений'},red:{name:'Красный',description:'не менее трех стандартных отклонений'},neutral:{name:'Серый',description:'нет истории за выбранный период'}};
+  const minuteOrigin=Math.floor(Date.now()/1000);
   function mean(values){return values.reduce((sum,value)=>sum+value,0)/values.length;}
   function statistics(points){
     const prior=points.slice(0,-1),average=mean(prior),variance=prior.reduce((sum,value)=>sum+(value-average)**2,0)/Math.max(1,prior.length-1),sd=Math.sqrt(variance),last=points.at(-1);
@@ -32,7 +33,16 @@
     const config=metrics[key],periodIndex=periods.findIndex(period=>period.id===periodId),period=periods[periodIndex];
     if(!config||!period||!Number.isFinite(current))return null;
     const seed=Object.keys(metrics).indexOf(key)+1;
-    // У каждой демонстрационной метрики свой фиксированный рисунок, без часов и случайных чисел.
+    if(periodId==='1m'){
+      // Одна временная шкала сохраняет общие точки окна при обновлении и возврате в раздел.
+      const second=Math.floor(Date.now()/1000)-minuteOrigin,amplitude=config.spread*period.scale;
+      const points=Array.from({length:61},(_,index)=>{
+        const at=second-60+index,shape=Math.sin(at*.53+seed)*.8+Math.cos(at*.21)*.45+Math.sin(at*.11+seed*2)*.3;
+        return Math.max(config.bounds[0],Math.min(config.bounds[1],current+amplitude*shape));
+      });
+      return {points,...statistics(points)};
+    }
+    // Остальные периоды имеют фиксированный демонстрационный рисунок.
     const shape=Array.from({length:60},(_,index)=>Math.sin(index*.53+seed)*.8+Math.cos(index*.21+periodIndex)*.45+Math.sin(index*.11+seed*2)*.3);
     const center=mean(shape),sd=Math.sqrt(shape.reduce((sum,value)=>sum+(value-center)**2,0)/(shape.length-1)),amplitude=config.spread*period.scale;
     const points=shape.map(value=>Math.max(config.bounds[0],Math.min(config.bounds[1],current+amplitude*((value-center)/sd-config.offset[periodIndex]))));
@@ -67,7 +77,7 @@
   const legend=make('div','home-trend-legend'),source=make('span','home-trend-source','Демо / личный фон'),meaning=make('span','','Цвет: отличие от фона / не диагноз');legend.append(source,meaning);
   legend.title='Демонстрационный фон построен из предшествующих точек выбранного периода. Зеленый: |z| < 2; желтый: 2 <= |z| < 3; красный: |z| >= 3. Полоса показывает среднее +/- 2 стандартных отклонения. Статистические границы не являются медицинской нормой.';
   panel.append(header,controls,graph,xAxis,legend);bodyPanel.after(panel);
-  let selected='hr',periodId='24h',scheduled=0;
+  let selected='hr',periodId='24h',scheduled=0,minuteTimer=0,suspended=false;
   const indicators=new Map(),format=(number,digits=1)=>new Intl.NumberFormat('ru',{maximumFractionDigits:digits}).format(number);
   for(const card of cards){
     const line=make('span','home-vital-trend');line.setAttribute('aria-hidden','true');card.append(line);indicators.set(card,line);
@@ -92,8 +102,11 @@
     const config=metrics[item.key],period=periods.find(value=>value.id===periodId),result=item.result;
     heading.textContent=config.name;reading.textContent=item.key==='pressure'&&item.value!==null?format(item.value,0)+' мм рт. ст.':item.raw;panel.dataset.trendLevel=result?.level||'neutral';panel.dataset.trendMetric=item.key;panel.dataset.trendPeriod=periodId;
     controls.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.trendPeriod===periodId)));
-    svg.replaceChildren();yAxis.replaceChildren();xAxis.replaceChildren();empty.hidden=Boolean(result);plot.hidden=!result;yAxis.hidden=!result;xAxis.hidden=!result;source.textContent=result?'Демо / личный фон':'Нет истории за период';
-    if(!result){svg.setAttribute('aria-label',config.name+'. Нет истории за '+period.name+'.');return;}
+    svg.replaceChildren();yAxis.replaceChildren();xAxis.replaceChildren();empty.hidden=Boolean(result);plot.hidden=!result;yAxis.hidden=!result;xAxis.hidden=!result;
+    const noMinuteFeed=periodId==='1m'&&!item.isDemo;
+    empty.textContent=noMinuteFeed?'Нет потока измерений за последнюю минуту.':'Нет истории за этот период.';
+    source.textContent=result?(periodId==='1m'?'Демо / личный фон · обновление 1 с':'Демо / личный фон'):noMinuteFeed?'Нет потока измерений':'Нет истории за период';
+    if(!result){svg.setAttribute('aria-label',config.name+'. '+empty.textContent);return;}
     const {points,average,sd,level}=result,minimum=Math.min(...points,average-2*sd),maximum=Math.max(...points,average+2*sd),padding=Math.max((maximum-minimum)*.14,config.spread*.05),low=minimum-padding,high=maximum+padding;
     const y=value=>210-(value-low)/(high-low)*210,x=index=>index/(points.length-1)*800;
     svg.append(svgNode('rect',{x:0,y:y(average+2*sd),width:800,height:Math.max(0,y(average-2*sd)-y(average+2*sd)),class:'home-trend-band'}));
@@ -116,12 +129,23 @@
       card.setAttribute('aria-label',metrics[item.key].name+': '+item.raw+'. '+(delta?delta.accessible+' за '+period.name+'. ':'')+levels[level].name+': '+levels[level].description+'.'+(result?' Демо / личный фон.':''));
     }
     renderGraph(snapshots.find(item=>item.key===selected)||snapshots[0]);
+    syncMinuteClock();
   }
   controls.addEventListener('click',event=>{const button=event.target.closest('[data-trend-period]');if(button){periodId=button.dataset.trendPeriod;refresh();}});
-  function schedule(){if(!scheduled)scheduled=requestAnimationFrame(()=>{scheduled=0;refresh();});}
+  function visible(){return !suspended&&!document.hidden&&!home.hidden&&home.getClientRects().length>0;}
+  function stopMinuteClock(){clearTimeout(minuteTimer);minuteTimer=0;}
+  function syncMinuteClock(){
+    const card=cards.find(item=>item.dataset.homeMetric===selected);
+    if(periodId!=='1m'||!visible()||card?.dataset.source!=='demo'||!Number.isFinite(metricValue(selected,card.querySelector('strong')?.textContent))){stopMinuteClock();return;}
+    if(!minuteTimer)minuteTimer=setTimeout(()=>{minuteTimer=0;if(visible()&&periodId==='1m')refresh();else stopMinuteClock();},1000-Date.now()%1000);
+  }
+  function schedule(){if(!visible()){stopMinuteClock();cancelAnimationFrame(scheduled);scheduled=0;return;}if(!scheduled)scheduled=requestAnimationFrame(()=>{scheduled=0;refresh();});}
   const observer=new MutationObserver(schedule);
   for(const card of cards){const number=card.querySelector('strong');if(number)observer.observe(number,{childList:true,subtree:true,characterData:true});observer.observe(card,{attributes:true,attributeFilter:['data-source']});}
+  const visibilityObserver=new MutationObserver(schedule);visibilityObserver.observe(home,{attributes:true,attributeFilter:['hidden']});visibilityObserver.observe(document.body,{attributes:true,attributeFilter:['data-home','data-overview','data-mission-workspace']});
+  document.addEventListener('visibilitychange',schedule);
   window.addEventListener('mission-wellbeing-change',schedule);
-  window.addEventListener('pagehide',event=>{cancelAnimationFrame(scheduled);scheduled=0;if(!event.persisted)observer.disconnect();});
+  window.addEventListener('pageshow',()=>{suspended=false;schedule();});
+  window.addEventListener('pagehide',event=>{suspended=true;stopMinuteClock();cancelAnimationFrame(scheduled);scheduled=0;if(!event.persisted){observer.disconnect();visibilityObserver.disconnect();}});
   window.missionHomeTrends={refresh};refresh();
 })();

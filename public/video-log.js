@@ -32,12 +32,11 @@
   function filmName(value) { return normalized(value).trim().replace(/\s+/g, ' ') || 'Участник'; }
   async function loadIdentity() {
     try {
-      const response = await fetch('/api/me', { cache: 'no-store' });
-      if (!response.ok) throw new Error('identity_unavailable');
-      identity = await response.json();
+      if(window.missionProfileName)identity=await window.missionProfileName.load();
+      else{const response = await fetch('/api/me', { cache: 'no-store' });if (!response.ok) throw new Error('identity_unavailable');identity = await response.json();}
       try {
         entry = Math.max(1, Number(localStorage.getItem(storageKey('entry'))) || 1);
-        if (!nameDirty) researcher.value = normalized(localStorage.getItem(storageKey('name')) || identity.name || '');
+        if (!nameDirty) researcher.value = normalized(window.missionProfileName?identity.name:localStorage.getItem(storageKey('name')) || identity.name || '');
       } catch { if (!nameDirty) researcher.value = normalized(identity.name || ''); }
       if (!nameDirty) {
         const parts = researcher.value.trim().split(/\s+/);
@@ -359,7 +358,9 @@
   for (const node of [firstName, lastName]) node.addEventListener('input', () => { nameDirty = true; saveSignature(); });
   identityForm.addEventListener('submit', event => event.preventDefault());
   window.addEventListener('mission-profile-change', () => {
-    if (!identity || ownProfileChange || phase === 'recording') return;
+    if(ownProfileChange||phase==='recording')return;
+    if(window.missionProfileName){nameDirty=false;void loadIdentity();return;}
+    if (!identity) return;
     try {
       const saved = localStorage.getItem(storageKey('name'));
       if (saved) { const parts = saved.trim().split(/\s+/); firstName.value = parts.length > 1 ? parts.slice(0, -1).join(' ') : parts[0]; lastName.value = parts.length > 1 ? parts.at(-1) : ''; updateSignature(); }

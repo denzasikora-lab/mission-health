@@ -22,10 +22,26 @@ function storedSelfReport(raw){
   try{const value=typeof raw==='string'?JSON.parse(raw):raw,score=wellbeingScore(value);return {...value,score,label:wellbeingLabel(score),wellbeingScale:100};}catch{return null;}
 }
 function diaryDocument(row){const report=storedSelfReport(row.wellbeing_json);return row.content+(report?'\nСамочувствие: '+report.score+'/100 / '+report.label+'. Самооценка пользователя.':'');}
-async function videoLogIdentity(request,user){
+async function savedProfileName(env,user){return env?.DB?await env.DB.prepare('SELECT display_name FROM personal_profiles WHERE owner_id=?').bind(user).first():null;}
+function normalizedProfileName(value){
+  if(typeof value!=='string'||/[\u0000-\u001f\u007f-\u009f]/.test(value))fail('invalid_name',400);
+  const name=value.trim().replace(/\s+/gu,' ').replaceAll('\u0451','\u0435').replaceAll('\u0401','\u0415').replace(/[\u2013\u2014]/g,'-');
+  if(!name||name.length>100)fail('invalid_name',400);return name;
+}
+async function profileIdentityRoute(request,env,user){
+  if(request.method==='GET')return json(await videoLogIdentity(request,user,env));
+  if(request.method!=='PUT')fail('method_not_allowed',405);
+  const expectedScope=request.headers.get('x-mission-profile-scope');if(expectedScope!==null&&expectedScope!==(await videoLogIdentity(request,user,env)).storageScope)fail('profile_changed',409);
+  const input=await personalInput(request);if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).length!==1||!Object.hasOwn(input,'name'))fail('invalid_input',400);
+  const name=normalizedProfileName(input.name);
+  await database(env).prepare('INSERT INTO personal_profiles (owner_id,display_name,updated_at) VALUES (?,?,?) ON CONFLICT(owner_id) DO UPDATE SET display_name=excluded.display_name,updated_at=excluded.updated_at WHERE personal_profiles.display_name<>excluded.display_name').bind(user,name,new Date().toISOString()).run();
+  return json(await videoLogIdentity(request,user,env));
+}
+async function videoLogIdentity(request,user,env){
   let name=request.headers.get('oai-authenticated-user-full-name')||'';
   if(request.headers.get('oai-authenticated-user-full-name-encoding')==='percent-encoded-utf-8')try{name=decodeURIComponent(name)}catch{name=''}
   if(!name.trim())name=(request.headers.get('oai-authenticated-user-email')||'').split('@')[0];
+  name=(await savedProfileName(env,user))?.display_name||name;
   // Идентификатор подписи связан с аккаунтом, исходный идентификатор не передается клиенту.
   const digest=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(user)));
   const digits=String(new DataView(digest.buffer).getUint32(0)%1000000000).padStart(9,'0');
@@ -171,7 +187,7 @@ export default {
       if(url.pathname==='/api/transcriptions')return await speechRoute(request,env);
       if(url.pathname==='/api/status'&&request.method==='GET')return json(await capabilities(env));
       if(url.pathname==='/api/location'&&request.method==='GET')return json({country:/^[A-Z]{2}$/.test(request.cf?.country||'')?request.cf.country:null});
-      if(url.pathname==='/api/me'&&request.method==='GET')return json(await videoLogIdentity(request,user));
+      if(url.pathname==='/api/me')return await profileIdentityRoute(request,env,user);
       const actiwatchMatch=url.pathname.match(/^\/api\/actiwatch(?:\/([a-f0-9-]{36}))?$/i);if(actiwatchMatch)return await actiwatchRoute(request,env,user,actiwatchMatch[1]);
       if(url.pathname==='/api/activity')return await activityRoute(request,env,user);
       if(url.pathname==='/api/compose')return await composeRoute(request,env);

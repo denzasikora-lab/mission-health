@@ -146,7 +146,7 @@
   $b('book-spread').addEventListener('keydown',event=>{if(event.target!==$b('book-spread'))return;if(['ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();void turn(event.key==='ArrowRight'?1:-1)}});
   let touch; $b('book-spread').addEventListener('pointerdown',event=>{if(event.target.closest('button,video,a'))return;touch={x:event.clientX,y:event.clientY};});$b('book-spread').addEventListener('pointerup',event=>{if(!touch)return;const dx=event.clientX-touch.x,dy=event.clientY-touch.y;touch=null;if(Math.abs(dx)>70&&Math.abs(dx)>Math.abs(dy)*1.5)void turn(dx<0?1:-1)});$b('book-spread').addEventListener('pointercancel',()=>touch=null);
   new ResizeObserver(()=>{if(visible())draw()}).observe($b('book-stage'));
-  async function author(){try{identity||=await journalApi('/api/me');B.name=localStorage.getItem('mission-health-log-'+identity.researcherId+'-name')||identity.name||'Мой архив';draw()}catch{}}
+  async function author(){try{if(window.missionProfileName){identity=await window.missionProfileName.load();B.name=identity.name||'Мой архив';}else{identity||=await journalApi('/api/me');B.name=localStorage.getItem('mission-health-log-'+identity.researcherId+'-name')||identity.name||'Мой архив';}draw()}catch{}}
   window.addEventListener('mission-profile-change',()=>void author());window.addEventListener('pagehide',cancelSearch);
   window.missionBook={render,refresh:()=>{if(visible()&&!B.demo)void load()}};void author();render();
   if(new URLSearchParams(location.search).get('book')==='1')window.missionDesign.navigate('archive');

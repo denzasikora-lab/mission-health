@@ -1,4 +1,10 @@
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+export const personalProfiles=sqliteTable('personal_profiles',{
+  ownerId:text('owner_id').primaryKey(),
+  displayName:text('display_name').notNull(),
+  updatedAt:text('updated_at').notNull()
+});
+
 export const journalMessages=sqliteTable('journal_messages',{
   id:text('id').primaryKey(),
   ownerId:text('owner_id').notNull(),

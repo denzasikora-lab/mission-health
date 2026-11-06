@@ -31,3 +31,24 @@
 .nasagpt-sidebar[hidden]{display:none!important}
 
 @container mission (max-width:450px){#nasagpt-sidebar .personal-tabs{grid-template-columns:minmax(0,.95fr) minmax(0,1.1fr) minmax(0,1.5fr) minmax(0,1.1fr)}#nasagpt-sidebar .personal-tabs>button{font-size:clamp(.5rem,2.2cqw,.65rem);padding-inline:2px;white-space:nowrap;overflow-wrap:normal}}
+
+.personal-conversation-heading.has-profile-name{flex-wrap:wrap;align-items:center}
+.profile-name-form{display:grid;gap:4px;flex:1 1 200px;max-width:340px;min-width:0;margin-inline-start:auto}
+.profile-name-form input{width:100%;min-width:0;box-sizing:border-box;height:40px;padding:8px 11px;border:1px solid var(--border);border-radius:9px;background:var(--inset);color:var(--text);font:inherit;font-size:.8rem}
+.profile-name-form input:focus{outline:2px solid var(--accent);outline-offset:2px}
+.profile-name-form input::placeholder{color:var(--muted)}
+.profile-name-form small{font-size:.6rem;line-height:1.4;color:var(--muted)}
+.profile-name-form small:empty{display:none}
+@container mission (max-width:700px){.personal-conversation-heading>.profile-name-form{order:3;flex-basis:100%;max-width:none;margin-inline-start:0}.personal-conversation-heading.has-profile-name>div:last-child{margin-inline-start:auto}}
+
+.wellbeing-checkin{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px}
+.wellbeing-checkin>header{grid-column:1;grid-row:1}
+.wellbeing-readout{grid-column:2;grid-row:1;display:flex;flex:none;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:nowrap}
+.wellbeing-readout>strong{order:2;flex:0 0 48px;inline-size:48px}
+.wellbeing-readout>span{order:1;max-inline-size:18ch;text-align:right}
+.wellbeing-readout .metric-gauge{--gauge-size:48px;inline-size:48px;block-size:48px;max-inline-size:none}
+.wellbeing-checkin>.wellbeing-range-shell{grid-column:1/-1;grid-row:2}
+.wellbeing-checkin>.wellbeing-endpoints{grid-column:1/-1;grid-row:3}
+.wellbeing-checkin>.wellbeing-time{grid-column:1;grid-row:4}
+.wellbeing-checkin>.wellbeing-reset{grid-column:2;grid-row:4;justify-self:end}
+@container mission (max-width:500px){.wellbeing-readout>span{max-inline-size:13ch}.wellbeing-readout{gap:7px}}

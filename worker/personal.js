@@ -21,10 +21,10 @@ async function chatAttachmentIds(env,user,room,value){
 async function hydratedChatMessage(env,row){return {...chatMessage(row),attachments:await chatAttachments(env,JSON.parse(row.attachments_json||'[]'))};}
 async function teamChatRoute(request,env,user,url){
   const db=database(env);
-  const view=async row=>({id:row.id,role:'user',content:row.content,authorName:row.author_name,isOwn:row.owner_id===user,createdAt:row.created_at,attachments:await chatAttachments(env,JSON.parse(row.attachments_json))});
+  const view=async row=>({id:row.id,role:'user',content:row.content,authorName:(Object.hasOwn(row,'display_name')?row.display_name:(await savedProfileName(env,row.owner_id))?.display_name)||row.author_name,isOwn:row.owner_id===user,createdAt:row.created_at,attachments:await chatAttachments(env,JSON.parse(row.attachments_json))});
   if(request.method==='GET'){
-    const cursor=personalCursor(url),filter=cursor?' WHERE (created_at<? OR (created_at=? AND id<?))':'';
-    const {results}=await db.prepare('SELECT * FROM team_chat_messages'+filter+' ORDER BY created_at DESC,id DESC LIMIT 41').bind(...(cursor?[cursor[0],cursor[0],cursor[1]]:[])).all();
+    const cursor=personalCursor(url),filter=cursor?' WHERE (m.created_at<? OR (m.created_at=? AND m.id<?))':'';
+    const {results}=await db.prepare('SELECT m.*,p.display_name FROM team_chat_messages m LEFT JOIN personal_profiles p ON p.owner_id=m.owner_id'+filter+' ORDER BY m.created_at DESC,m.id DESC LIMIT 41').bind(...(cursor?[cursor[0],cursor[0],cursor[1]]:[])).all();
     const rows=results.slice(0,40),last=rows.at(-1);return json({messages:await Promise.all(rows.reverse().map(view)),hasMore:results.length>40,cursor:last?JSON.stringify([last.created_at,last.id]):null});
   }
   if(request.method!=='POST')fail('method_not_allowed',405);
@@ -33,7 +33,7 @@ async function teamChatRoute(request,env,user,url){
   const attachments=await chatAttachmentIds(env,user,'team',input.attachments);if(!input.content.trim()&&!attachments.length)fail('invalid_input',400);
   const previous=await db.prepare('SELECT * FROM team_chat_messages WHERE id=?').bind(input.id).first();
   if(previous){if(previous.owner_id!==user||previous.content!==input.content.trim()||previous.attachments_json!==JSON.stringify(attachments))fail('id_conflict',409);return json({message:await view(previous)},200);}
-  const identity=await videoLogIdentity(request,user),name=identity.name||'Участник '+identity.researcherId.replaceAll(' ','').slice(-6);
+  const identity=await videoLogIdentity(request,user,env),name=identity.name||'Участник '+identity.researcherId.replaceAll(' ','').slice(-6);
   const row={id:input.id,owner_id:user,author_name:name,content:input.content.trim(),attachments_json:JSON.stringify(attachments),created_at:new Date().toISOString()};
   await db.prepare('INSERT INTO team_chat_messages (id,owner_id,author_name,content,attachments_json,created_at) VALUES (?,?,?,?,?,?)').bind(row.id,user,row.author_name,row.content,row.attachments_json,row.created_at).run();
   return json({message:await view(row)},201);

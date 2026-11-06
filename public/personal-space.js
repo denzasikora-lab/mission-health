@@ -91,7 +91,7 @@
   }
   function messageNode(entry,kind,id){
     const item=create('article','personal-message '+(kind==='team'&&!entry.isOwn||entry.role==='assistant'?'assistant':'user'));
-    const header=create('header'),name=create('span','',kind==='team'?(entry.authorName+(entry.isOwn?' / ты':'')):kind==='diary'?'Твоя запись':entry.role==='assistant'?'NasaGPT':'Ты');header.append(name,create('time','',stamp(entry.createdAt)));if(kind!=='team')header.append(star(entry,kind,id));
+    const header=create('header'),name=create('span','',kind==='team'?(entry.authorName+(entry.isOwn?' / ты':'')):kind==='diary'?'Твоя запись':entry.role==='assistant'?'NasaGPT':(window.missionProfileName?.name||'Ты'));header.append(name,create('time','',stamp(entry.createdAt)));if(kind!=='team')header.append(star(entry,kind,id));
     item.append(header);if(entry.content)item.append(create('p','',entry.content));if(kind!=='team'&&entry.wellbeing)item.append(badge(entry.wellbeing));for(const file of entry.attachments||[]){const link=create('a','chat-file-link',file.name+' / '+Math.max(1,Math.ceil(file.bytes/1024))+' КБ');link.href=file.url;link.download=file.name;item.append(link);}
     if(entry.pending&&kind==='chat'){const retry=create('button','personal-retry','Повторить запрос ответа');retry.type='button';retry.disabled=store('chat').busy;retry.addEventListener('click',()=>void retryChat(entry));item.append(retry);}
     return item;
@@ -102,7 +102,7 @@
       const kind=view.kind;
       if(kind==='scheduler'){view.form.hidden=true;view.more.hidden=true;window.missionScheduler.render(view.list);view.refresh.disabled=window.missionScheduler.loading;continue;}
       const s=kind==='favorites'?null:store(kind),scrollTop=view.list.scrollTop,atBottom=view.list.scrollHeight-view.list.scrollTop-view.list.clientHeight<40;view.list.replaceChildren();
-      const items=kind==='favorites'?favoriteItems:s.messages;
+      const items=kind==='favorites'?favoriteItems:kind==='team'&&window.missionProfileName?.name?s.messages.map(entry=>entry.isOwn?{...entry,authorName:window.missionProfileName.name}:entry):s.messages;
       if(!items.length)view.list.append(create('div','personal-empty',(kind==='favorites'?favoriteLoading:s.loading)?'Загружаю...':kind==='favorites'?'Сохраняй важные записи и ответы кнопкой со звездой.':kind==='diary'?'Расскажи, как прошел день. Запись и выбранное самочувствие попадут в дневник.':kind==='team'?'Общий канал астронавтов. Начни разговор с экипажем.':'Привет! Я NasaGPT. О чем поговорим?'));
       if(kind==='team'&&window.missionAstronautChat)window.missionAstronautChat.render(view.list,items,entry=>messageNode(entry,'team',s.profile));
       else for(const entry of items){
@@ -165,6 +165,8 @@
   sidebar.id='nasagpt-sidebar';sidebarView.list.id='sidebar-personal-content';sidebarView.list.setAttribute('role','tabpanel');
   for(const [kind,title] of [['chat','NasaGPT'],['favorites','Избранное'],['scheduler','Запланировано'],['team','Общий чат']]){const b=create('button','',title);b.type='button';b.id='sidebar-tab-'+kind;b.dataset.sidebarTab=kind;b.setAttribute('role','tab');b.setAttribute('aria-controls','sidebar-personal-content');b.setAttribute('aria-selected',String(kind==='chat'));b.tabIndex=kind==='chat'?0:-1;b.addEventListener('click',()=>{for(const tab of sidebarTabs.children){tab.setAttribute('aria-selected',String(tab===b));tab.tabIndex=tab===b?0:-1;}sidebarView.list.setAttribute('aria-labelledby',b.id);setKind(sidebarView,kind);});b.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const list=[...sidebarTabs.children],i=list.indexOf(b),next=event.key==='Home'?0:event.key==='End'?list.length-1:(i+(event.key==='ArrowRight'?1:list.length-1))%list.length;list[next].click();list[next].focus();});sidebarTabs.append(b);}
   sidebar.prepend(sidebarTabs);sidebarView.list.setAttribute('aria-labelledby','sidebar-tab-chat');sidebar.querySelector('[data-personal-favorites]').hidden=true;sidebarView.favoriteShortcut=false;
+  window.missionProfileName?.attach(sidebar.querySelector('.personal-conversation-heading'));
+  window.addEventListener('mission-profile-change',renderViews);
   window.addEventListener('mission-tasks-change',renderViews);
   window.addEventListener('mission-tasks-open',()=>{window.missionDesign.navigate('overview');sidebarTabs.querySelector('[data-sidebar-tab=scheduler]').click();sidebar.scrollIntoView({behavior:'smooth',block:'start'});});
   setInterval(()=>{if(!document.hidden&&views.some(view=>view.kind==='team'&&view.host.getClientRects().length))void load('team',false,true);},5000);
