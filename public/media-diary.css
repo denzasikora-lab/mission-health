@@ -29,7 +29,6 @@ body[data-display=phone] .media-diary[data-active=true][data-mode]{display:block
 
 .media-diary #voice-dialog{margin-top:20px;padding-top:20px;border-top:1px solid #27424b;scroll-margin-top:14px}
 
-.apparent-age-panel{margin-top:14px;padding:14px 0;border-top:1px solid #37626466;color:#bbd4cf;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.apparent-age-panel header{display:flex;align-items:center;justify-content:space-between;gap:10px}.apparent-age-panel h3{font-size:.86rem;margin:0}.apparent-age-panel header>span,.apparent-age-panel details,.apparent-age-note,.apparent-age-reference{font-size:.6rem;color:#8eaaa3;line-height:1.6}.apparent-age-readout{display:flex;align-items:center;gap:16px;margin:12px 0}.apparent-age-readout strong{font-size:1.2rem;min-width:145px}.apparent-age-readout p{font-size:.65rem;line-height:1.6;margin:0;color:#8eaaa3}.apparent-age-reference{display:flex;align-items:center;justify-content:space-between;gap:12px}.apparent-age-reference button{font:inherit;min-height:32px;padding:6px 9px;border:1px solid #376264;border-radius:8px;background:#142d2b;color:#bbd4cf}.apparent-age-reference button:disabled{opacity:.4}.apparent-age-panel details a{overflow-wrap:anywhere;color:inherit}@container media-diary (max-width:550px){.apparent-age-panel header{align-items:start}.apparent-age-panel header>span{max-width:40%;text-align:right}.apparent-age-readout,.apparent-age-reference{align-items:start;flex-direction:column;gap:8px}.apparent-age-readout strong{min-width:0}}
 
 /* Дневник занимает основной раздел и прокручивается вместе со страницей. */
 #media-diary-dialog.media-diary{position:static;inset:auto;display:block;width:100%;max-width:100%;max-height:none;margin:0;padding:16px;overflow:visible;box-shadow:none;container:media-diary/inline-size;scroll-margin-top:16px}
@@ -94,5 +93,48 @@ body[data-diary=true] .mission-content .main-column>:not(#media-diary-dialog),bo
 /* Внешность, видимый возраст и кожа составляют общую группу результатов. */
 #media-diary-dialog .diary-visual-analysis{padding:14px;border:1px solid #315b61;border-radius:13px;background:#0c1c20}
 #media-diary-dialog .diary-visual-analysis>:is(.appearance-panel,.apparent-age-panel,.skin-spots-panel,.media-analysis-result){padding:0;margin:0;border:0;border-radius:0;background:transparent}
-#media-diary-dialog .diary-visual-analysis>:is(.appearance-panel,.apparent-age-panel,.skin-spots-panel,.media-analysis-result)+:is(.appearance-panel,.apparent-age-panel,.skin-spots-panel,.media-analysis-result){padding-top:16px;border-top:1px solid #27424b}
 @container media-diary (max-width:450px){#media-diary-dialog .diary-visual-analysis{padding:10px}}
+
+/* Все визуальные измерения используют одну сетку и общие пояснения. */
+#media-diary-dialog .appearance-metric-extra{grid-template-rows:auto auto auto;align-content:start}
+#media-diary-dialog .appearance-metric-extra strong{white-space:normal;overflow-wrap:break-word;font-size:.85rem;line-height:1.3;color:#a6bfb0}
+#media-diary-dialog .appearance-metric-extra .appearance-metric-status{margin:0;color:#79998b;font-size:.48rem;line-height:1.4;overflow-wrap:break-word}
+#media-diary-dialog .appearance-extra-methods{display:grid;gap:12px;margin-top:10px;min-width:0}
+#media-diary-dialog .appearance-extra-methods>div{margin:0;padding:0;border:0;background:none;min-width:0}
+#media-diary-dialog .appearance-extra-methods p{margin:6px 0}
+#media-diary-dialog .appearance-extra-methods small{display:block;color:inherit;font-size:inherit}
+#media-diary-dialog .apparent-age-reference{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:7px 0}
+#media-diary-dialog .appearance-extra-methods .skin-spots-items:empty{display:none}
+#media-diary-dialog .appearance-extra-methods .skin-spots-items{margin:8px 0}
+
+/* Светлая тема дневника использует общую палитру интерфейса. */
+:root[data-theme=light] #media-diary-dialog{color:var(--text);color-scheme:light}
+:root[data-theme=light] #media-diary-dialog :is(.diary-panel,.diary-visual-analysis,.voice-analysis-panel,.media-analysis-result){background:var(--field);color:var(--text);border-color:var(--border)}
+:root[data-theme=light] #media-diary-dialog :is(.diary-category-heading,.diary-footer,.voice-readings,.appearance-method,.diary-analysis,.media-analysis-job){border-color:var(--border)}
+:root[data-theme=light] #media-diary-dialog :is(.diary-category-heading h3,.diary-category-titles h2,.appearance-header h3,.voice-analysis-panel h3,.voice-analysis-metrics strong){color:var(--text)}
+:root[data-theme=light] #media-diary-dialog :is(.log-notice,.voice-notice,.voice-readings span,.log-earth,.log-earth>span:first-child,.appearance-badge,.appearance-guide p,.appearance-guide small,.appearance-metric-title,.appearance-legend,.appearance-method,.appearance-note,.appearance-limits,.appearance-extra-methods,.appearance-metric-status,.voice-analysis-state,.voice-analysis-metrics span,.voice-analysis-model,.voice-analysis-hint,.voice-analysis-method,.diary-analysis,.diary-analysis-label,.media-analysis-result p,.media-analysis-job>header,.media-analysis-job>p){color:var(--muted)}
+:root[data-theme=light] #media-diary-dialog :is(.appearance-limits b,.diary-analysis b,.diary-analysis small){color:var(--text)}
+:root[data-theme=light] #media-diary-dialog :is(.log-controls button,.log-controls select,.diary-voice-choice,.voice-close,.appearance-panel button,.media-analysis-result button,.speech-environment){background:var(--inset);color:var(--text);border-color:var(--border)}
+:root[data-theme=light] #media-diary-dialog :is(.log-notice,.voice-notice)[data-error=true]{color:var(--amber)}
+:root[data-theme=light] #media-diary-dialog :is(#video-log-camera,#voice-mic)[data-recording=true]{background:#f6d8d0;color:#8b3024;border-color:#bc685a}
+:root[data-theme=light] #media-diary-dialog :is(.voice-analysis-metrics>div,.skin-spot-item,.appearance-preview,.appearance-metric){background:var(--bg);border-color:var(--border);color:var(--text)}
+:root[data-theme=light] #media-diary-dialog .appearance-metric{--indicator:var(--muted)}
+:root[data-theme=light] #media-diary-dialog .appearance-metric[data-level=green]{--indicator:var(--green)}
+:root[data-theme=light] #media-diary-dialog .appearance-metric[data-level=amber]{--indicator:var(--amber)}
+:root[data-theme=light] #media-diary-dialog .appearance-metric[data-level=red]{--indicator:#a73a39}
+:root[data-theme=light] #media-diary-dialog .appearance-metric-extra strong{color:var(--text)}
+:root[data-theme=light] #media-diary-dialog .appearance-metric[data-level=neutral] .appearance-scale{background:var(--inset)}
+:root[data-theme=light] #media-diary-dialog .appearance-ring{background:conic-gradient(var(--accent) calc(var(--capture)*1turn),var(--inset) 0);color:var(--text)}
+:root[data-theme=light] #media-diary-dialog .appearance-ring:before{background:var(--field)}
+:root[data-theme=light] #media-diary-dialog .appearance-panel[data-state=live] .appearance-ring{background:var(--selected)}
+:root[data-theme=light] #media-diary-dialog :is(.appearance-method a,.voice-analysis-method a){color:var(--accent)}
+:root[data-theme=light] #media-diary-dialog .voice-stage[data-style]{background:radial-gradient(ellipse at 50% 70%,#d5e9de,var(--field) 75%);border-color:var(--border);box-shadow:none;color:var(--text)}
+:root[data-theme=light] #media-diary-dialog .voice-stage[data-style]:after{background:none;box-shadow:inset 0 0 40px #6d987713}
+:root[data-theme=light] #media-diary-dialog .voice-stage[data-style] :is(.voice-stage-heading,.voice-stage-caption){color:var(--muted)}
+
+:root[data-theme=light] #media-diary-dialog .metric-gauge:not(.metric-gauge-empty){color:color-mix(in srgb,var(--gauge-color) 60%,#123d25 40%)}
+:root[data-theme=light] #media-diary-dialog .voice-readings strong{color:var(--text)}
+:root[data-theme=light] #media-diary-dialog .voice-level-track{background:var(--inset)}
+:root[data-theme=light] #media-diary-dialog .voice-level-track i{background:var(--accent)}
+:root[data-theme=light] #media-diary-dialog .diary-panel{color-scheme:light}
+:root[data-theme=light] #media-diary-dialog :is(.skin-spot-item p,.log-options){color:var(--muted)}

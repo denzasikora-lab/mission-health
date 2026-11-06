@@ -30,3 +30,38 @@ body[data-book="true"] .mission-content .insight-column,body[data-book="true"] .
 #mission-book .book-training>div{min-width:0;overflow-wrap:break-word}
 #mission-book .book-training button{max-width:100%;white-space:normal}
 @container mission (max-width:700px){#mission-book>.book-history-panel{margin-block-start:18px;padding:16px;gap:16px}#book-history-panel>.personal-activity{padding-top:16px}}
+
+/* Страница учитывает ширину текста; нижние панели заменены жестами и клавиатурой. */
+.book-navigation,.book-bottom{display:none!important}
+.mission-book{--paper:#0a1d13;--ink:#dbe9dc;--paper-muted:#9bb29d;--paper-line:#92b79a38;--paper-edge:#31563b;--book-binding:#142e1e;--book-crease:#00160866}
+html[data-theme="light"] .mission-book{--paper:#faf8ef;--ink:#273f30;--paper-muted:#657360;--paper-line:#657a5438;--paper-edge:#d5d2b7;--book-binding:#97a083;--book-crease:#37533228}
+html[data-theme="dark"] .mission-book{--paper:#0a1d13;--ink:#dbe9dc;--paper-muted:#9bb29d}
+.book-stage{min-height:0;padding:12px 14px 22px;overflow:visible}
+.book-spread{min-height:0;max-width:1100px;touch-action:pan-y pinch-zoom;cursor:pointer;box-shadow:0 3px 0 var(--paper-edge),0 7px 0 -1px var(--book-binding),0 18px 36px #0004}
+.book-spread[data-pages="1"]{max-width:620px}
+.book-spread:after{background:linear-gradient(90deg,transparent,var(--book-crease) 46%,var(--paper-line) 52%,transparent)}
+.book-page,.book-page:nth-child(even){min-height:var(--book-page-height,520px);height:auto;padding:26px clamp(20px,2.5vw,38px) 44px;background:var(--paper);color:var(--ink);box-sizing:border-box;overflow:visible}
+.book-page-running{font-size:10px;line-height:1.4;letter-spacing:.08em;padding-bottom:10px;border-color:var(--paper-line);color:var(--paper-muted)}
+.book-page-date{font-size:12px;line-height:1.45;margin-top:16px;color:var(--paper-muted)}
+.book-page h3{font:500 clamp(18px,1.6vw,23px)/1.3 Georgia,'Times New Roman',serif;letter-spacing:0;margin:9px 0 15px;color:var(--ink)}
+.book-page-text{font:400 clamp(14px,1.15vw,16px)/1.6 Georgia,'Times New Roman',serif;white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal;color:var(--ink)}
+.book-page-foot{font-size:11px;line-height:1.45;margin-top:18px;padding-top:9px;border-color:var(--paper-line);color:var(--paper-muted)}
+.book-page-number{font-size:11px;bottom:15px;color:var(--paper-muted)}
+.book-page-empty p{font:400 15px/1.65 Georgia,'Times New Roman',serif;color:var(--paper-muted)}
+.book-page .wellbeing-badge{color:var(--ink);background:var(--paper-line)}
+.book-page .personal-star{color:var(--paper-muted)}
+.book-page :is(button,a,video,audio){cursor:auto}
+.book-page :is(button,a){cursor:pointer}
+.book-measure{position:absolute;top:0;left:0;visibility:hidden;pointer-events:none;contain:layout style}
+.book-measure .book-page{min-height:0!important}
+html[data-theme="light"] :is(.book-search-dialog,.book-editor){color-scheme:light}
+html[data-theme="light"] .mission-book .book-cover{background:linear-gradient(105deg,#cedfc4,#e8efdc 12%,#c5dcc0);border-color:#789a70;color:#304e35;box-shadow:inset 7px 0 8px #536b3330,7px 5px 0 -1px #dfddc6,10px 8px 0 -1px #91a382,18px 24px 35px #36523030}
+html[data-theme="light"] .book-cover :is(.cover-open,.cover-kicker){color:#49613c}
+@container mission (max-width:580px){
+  .book-stage{padding:6px 2px 18px}
+  .book-page,.book-page:nth-child(even){padding:22px 21px 40px}
+  .book-page-text{font-size:14px;line-height:1.6}
+  .book-page h3{font-size:19px;margin-bottom:13px}
+  .book-page-date{margin-top:13px}
+  .book-page-running{font-size:9px}
+}

@@ -43,7 +43,7 @@ function environment(storage=new Map()){
   const context=new Proxy({}, {get:()=>()=>{}});
   class Element{
     constructor(){this.children=[];this.dataset={};this.style={setProperty(k,v){this[k]=v;}};this.events={};this.width=256;this.height=152;this.disabled=false;}
-    append(...values){this.children.push(...values);}setAttribute(){}getContext(){return context;}
+    append(...values){this.children.push(...values);}prepend(...values){this.children.unshift(...values);}setAttribute(){}getContext(){return context;}
     addEventListener(k,fn){this.events[k]=fn;}
   }
   const node=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);};

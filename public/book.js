@@ -4,8 +4,8 @@
   book.innerHTML=`<header class="book-toolbar" hidden><div><span class="book-eyebrow">PERSONAL ARCHIVE / MISSION HEALTH</span><h2>Архив</h2><p id="book-scope"></p><label class="book-archive-label">История <select id="book-archive-select" aria-label="Выбрать архив"><option value="personal">Мой архив</option><option value="jessica-meir">Прежние записи / Jessica</option><option value="jack-hathaway">Прежние записи / Jack</option><option value="christina-koch">Прежние записи / Christina</option></select></label></div><div class="book-toolbar-actions"><button type="button" id="book-exit" title="Вернуться на мою главную"><span aria-hidden="true">←</span> Выйти из архива</button><button type="button" id="book-write">+ Запись</button><button type="button" id="book-search-open"><span aria-hidden="true">✧</span> NasaGPT</button></div></header>
     <div id="book-demo-banner" class="book-demo-banner" hidden>ПРИМЕР / записи придуманы и не сохраняются <button type="button" id="book-demo-exit">Моя история</button></div>
     <div class="book-stage" id="book-stage"><button type="button" id="book-cover" class="book-cover" aria-label="Открыть архив"><span class="cover-corner top"></span><span class="cover-kicker">MISSION HEALTH</span><img class="cover-nasa" src="assets/nasa-brand/nasa-insignia.png" alt="NASA"><strong>Личная<br>история</strong><span id="book-author">Мой архив</span><span class="cover-rule"></span><span class="cover-caption">НАБЛЮДАТЬ · ЗАПОМИНАТЬ · ВОЗВРАЩАТЬСЯ</span><span class="cover-open">Открыть архив ↗</span><span class="cover-corner bottom"></span></button><div id="book-spread" class="book-spread" tabindex="0" role="region" aria-label="Страницы личной истории" hidden></div></div>
-    <nav class="book-navigation" aria-label="Листать книгу"><button type="button" id="book-prev" aria-label="Предыдущие страницы">← Назад</button><span id="book-position" role="status" aria-live="polite">Обложка</span><button type="button" id="book-next" aria-label="Следующие страницы">Далее →</button></nav>
-    <div class="book-bottom"><button type="button" id="book-older" hidden>Загрузить ранние записи</button><button type="button" id="book-close-cover">На обложку</button><button type="button" id="book-demo">Посмотреть пример</button><span id="book-notice" role="status"></span></div>`;
+    <nav class="book-navigation" aria-label="Листать книгу" hidden><button type="button" id="book-prev" aria-label="Предыдущие страницы">← Назад</button><span id="book-position" role="status" aria-live="polite">Обложка</span><button type="button" id="book-next" aria-label="Следующие страницы">Далее →</button></nav>
+    <div class="book-bottom" hidden><button type="button" id="book-older" hidden>Загрузить ранние записи</button><button type="button" id="book-close-cover">На обложку</button><button type="button" id="book-demo">Посмотреть пример</button><span id="book-notice" role="status"></span></div>`;
   document.querySelector('.main-column').prepend(book);
   const search=document.createElement('dialog');search.id='book-search-dialog';search.className='book-search-dialog';search.lang='ru';
   search.innerHTML=`<header><div><span class="book-eyebrow">ПАМЯТЬ ТВОЕЙ КНИГИ</span><h2>✧ NasaGPT</h2></div><button type="button" data-close-search aria-label="Закрыть NasaGPT">✕</button></header><p class="book-search-intro">Найди момент по смыслу и вернись на нужную страницу.</p><form id="book-search-form"><label for="book-query">Что вспомнить?</label><div class="book-query-row"><input id="book-query" maxlength="1000" placeholder="Когда мне мешал шум во время сна?" required autocomplete="off"><button type="submit" id="book-find">Найти</button></div></form><div class="book-search-prompts"><button type="button" data-book-query="Что мешало мне спать?">Сон</button><button type="button" data-book-query="Как я восстанавливался после тренировки?">Восстановление</button><button type="button" data-book-query="Какие наблюдения я записывал?">Наблюдения</button></div><p id="book-search-status" role="status" aria-live="polite">EmbeddingGemma 2 / поиск по смыслу. При первом запуске загружается текстовая модель, записи обрабатываются на устройстве.</p><button type="button" id="book-search-stop" hidden>Остановить поиск</button><div id="book-search-results"></div><footer>NasaGPT - название поиска в независимом исследовательском прототипе. Результаты ведут к исходным записям. Это не сервис NASA.</footer>`;
@@ -15,7 +15,9 @@
   document.body.append(editor);
   const $b=id=>document.getElementById(id),B={profile:null,entries:[],pages:[],index:0,cover:true,hasMore:false,cursor:null,version:0,loading:false,loaded:false,demo:false,name:'Мой архив'};
   let saveId=null,saving=false;
-  let worker=null,job=null,searchVersion=0,controller=null,searching=false,turnTimer;
+  let worker=null,job=null,searchVersion=0,controller=null,searching=false,turnTimer,resizeTimer,layoutSignature='';
+  for(const id of ['book-position','book-notice']){const status=$b(id);status.className='sr-only';$b('book-stage').before(status);}
+  $b('book-spread').setAttribute('aria-description','Правая половина страницы - дальше, левая - назад. Можно листать свайпом или стрелками клавиатуры.');
   const demoEntries=[
     {id:'demo-sleep',createdAt:'2026-10-26T07:10:00Z',content:'Сон и тишина\n\nСпал шесть часов. Ночью несколько раз просыпался из-за шума вентилятора. Утром было трудно сосредоточиться. Хочу сравнить самочувствие с более спокойной ночью.'},
     {id:'demo-exercise',createdAt:'2026-10-27T17:30:00Z',content:'После тренировки\n\nЗакончил обычную тренировку на велотренажере. Сделал паузу, выпил воды и записал ощущения. К вечеру усталость стала меньше. Завтра хочу начать с легкой разминки.'},
@@ -25,19 +27,20 @@
   const profile=()=>$b('book-archive-select').value;
   const visible=()=>state.workspace==='crew'&&state.view==='journal';
   function create(tag,className,text){const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node}
-  function perSpread(){return $b('book-stage').clientWidth>=580?2:1}
+  function perSpread(){return $b('book-stage').clientWidth>=760?2:1}
   function note(value){$b('book-notice').textContent=value}
-  function pageNode(page,number){
+  function pageNode(page,number,measuring=false){
     const article=create('article','book-page');
     article.append(create('div','book-page-running',B.demo?'ПРИМЕР / ВЫМЫШЛЕННАЯ ЗАПИСЬ':'MISSION HEALTH / ЛИЧНЫЙ АРХИВ'));
     if(page){
       const date=create('time','book-page-date',stamp(page.entry.createdAt));date.dateTime=page.entry.createdAt;article.append(date);
-      article.append(create('h3','',page.part?'Продолжение':page.content.split(/\n|[.!?]\s/)[0].slice(0,72)||'Наблюдение'));
+      const lines=page.content.split('\n'),hasHeading=!page.part&&lines.length>1&&lines[0].trim().length>0&&lines[0].length<=72;
+      article.append(create('h3','',page.part?'Продолжение':hasHeading?lines[0]:'Запись'));
       if(!page.part&&page.entry.wellbeing&&window.missionFavorites)article.append(window.missionFavorites.badge(page.entry.wellbeing));
       if(!page.part&&!B.demo&&window.missionFavorites)article.append(window.missionFavorites.button(page.entry,'diary',B.profile));
-      const lines=page.content.split('\n'),body=!page.part&&lines.length>1&&lines[0].length<=72?lines.slice(1).join('\n').trim():page.content;
+      const body=hasHeading?lines.slice(1).join('\n').trim():page.content;
       const text=create('div','book-page-text',body);text.dir='auto';article.append(text);
-      if(!page.part)for(const media of page.entry.attachments||[]){const node=create(media.kind==='video'?'video':'img','book-media');node.src=media.url;if(media.kind==='video'){node.controls=true;node.playsInline=true;node.preload='metadata';if(media.posterUrl)node.poster=media.posterUrl}else{node.alt=media.region||'Фото из записи';node.loading='lazy'}article.append(node);}
+      if(!page.part)for(const media of page.entry.attachments||[]){const node=create(measuring?'div':media.kind==='video'?'video':'img','book-media');if(measuring)node.style.height='210px';else{node.src=media.url;if(media.kind==='video'){node.controls=true;node.playsInline=true;node.preload='metadata';if(media.posterUrl)node.poster=media.posterUrl}else{node.alt=media.region||'Фото из записи';node.loading='lazy'}}article.append(node);}
       article.append(create('div','book-page-foot','Личная запись / '+(page.part?'продолжение':'исходный текст')));
     }else{
       article.classList.add('book-page-empty');article.append(create('span','book-empty-orbit','✧'),create('h3','',B.pages.length?'Место для новой истории':'Первая глава впереди'),create('p','',B.pages.length?'Здесь появится следующее наблюдение.':'Запиши, как прошел день. Книга сохранит твои слова, а NasaGPT поможет вернуться к ним.'));
@@ -55,13 +58,44 @@
     $b('book-author').textContent=B.name;$b('book-scope').textContent=(B.profile===personalProfileId?'Твои личные записи':'Твой прежний архив / '+(crew.find(person=>person.id===B.profile)?.name||''))+(B.demo?' / пример':'');
     $b('book-cover').setAttribute('aria-label','Открыть книгу / '+B.name);
   }
-  function rebuild(anchor){B.pages=tools.pages(B.entries);if(anchor){const index=B.pages.findIndex(page=>page.entry.id===anchor);if(index>=0)B.index=index}draw()}
+  function pageLayout(){
+    const stage=$b('book-stage'),style=window.getComputedStyle(stage),width=Math.max(220,stage.clientWidth-(parseFloat(style.paddingLeft)||0)-(parseFloat(style.paddingRight)||0)),count=perSpread(),height=Math.max(440,Math.min(650,Math.round(window.innerHeight*.74)||560));
+    return {width:Math.max(180,Math.min(width,count===2?1100:620)/count),height,key:[Math.round(width),count,height].join(':')};
+  }
+  function paginate(){
+    const layout=pageLayout(),stage=$b('book-stage');layoutSignature=layout.key;stage.style.setProperty('--book-page-height',layout.height+'px');
+    const measure=create('div','book-measure');measure.style.width=layout.width+'px';measure.setAttribute('aria-hidden','true');stage.append(measure);
+    const pages=[],capacity=Math.max(240,Math.floor((layout.width-50)/8)*Math.floor((layout.height-190)/24));
+    try{
+      for(const entry of [...B.entries].sort((a,b)=>a.createdAt.localeCompare(b.createdAt)||a.id.localeCompare(b.id))){
+        const pending=tools.chunks(entry.content,capacity);let part=0,offset=0;
+        while(pending.length){
+          const content=pending.shift(),page={entry,content,part,offset};
+          const fits=value=>{const node=pageNode({...page,content:value},pages.length+1,true);node.style.minHeight='0';measure.replaceChildren(node);return node.getBoundingClientRect().height<=layout.height;};
+          if(content.length>80&&!fits(content)){
+            const chars=Array.from(content);let low=1,high=chars.length;
+            while(low<high){const middle=Math.ceil((low+high)/2);if(fits(chars.slice(0,middle).join('')))low=middle;else high=middle-1;}
+            // Медиа может быть выше страницы: короткий текст остается вместе с ним без обрезки.
+            const limit=low<80?Math.min(chars.length,160):low,prefix=chars.slice(0,limit).join(''),space=Math.max(prefix.lastIndexOf(' '),prefix.lastIndexOf('\n')),cut=space>prefix.length*.65?space:prefix.length;
+            const first=prefix.slice(0,cut).trimEnd(),rest=content.slice(cut).trimStart();page.content=first;if(rest)pending.unshift(rest);
+          }
+          pages.push(page);offset+=page.content.length;part++;
+        }
+      }
+    }finally{measure.remove();}
+    return pages;
+  }
+  function rebuild(anchor){
+    B.pages=paginate();
+    if(anchor){const id=typeof anchor==='string'?anchor:anchor.id,offset=typeof anchor==='string'?0:anchor.offset;let index=B.pages.findIndex(page=>page.entry.id===id);if(index>=0){while(index+1<B.pages.length&&B.pages[index+1].entry.id===id&&B.pages[index+1].offset<=offset)index++;B.index=index;}}
+    draw();
+  }
   async function load(older=false){
     if(B.loading)return;const version=B.version,id=B.profile;B.loading=true;note('Загружаю историю...');draw();
     try{
       const data=await journalApi('/api/astronauts/'+id+'/book'+(older?'?cursor='+encodeURIComponent(B.cursor):''));if(version!==B.version||B.demo)return;
-      const anchor=B.pages[B.index]?.entry.id;B.entries=older?[...B.entries,...data.entries.filter(item=>!B.entries.some(old=>old.id===item.id))]:data.entries;B.hasMore=data.hasMore;B.cursor=data.cursor;B.loaded=true;rebuild(older?anchor:null);note(data.total?'Сохраненных записей: '+data.total:'В книге пока нет записей. Можно написать первую или посмотреть пример.');
-    }catch{if(version===B.version)note('История не загрузилась. Нажми «Обновить историю», чтобы повторить.');}
+      const current=B.pages[B.index],anchor=current?{id:current.entry.id,offset:current.offset}:null;B.entries=older?[...B.entries,...data.entries.filter(item=>!B.entries.some(old=>old.id===item.id))]:data.entries;B.hasMore=data.hasMore;B.cursor=data.cursor;B.loaded=true;rebuild(older?anchor:null);note(data.total?'Сохраненных записей: '+data.total:'В книге пока нет записей. Можно написать первую страницу.');
+    }catch{if(version===B.version)note('История не загрузилась. Открой раздел «Архив» еще раз, чтобы повторить.');}
     finally{if(version===B.version){B.loading=false;draw()}}
   }
   function cancelSearch(){++searchVersion;controller?.abort();controller=null;worker?.terminate();worker=null;if(job){clearTimeout(job.timer);job.reject(new DOMException('Остановлено','AbortError'));job=null}searching=false;$b('book-find').disabled=false;$b('book-search-stop').hidden=true;}
@@ -74,8 +108,9 @@
   }
   async function turn(direction){
     if(B.cover){B.cover=false;B.index=0;draw();return}
+    if(direction<0&&B.index===0&&B.hasMore&&!B.demo&&!B.loading)await load(true);
     const index=B.index+direction*perSpread();if(index<0||index>=B.pages.length)return;
-    clearTimeout(turnTimer);const old=$b('book-spread').querySelector(direction>0?'.book-page:last-child':'.book-page:first-child')?.cloneNode(true);B.index=index;draw();if(old){old.classList.add('book-turn-leaf');if(direction<0)old.classList.add('previous');old.setAttribute('aria-hidden','true');$b('book-spread').append(old);turnTimer=setTimeout(()=>old.remove(),520);}
+    clearTimeout(turnTimer);$b('book-spread').querySelectorAll('.book-turn-leaf').forEach(node=>node.remove());const old=$b('book-spread').querySelector(direction>0?'.book-page:last-child':'.book-page:first-child')?.cloneNode(true);B.index=index;draw();if(old){old.classList.add('book-turn-leaf');if(direction<0)old.classList.add('previous');old.setAttribute('aria-hidden','true');$b('book-spread').append(old);turnTimer=setTimeout(()=>old.remove(),520);}
   }
   function openEditor(){editor.showModal();$b('book-entry-text').focus();}
   function exitBook(){
@@ -142,10 +177,27 @@
   search.querySelectorAll('[data-book-query]').forEach(button=>button.addEventListener('click',()=>{$b('book-query').value=button.dataset.bookQuery;$b('book-search-form').requestSubmit()}));
   $b('book-demo').addEventListener('click',()=>{cancelSearch();B.demo=true;B.entries=demoEntries.map(entry=>({...entry}));B.index=0;B.cover=false;rebuild();note('Пример показывает оформление. Эти записи не относятся к тебе или астронавтам.')});
   $b('book-demo-exit').addEventListener('click',()=>{cancelSearch();B.demo=false;B.entries=[];B.pages=[];B.cover=true;B.loaded=false;void load()});
-  const refresh=create('button','','Обновить историю');refresh.type='button';refresh.id='book-refresh';refresh.addEventListener('click',()=>{cancelSearch();B.demo=false;void load()});$b('book-notice').before(refresh);
+  const refresh=create('button','','Обновить историю');refresh.type='button';refresh.id='book-refresh';refresh.addEventListener('click',()=>{cancelSearch();B.demo=false;void load()});$b('book-demo').before(refresh);
   $b('book-spread').addEventListener('keydown',event=>{if(event.target!==$b('book-spread'))return;if(['ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();void turn(event.key==='ArrowRight'?1:-1)}});
-  let touch; $b('book-spread').addEventListener('pointerdown',event=>{if(event.target.closest('button,video,a'))return;touch={x:event.clientX,y:event.clientY};});$b('book-spread').addEventListener('pointerup',event=>{if(!touch)return;const dx=event.clientX-touch.x,dy=event.clientY-touch.y;touch=null;if(Math.abs(dx)>70&&Math.abs(dx)>Math.abs(dy)*1.5)void turn(dx<0?1:-1)});$b('book-spread').addEventListener('pointercancel',()=>touch=null);
-  new ResizeObserver(()=>{if(visible())draw()}).observe($b('book-stage'));
+  const spread=$b('book-spread'),interactive=target=>target.closest('button,a,input,textarea,select,video,audio,summary,label,[contenteditable]');
+  const selecting=()=>{const selection=window.getSelection?.();return selection&&!selection.isCollapsed&&(spread.contains(selection.anchorNode)||spread.contains(selection.focusNode));};
+  let touch;
+  function releaseTouch(){const current=touch;touch=null;if(current&&spread.hasPointerCapture?.(current.id))spread.releasePointerCapture(current.id);return current;}
+  spread.addEventListener('pointerdown',event=>{
+    if(event.isPrimary===false||event.button!==undefined&&event.button!==0||interactive(event.target)||selecting())return;
+    touch={id:event.pointerId,x:event.clientX,y:event.clientY,time:performance.now()};
+    if(event.pointerType!=='mouse')spread.setPointerCapture?.(event.pointerId);
+  });
+  spread.addEventListener('pointermove',event=>{if(!touch||event.pointerId!==touch.id)return;const dx=Math.abs(event.clientX-touch.x),dy=Math.abs(event.clientY-touch.y);if(dy>10&&dy>dx*1.1)releaseTouch();});
+  spread.addEventListener('pointerup',event=>{
+    if(!touch||event.pointerId!==touch.id)return;const start=releaseTouch();if(interactive(event.target)||selecting())return;
+    const dx=event.clientX-start.x,dy=event.clientY-start.y,width=spread.getBoundingClientRect().width,threshold=Math.max(28,Math.min(50,width*.09));
+    if(Math.abs(dx)>=threshold&&Math.abs(dx)>Math.abs(dy)*1.3){event.preventDefault();void turn(dx<0?1:-1);}
+    else if(Math.hypot(dx,dy)<=10&&performance.now()-start.time<500){const bounds=spread.getBoundingClientRect();void turn(event.clientX-bounds.left>=bounds.width/2?1:-1);}
+  });
+  spread.addEventListener('pointercancel',releaseTouch);spread.addEventListener('lostpointercapture',()=>touch=null);
+  function resizePages(){if(!visible())return;if(pageLayout().key!==layoutSignature){const current=B.pages[B.index];rebuild(current?{id:current.entry.id,offset:current.offset}:null)}else draw();}
+  new ResizeObserver(resizePages).observe($b('book-stage'));window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(resizePages,80);});
   window.addEventListener('pagehide',cancelSearch);
   window.missionBook={render,refresh:()=>{if(visible()&&!B.demo)void load()}};render();
   if(new URLSearchParams(location.search).get('book')==='1')window.missionDesign.navigate('archive');

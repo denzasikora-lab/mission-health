@@ -31,8 +31,9 @@
     const bar=document.createElement('div');bar.className='appearance-scale';bar.setAttribute('aria-hidden','true');bar.append(document.createElement('i'));
     const label=document.createElement('small');label.textContent='Включи камеру и собери эталон';
     node.append(title,value,bar,label);node.title=metric.description;node.setAttribute('aria-label',metric.title+': '+labels.neutral);
-    document.getElementById('appearance-metrics').append(node);cards.set(metric.key,{node,value,bar,label});
+    cards.set(metric.key,{node,value,bar,label});
   }
+  document.getElementById('appearance-metrics').prepend(...Array.from(cards.values(),card=>card.node));
   function key(){return storagePrefix+JSON.stringify([identity.storageScope,identity.name,cameraKey]);}
   function load(){
     reference=null;storageOk=true;

@@ -146,6 +146,7 @@
   }
 
   function drawParticles(time) {
+    const ink = document.documentElement?.dataset?.theme === 'light' ? '24,101,62' : '217,255,235';
     const motion = reducedMotion.matches ? 0 : time * .00016;
     const amplitude = 8 + level * 50;
     // Частицы формируют стоячие волны; спектр голоса меняет рисунок и высоту поверхности.
@@ -155,7 +156,7 @@
       const z = row / (rows - 1) * 2 - 1;
       const depth = (z + 1) / 2;
       const spread = .76 + depth * .24;
-      context.fillStyle = `rgba(217,255,235,${.5 + depth * .5})`;
+      context.fillStyle = `rgba(${ink},${.5 + depth * .5})`;
       for (let column = 0; column < columns; column++) {
         const x = column / (columns - 1) * 2 - 1;
         const envelope = Math.exp(-x * x * 1.6 - z * z * .6);
@@ -175,9 +176,10 @@
   function drawWave(time) {
     const phase = reducedMotion.matches ? 0 : time * .0016;
     const amplitude = 3 + level * height * .27;
+    const lightTheme = document.documentElement?.dataset?.theme === 'light';
     const gradient = context.createLinearGradient(0, 0, width, 0);
-    gradient.addColorStop(0, 'rgba(65,175,126,0)'); gradient.addColorStop(.25, '#53b88a');
-    gradient.addColorStop(.5, '#d6ffea'); gradient.addColorStop(.75, '#53b88a'); gradient.addColorStop(1, 'rgba(65,175,126,0)');
+    gradient.addColorStop(0, 'rgba(65,175,126,0)'); gradient.addColorStop(.25, lightTheme ? '#29845a' : '#53b88a');
+    gradient.addColorStop(.5, lightTheme ? '#155e40' : '#d6ffea'); gradient.addColorStop(.75, lightTheme ? '#29845a' : '#53b88a'); gradient.addColorStop(1, 'rgba(65,175,126,0)');
     context.strokeStyle = gradient;
     for (let line = 0; line < 7; line++) {
       context.beginPath(); context.lineWidth = line === 3 ? 2 : 1;
@@ -195,34 +197,35 @@
   }
 
   function drawSilo(time) {
+    const lightTheme = document.documentElement?.dataset?.theme === 'light', ink = lightTheme ? '32,105,115' : '118,215,255';
     const motion = reducedMotion.matches ? 0 : time * .0006;
     const energy = source === 'mic' ? level : 0;
     const center = width * .5, base = height * .84, reach = height * (.43 + energy * .3);
     context.save();
     const background = context.createLinearGradient(0,0,0,height);
-    background.addColorStop(0,'#061321');background.addColorStop(.55,'#12344e');background.addColorStop(1,'#071a2a');
+    background.addColorStop(0,lightTheme?'#f0f8ee':'#061321');background.addColorStop(.55,lightTheme?'#d7e9df':'#12344e');background.addColorStop(1,lightTheme?'#e7f2e9':'#071a2a');
     context.fillStyle=background;context.fillRect(0,0,width,height);
     const haze=context.createRadialGradient(center,height*.58,0,center,height*.58,width*.52);
-    haze.addColorStop(0,`rgba(64,161,231,${.2+energy*.15})`);haze.addColorStop(1,'rgba(29,90,144,0)');
+    haze.addColorStop(0,`rgba(${lightTheme?'53,139,125':'64,161,231'},${.2+energy*.15})`);haze.addColorStop(1,'rgba(29,90,144,0)');
     context.fillStyle=haze;context.fillRect(0,0,width,height);
     // Изогнутые линии задают глубину голубого экрана вокруг звуковой голограммы.
     for(let line=0;line<7;line++){
       const y=height*(.07+line*.14);
       context.beginPath();context.moveTo(-width*.04,y-height*.055);
       context.bezierCurveTo(width*.25,y+height*.09,width*.75,y+height*.09,width*1.04,y-height*.055);
-      context.strokeStyle=`rgba(118,215,255,${line===4?.23:.11})`;context.lineWidth=line===4?1.4:.7;context.stroke();
+      context.strokeStyle=`rgba(${ink},${line===4?.23:.11})`;context.lineWidth=line===4?1.4:.7;context.stroke();
     }
     for(let line=1;line<12;line++){
       const x=width*line/12,bend=(x-center)*.1;
       context.beginPath();context.moveTo(x-bend,0);context.quadraticCurveTo(x+bend,height*.5,x-bend,height);
-      context.strokeStyle='rgba(104,186,234,.045)';context.lineWidth=.6;context.stroke();
+      context.strokeStyle=`rgba(${ink},.07)`;context.lineWidth=.6;context.stroke();
     }
     const glow=context.createRadialGradient(center,base,0,center,base,width*.23);
-    glow.addColorStop(0,`rgba(118,215,255,${.2+energy*.3})`);glow.addColorStop(1,'rgba(67,169,245,0)');
+    glow.addColorStop(0,`rgba(${ink},${.2+energy*.3})`);glow.addColorStop(1,'rgba(67,169,245,0)');
     context.fillStyle=glow;context.fillRect(center-width*.25,base-height*.3,width*.5,height*.45);
-    context.globalCompositeOperation='lighter';
+    context.globalCompositeOperation=lightTheme?'source-over':'lighter';
     const light=context.createLinearGradient(0,base-reach,0,base);
-    light.addColorStop(0,'rgba(118,215,255,0)');light.addColorStop(.25,'rgba(118,215,255,.22)');light.addColorStop(.8,'rgba(118,215,255,.72)');light.addColorStop(1,'rgba(118,215,255,.08)');
+    light.addColorStop(0,`rgba(${ink},0)`);light.addColorStop(.25,`rgba(${ink},.22)`);light.addColorStop(.8,`rgba(${ink},.72)`);light.addColorStop(1,`rgba(${ink},.08)`);
     context.strokeStyle=light;
     const columns=width<500?72:112;
     // Высота и плотность центральных световых нитей реагируют на существующий сигнал микрофона.
@@ -240,7 +243,7 @@
       }
       context.globalAlpha=(.12+energy*.2)*(.4+envelope*.6);context.lineWidth=.6+layer*.25;context.stroke();
       const rise=(column*.618+motion*.12)%1;
-      context.fillStyle='#76d7ff';context.globalAlpha=(.12+energy*.22)*envelope*(1-rise);
+      context.fillStyle=lightTheme?'#206973':'#76d7ff';context.globalAlpha=(.12+energy*.22)*envelope*(1-rise);
       context.fillRect(x+Math.sin(column+motion)*2,base-rise*lift,1,1.6+energy*2);
     }
     context.restore();
