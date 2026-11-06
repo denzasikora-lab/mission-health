@@ -1,14 +1,14 @@
 import { readdir,readFile,mkdir,writeFile,rm,cp } from 'node:fs/promises';
 import { extname } from 'node:path';
 import { gzipSync } from 'node:zlib';
-const mime={'.html':'text/html; charset=utf-8','.json':'application/json; charset=utf-8','.csv':'text/csv; charset=utf-8','.txt':'text/plain; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.wasm':'application/wasm','.jpg':'image/jpeg','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2'};
+const mime={'.html':'text/html; charset=utf-8','.json':'application/json; charset=utf-8','.csv':'text/csv; charset=utf-8','.txt':'text/plain; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.wasm':'application/wasm','.jpg':'image/jpeg','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2','.mp4':'video/mp4','.mp3':'audio/mpeg','.m4a':'audio/mp4','.wav':'audio/wav','.webm':'video/webm'};
 const assets={};
 async function collect(directory,prefix=''){
   for(const item of await readdir(directory,{withFileTypes:true})){
     const filename=directory+'/'+item.name,path=prefix+'/'+item.name;
     if(item.isDirectory())await collect(filename,path);
     else {
-      const bytes=await readFile(filename),gzip=gzipSync(bytes,{level:9}),compressed=gzip.length<bytes.length*.95;
+      const bytes=await readFile(filename),gzip=gzipSync(bytes,{level:9}),compressed=!['.mp4','.mp3','.m4a','.wav','.webm'].includes(extname(item.name))&&gzip.length<bytes.length*.95;
       assets[path]={type:mime[extname(item.name)]||'application/octet-stream',data:(compressed?gzip:bytes).toString('base64'),...(compressed?{encoding:'gzip'}:{})};
     }
   }

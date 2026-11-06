@@ -65,3 +65,14 @@ html[data-theme="light"] .book-cover :is(.cover-open,.cover-kicker){color:#49613
   .book-page-date{margin-top:13px}
   .book-page-running{font-size:9px}
 }
+
+/* Медиа и расшифровки читаются как разделы записи, технические объекты не выводятся. */
+.book-observation-media{display:block;width:100%;margin:12px 0 16px;border-radius:8px;background:var(--paper-line)}
+video.book-observation-media{height:210px;max-height:210px;object-fit:contain}
+audio.book-observation-media{height:54px;max-height:54px}
+.book-page-structured .book-page-text{font:400 14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;white-space:pre-wrap}
+.book-page-structured .book-page-text>p{margin:0 0 10px}
+.book-observation-section{margin:12px 0 0;padding-top:9px;border-top:1px solid var(--paper-line);break-inside:avoid}
+.book-observation-section h4{font:600 13px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0 0 5px;color:var(--ink)}
+.book-observation-section p{font:inherit;margin:0;white-space:pre-wrap;color:var(--ink)}
+.book-page-structured .book-page-running{font-size:9px;letter-spacing:.05em}

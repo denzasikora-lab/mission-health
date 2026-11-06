@@ -13,9 +13,9 @@
   const editor=document.createElement('dialog');editor.id='book-editor';editor.className='book-editor';editor.lang='ru';
   editor.innerHTML='<form id="book-entry-form"><header><h2>Новая страница</h2><button type="button" id="book-editor-close" aria-label="Закрыть новую запись">✕</button></header><p>Мысли, ощущения и наблюдения. Запись сохранится в выбранном профиле.</p><label for="book-entry-text">Твоя запись</label><textarea id="book-entry-text" rows="9" maxlength="6000" required placeholder="Сегодня я заметил..."></textarea><p id="book-save-status" role="status"></p><button type="submit" id="book-save">Сохранить в архив</button></form>';
   document.body.append(editor);
-  const $b=id=>document.getElementById(id),B={profile:null,entries:[],pages:[],index:0,cover:true,hasMore:false,cursor:null,version:0,loading:false,loaded:false,demo:false,name:'Мой архив'};
+  const $b=id=>document.getElementById(id),B={profile:null,entries:[],samples:[],snapshot:null,pages:[],index:0,cover:true,hasMore:false,cursor:null,version:0,loading:false,loaded:false,demo:false,name:'Мой архив'};
   let saveId=null,saving=false;
-  let worker=null,job=null,searchVersion=0,controller=null,searching=false,turnTimer,resizeTimer,layoutSignature='';
+  let worker=null,job=null,searchVersion=0,controller=null,searching=false,turnTimer,resizeTimer,layoutSignature='',preloadTask;
   for(const id of ['book-position','book-notice']){const status=$b(id);status.className='sr-only';$b('book-stage').before(status);}
   $b('book-spread').setAttribute('aria-description','Правая половина страницы - дальше, левая - назад. Можно листать свайпом или стрелками клавиатуры.');
   const demoEntries=[
@@ -29,19 +29,27 @@
   function create(tag,className,text){const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node}
   function perSpread(){return $b('book-stage').clientWidth>=760?2:1}
   function note(value){$b('book-notice').textContent=value}
+  function pauseMedia(){for(const node of $b('book-spread').querySelectorAll('audio,video'))node.pause();}
   function pageNode(page,number,measuring=false){
     const article=create('article','book-page');
-    article.append(create('div','book-page-running',B.demo?'ПРИМЕР / ВЫМЫШЛЕННАЯ ЗАПИСЬ':'MISSION HEALTH / ЛИЧНЫЙ АРХИВ'));
+    const display=page?.presentation,extra=page?.entry.archiveSample||page?.entry.archiveCurrent;
+    if(display?.structured)article.classList.add('book-page-structured');
+    article.append(create('div','book-page-running',page?.entry.archiveSample?'ПРЕДЗАГРУЖЕННАЯ ЗАПИСЬ / ТЕХНИЧЕСКИЙ ОБРАЗЕЦ':page?.entry.archiveCurrent?'MISSION HEALTH / ТЕКУЩИЕ РЕЗУЛЬТАТЫ':B.demo?'ПРИМЕР / ВЫМЫШЛЕННАЯ ЗАПИСЬ':'MISSION HEALTH / ЛИЧНЫЙ АРХИВ'));
     if(page){
       const date=create('time','book-page-date',stamp(page.entry.createdAt));date.dateTime=page.entry.createdAt;article.append(date);
       const lines=page.content.split('\n'),hasHeading=!page.part&&lines.length>1&&lines[0].trim().length>0&&lines[0].length<=72;
-      article.append(create('h3','',page.part?'Продолжение':hasHeading?lines[0]:'Запись'));
-      if(!page.part&&page.entry.wellbeing&&window.missionFavorites)article.append(window.missionFavorites.badge(page.entry.wellbeing));
-      if(!page.part&&!B.demo&&window.missionFavorites)article.append(window.missionFavorites.button(page.entry,'diary',B.profile));
+      article.append(create('h3','',page.part?'Продолжение':display?.title|| (hasHeading?lines[0]:'Запись')));
+      if(!page.part&&page.entry.wellbeing&&!extra&&window.missionFavorites)article.append(window.missionFavorites.badge(page.entry.wellbeing));
+      if(!page.part&&!B.demo&&!extra&&window.missionFavorites)article.append(window.missionFavorites.button(page.entry,'diary',B.profile));
+      if(!page.part&&display?.media){
+        const media=display.media,node=create(measuring?'div':media.kind,'book-media book-observation-media');
+        if(measuring)node.style.height=media.kind==='audio'?'54px':'210px';else{node.src=media.url;node.controls=true;node.preload='metadata';if(media.kind==='video'){node.playsInline=true;if(media.poster)node.poster=media.poster;}node.setAttribute('aria-label',media.kind==='video'?'Видеозапись наблюдения':'Аудиозапись наблюдения');}
+        article.append(node);
+      }
       const body=hasHeading?lines.slice(1).join('\n').trim():page.content;
-      const text=create('div','book-page-text',body);text.dir='auto';article.append(text);
-      if(!page.part)for(const media of page.entry.attachments||[]){const node=create(measuring?'div':media.kind==='video'?'video':'img','book-media');if(measuring)node.style.height='210px';else{node.src=media.url;if(media.kind==='video'){node.controls=true;node.playsInline=true;node.preload='metadata';if(media.posterUrl)node.poster=media.posterUrl}else{node.alt=media.region||'Фото из записи';node.loading='lazy'}}article.append(node);}
-      article.append(create('div','book-page-foot','Личная запись / '+(page.part?'продолжение':'исходный текст')));
+      const text=create('div','book-page-text');text.dir='auto';if(display?.structured&&window.missionArchiveContent)window.missionArchiveContent.renderText(text,body,create);else text.textContent=body;article.append(text);
+      if(!page.part&&!display?.media)for(const media of page.entry.attachments||[]){const node=create(measuring?'div':media.kind==='video'?'video':'img','book-media');if(measuring)node.style.height='210px';else{node.src=media.url;if(media.kind==='video'){node.controls=true;node.playsInline=true;node.preload='metadata';if(media.posterUrl)node.poster=media.posterUrl}else{node.alt=media.region||'Фото из записи';node.loading='lazy'}}article.append(node);}
+      article.append(create('div','book-page-foot',page.entry.archiveSample?'Технический образец / не личные данные':page.entry.archiveCurrent?'Личные результаты / без демонстрационных показателей':'Личная запись / '+(page.part?'продолжение':'исходный текст')));
     }else{
       article.classList.add('book-page-empty');article.append(create('span','book-empty-orbit','✧'),create('h3','',B.pages.length?'Место для новой истории':'Первая глава впереди'),create('p','',B.pages.length?'Здесь появится следующее наблюдение.':'Запиши, как прошел день. Книга сохранит твои слова, а NasaGPT поможет вернуться к ним.'));
       const add=create('button','','Написать страницу');add.type='button';add.addEventListener('click',openEditor);article.append(add);
@@ -50,7 +58,7 @@
   }
   function draw(){
     const spread=$b('book-spread'),count=perSpread();B.index=Math.max(0,Math.min(B.index,Math.max(0,B.pages.length-1)));
-    $b('book-cover').hidden=!B.cover;spread.hidden=B.cover;spread.replaceChildren();spread.dataset.pages=count;
+    $b('book-cover').hidden=!B.cover;spread.hidden=B.cover;pauseMedia();spread.replaceChildren();spread.dataset.pages=count;
     if(!B.cover){spread.append(pageNode(B.pages[B.index],B.index+1));if(count===2)spread.append(pageNode(B.pages[B.index+1],B.index+2));}
     $b('book-position').textContent=B.cover?'Обложка':B.pages.length?'Страницы '+(B.index+1)+(count===2?' / '+(B.index+2):'')+' · записей: '+B.entries.length:'Чистый лист';
     $b('book-prev').disabled=B.cover||B.index===0;$b('book-next').disabled=B.loading||!B.cover&&B.index+count>=B.pages.length;
@@ -67,16 +75,20 @@
     const measure=create('div','book-measure');measure.style.width=layout.width+'px';measure.setAttribute('aria-hidden','true');stage.append(measure);
     const pages=[],capacity=Math.max(240,Math.floor((layout.width-50)/8)*Math.floor((layout.height-190)/24));
     try{
-      for(const entry of [...B.entries].sort((a,b)=>a.createdAt.localeCompare(b.createdAt)||a.id.localeCompare(b.id))){
-        const pending=tools.chunks(entry.content,capacity);let part=0,offset=0;
+      const personal=[...B.entries].sort((a,b)=>a.createdAt.localeCompare(b.createdAt)||a.id.localeCompare(b.id)),entries=B.demo?personal:[...B.samples,...(B.snapshot?[B.snapshot]:[]),...personal];
+      for(const entry of entries){
+        const presentation=window.missionArchiveContent?.presentation(entry),pending=tools.chunks(presentation?.content??entry.content,capacity);let part=0,offset=0;
         while(pending.length){
-          const content=pending.shift(),page={entry,content,part,offset};
+          let content=pending.shift();const trailing=window.missionArchiveContent?.splitTrailingHeading(content);
+          if(trailing&&pending.length){const next=trailing.heading+'\n'+pending.shift();if(trailing.body){content=trailing.body;pending.unshift(next);}else content=next;}
+          const page={entry,content,part,offset,presentation};
           const fits=value=>{const node=pageNode({...page,content:value},pages.length+1,true);node.style.minHeight='0';measure.replaceChildren(node);return node.getBoundingClientRect().height<=layout.height;};
           if(content.length>80&&!fits(content)){
             const chars=Array.from(content);let low=1,high=chars.length;
             while(low<high){const middle=Math.ceil((low+high)/2);if(fits(chars.slice(0,middle).join('')))low=middle;else high=middle-1;}
             // Медиа может быть выше страницы: короткий текст остается вместе с ним без обрезки.
-            const limit=low<80?Math.min(chars.length,160):low,prefix=chars.slice(0,limit).join(''),space=Math.max(prefix.lastIndexOf(' '),prefix.lastIndexOf('\n')),cut=space>prefix.length*.65?space:prefix.length;
+            const limit=low<80&&!fits('')?Math.min(chars.length,160):low,prefix=chars.slice(0,limit).join(''),space=Math.max(prefix.lastIndexOf(' '),prefix.lastIndexOf('\n'));let cut=space>prefix.length*.65?space:prefix.length;
+            const orphan=window.missionArchiveContent?.splitTrailingHeading(content.slice(0,cut));if(orphan?.body)cut=orphan.body.length;
             const first=prefix.slice(0,cut).trimEnd(),rest=content.slice(cut).trimStart();page.content=first;if(rest)pending.unshift(rest);
           }
           pages.push(page);offset+=page.content.length;part++;
@@ -90,25 +102,39 @@
     if(anchor){const id=typeof anchor==='string'?anchor:anchor.id,offset=typeof anchor==='string'?0:anchor.offset;let index=B.pages.findIndex(page=>page.entry.id===id);if(index>=0){while(index+1<B.pages.length&&B.pages[index+1].entry.id===id&&B.pages[index+1].offset<=offset)index++;B.index=index;}}
     draw();
   }
-  async function load(older=false){
+  async function preload(){
+    if(!preloadTask)preloadTask=fetch('/data/archive-preload.json',{cache:'no-cache'}).then(response=>{if(!response.ok)throw new Error('preload_unavailable');return response.json();}).then(data=>data?.version===1&&Array.isArray(data.items)?data.items.filter(item=>item?.archiveSample===true&&typeof item.id==='string'&&Number.isFinite(Date.parse(item.createdAt))&&window.missionArchiveContent?.observation(item)).slice(0,2):[]).catch(()=>[]);
+    return preloadTask;
+  }
+  async function personalExtras(entries){
+    const helper=window.missionArchiveContent;if(!helper||B.profile!==personalProfileId)return {samples:[],snapshot:null};
+    const [samples,identity,wearable]=await Promise.all([preload(),journalApi('/api/me').catch(()=>null),journalApi('/api/actiwatch').catch(()=>null)]);
+    const identified=/^[a-f0-9]{64}$/i.test(identity?.storageScope||'');if(identified)window.missionAppearance?.setIdentity({storageScope:identity.storageScope,name:'Astronaut'});
+    const visual=helper.captureVisual(identified?document:{querySelectorAll:()=>[]},entries),wellbeing=identified?window.missionCheckin?.current()||null:null;
+    return {samples,snapshot:helper.currentEntry(entries,{visual,wellbeing,wearable:identified?wearable:null})};
+  }
+  async function load(older=false,preferredAnchor=null){
     if(B.loading)return;const version=B.version,id=B.profile;B.loading=true;note('Загружаю историю...');draw();
     try{
       const data=await journalApi('/api/astronauts/'+id+'/book'+(older?'?cursor='+encodeURIComponent(B.cursor):''));if(version!==B.version||B.demo)return;
-      const current=B.pages[B.index],anchor=current?{id:current.entry.id,offset:current.offset}:null;B.entries=older?[...B.entries,...data.entries.filter(item=>!B.entries.some(old=>old.id===item.id))]:data.entries;B.hasMore=data.hasMore;B.cursor=data.cursor;B.loaded=true;rebuild(older?anchor:null);note(data.total?'Сохраненных записей: '+data.total:'В книге пока нет записей. Можно написать первую страницу.');
+      const current=B.pages[B.index],anchor=preferredAnchor||(current?{id:current.entry.id,offset:current.offset}:null),entries=older?[...B.entries,...data.entries.filter(item=>!B.entries.some(old=>old.id===item.id))]:data.entries,extras=await personalExtras(entries);if(version!==B.version||B.demo)return;
+      B.entries=entries;B.samples=extras.samples;B.snapshot=extras.snapshot;B.hasMore=data.hasMore;B.cursor=data.cursor;B.loaded=true;rebuild(older?anchor:null);note(data.total?'Сохраненных личных записей: '+data.total:'Предзагруженные видео и аудио доступны. Личных записей пока нет.');
     }catch{if(version===B.version)note('История не загрузилась. Открой раздел «Архив» еще раз, чтобы повторить.');}
     finally{if(version===B.version){B.loading=false;draw()}}
   }
   function cancelSearch(){++searchVersion;controller?.abort();controller=null;worker?.terminate();worker=null;if(job){clearTimeout(job.timer);job.reject(new DOMException('Остановлено','AbortError'));job=null}searching=false;$b('book-find').disabled=false;$b('book-search-stop').hidden=true;}
   function render(){
-    const on=visible();document.body.dataset.book=String(on);book.hidden=!on;
+    const on=visible();document.body.dataset.book=String(on);book.hidden=!on;if(!on)pauseMedia();
     if(B.profile!==profile()){
-      cancelSearch();B.version++;B.profile=profile();B.entries=[];B.pages=[];B.index=0;B.cover=true;B.demo=false;B.loading=false;B.loaded=false;B.hasMore=false;B.cursor=null;saveId=null;$b('book-search-results').replaceChildren();$b('book-query').value='';$b('book-entry-text').value='';editor.close();search.close();
+      cancelSearch();B.version++;B.profile=profile();B.entries=[];B.samples=[];B.snapshot=null;B.pages=[];B.index=0;B.cover=true;B.demo=false;B.loading=false;B.loaded=false;B.hasMore=false;B.cursor=null;saveId=null;$b('book-search-results').replaceChildren();$b('book-query').value='';$b('book-entry-text').value='';editor.close();search.close();
     }
     if(on&&!B.loaded&&!B.loading)void load();if(on)draw();window.missionTraining?.render({visible:on,profile:B.profile,demo:B.demo});
   }
   async function turn(direction){
     if(B.cover){B.cover=false;B.index=0;draw();return}
-    if(direction<0&&B.index===0&&B.hasMore&&!B.demo&&!B.loading)await load(true);
+    const firstPersonal=B.pages.findIndex(page=>!page.entry.archiveSample&&!page.entry.archiveCurrent),version=B.version;
+    if(direction<0&&firstPersonal>=0&&B.index<=firstPersonal&&B.index+perSpread()>firstPersonal&&B.hasMore&&!B.demo&&!B.loading)await load(true,{id:B.pages[firstPersonal].entry.id,offset:0});
+    if(version!==B.version)return;
     const index=B.index+direction*perSpread();if(index<0||index>=B.pages.length)return;
     clearTimeout(turnTimer);$b('book-spread').querySelectorAll('.book-turn-leaf').forEach(node=>node.remove());const old=$b('book-spread').querySelector(direction>0?'.book-page:last-child':'.book-page:first-child')?.cloneNode(true);B.index=index;draw();if(old){old.classList.add('book-turn-leaf');if(direction<0)old.classList.add('previous');old.setAttribute('aria-hidden','true');$b('book-spread').append(old);turnTimer=setTimeout(()=>old.remove(),520);}
   }
@@ -137,7 +163,7 @@
     const version=searchVersion,id=B.profile;
     let answer;
     if(items.length&&!B.demo){answer=create('div','book-rag-answer','Собираю ответ по найденным записям...');answer.setAttribute('role','status');list.append(answer);}
-    for(const entry of items){const card=create('button','book-result');card.type='button';card.append(create('time','',stamp(entry.createdAt)),create('strong','',entry.content.split('\n')[0].slice(0,90)),create('span','',entry.content.slice(0,210)),create('small','','Открыть страницу ↗'));card.addEventListener('click',()=>void openResult(entry));list.append(card)}
+    for(const entry of items){const display=window.missionArchiveContent?.presentation(entry),content=display?.content||entry.content,card=create('button','book-result');card.type='button';card.append(create('time','',stamp(entry.createdAt)),create('strong','',display?.title||content.split('\n')[0].slice(0,90)),create('span','',content.slice(0,210)),create('small','','Открыть страницу ↗'));card.addEventListener('click',()=>void openResult(entry));list.append(card)}
     if(answer)try{const data=await journalApi('/api/astronauts/'+id+'/book-answer',{method:'POST',signal:controller?.signal,body:JSON.stringify({query,ids:items.map(item=>item.id).slice(0,6)})});if(version===searchVersion&&id===B.profile)answer.textContent='NasaGPT\n\n'+data.answer;}catch{if(version===searchVersion&&id===B.profile)answer.textContent='Записи найдены по смыслу. Ответ языкового сервиса пока недоступен; можно открыть исходные страницы.';}
   }
   $b('book-search-form').addEventListener('submit',async event=>{
@@ -198,7 +224,7 @@
   spread.addEventListener('pointercancel',releaseTouch);spread.addEventListener('lostpointercapture',()=>touch=null);
   function resizePages(){if(!visible())return;if(pageLayout().key!==layoutSignature){const current=B.pages[B.index];rebuild(current?{id:current.entry.id,offset:current.offset}:null)}else draw();}
   new ResizeObserver(resizePages).observe($b('book-stage'));window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(resizePages,80);});
-  window.addEventListener('pagehide',cancelSearch);
+  window.addEventListener('pagehide',()=>{cancelSearch();pauseMedia();});
   window.missionBook={render,refresh:()=>{if(visible()&&!B.demo)void load()}};render();
   if(new URLSearchParams(location.search).get('book')==='1')window.missionDesign.navigate('archive');
 })();

@@ -11,7 +11,15 @@ async function bookRoute(request,env,user,profile,action,url){
     const filter=cursor?' AND (created_at<? OR (created_at=? AND id<?))':'';
     const {results}=await db.prepare("SELECT * FROM journal_messages WHERE owner_id=? AND astronaut_id=? AND role!='assistant'"+filter+' ORDER BY created_at DESC,id DESC LIMIT 25').bind(user,profile,...(cursor?[cursor[0],cursor[0],cursor[1]]:[])).all();
     const rows=results.slice(0,24),last=rows.at(-1),count=await db.prepare("SELECT COUNT(*) AS total FROM journal_messages WHERE owner_id=? AND astronaut_id=? AND role!='assistant'").bind(user,profile).first();
-    return json({entries:await Promise.all(rows.map(row=>hydratedMessage(env,user,profile,row))),total:count.total,hasMore:results.length>24,cursor:last?JSON.stringify([last.created_at,last.id]):null});
+    const entries=await Promise.all(rows.map(async row=>{
+      const entry=await hydratedMessage(env,user,profile,row);
+      if(profile==='personal'&&row.assistant_source==='media-upload'){
+        const observation=await mediaBookObservation(env,user,row);
+        if(observation){entry.observation=observation;entry.references=[{type:'media',id:row.id,kind:observation.kind,duration:observation.duration,createdAt:row.created_at}];}
+      }
+      return entry;
+    }));
+    return json({entries,total:count.total,hasMore:results.length>24,cursor:last?JSON.stringify([last.created_at,last.id]):null});
   }
   if(action==='book-index'&&request.method==='GET'){
     const {results}=await db.prepare("SELECT m.id,m.content,m.created_at,m.wellbeing_json FROM journal_messages m LEFT JOIN journal_text_vectors v ON v.message_id=m.id AND v.owner_id=m.owner_id AND v.astronaut_id=m.astronaut_id AND v.model=? WHERE m.owner_id=? AND m.astronaut_id=? AND m.role!='assistant' AND v.message_id IS NULL ORDER BY m.created_at DESC,m.id DESC LIMIT 12").bind(bookVectorModel,user,profile).all();

@@ -48,6 +48,56 @@ function mediaAcousticSnapshot(features){
   const tone=model&&Array.isArray(features.tone)?features.tone.filter(item=>['neutral','happy','sad','angry','tense'].includes(item?.label)&&Number.isFinite(item.similarity)&&Math.abs(item.similarity)<=1.01).slice(0,5).map(item=>({label:item.label,similarity:item.similarity})):[];
   return acoustic||tone.length?{acoustic,...(model?{model,tone}:{})}:null;
 }
+function mediaPresentationFeatures(input,kind){
+  if(!input||typeof input!=='object'||Array.isArray(input))return null;
+  const result={},acoustic=mediaAcousticSnapshot(input),model=input.model==='embeddinggemma-2:daa72c51243991dfcaf9f9137d2c573d8f7790c0:q4:768';
+  if(acoustic?.acoustic)result.acoustic=acoustic.acoustic;
+  if(model){result.model=input.model;result.tone=acoustic?.tone||[];}
+  if(kind==='video'){
+    const v=input.videoVector,videoVector=model&&Array.isArray(v)&&v.length===768&&v.every(n=>Number.isFinite(n)&&Math.abs(n)<=1.01)&&Math.abs(Math.hypot(...v)-1)<=.05;
+    try{const age=globalThis.MissionApparentAgeCore.validate(input.apparentAge);if(age&&(age.status==='unavailable'||videoVector))result.apparentAge=age;}catch{}
+    try{const skin=globalThis.MissionSkinSpotsCore.validate(input.skin);if(skin&&(!skin.items.some(item=>item.vector)||model)){const {trackingKey,...report}=skin;result.skin={...report,items:skin.items.map(({vector,...item})=>item)};}}catch{}
+  }
+  return Object.keys(result).length?result:null;
+}
+function mediaArchiveReference(row){
+  if(row.astronaut_id!=='personal'||row.role!=='user'||row.assistant_source!=='media-upload')return null;
+  try{const reference=JSON.parse(row.references_json)[0];return reference?.type==='media'&&reference.id===row.id&&['audio','video'].includes(reference.kind)&&Number.isFinite(reference.duration)&&reference.duration>0&&reference.duration<=125?reference:null;}catch{return null;}
+}
+async function mediaAnalysisObjectKey(user,id){
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(user))),v=>v.toString(16).padStart(2,'0')).join('');return 'health-media/'+hash+'/'+id;
+}
+function mediaObjectValid(object,user,reference){
+  const types=reference.kind==='video'?['video/mp4','video/webm']:['audio/webm','audio/wav','audio/mp4','audio/ogg','audio/mpeg'];
+  return object&&Number.isSafeInteger(object.size)&&object.size>=44&&object.size<=healthMediaLimit&&types.includes(object.httpMetadata?.contentType)&&(!object.customMetadata?.owner||object.customMetadata.owner===user)&&(!reference.digest||!object.customMetadata?.digest||reference.digest===object.customMetadata.digest);
+}
+async function mediaAnalysisObjectHead(env,user,row,reference){
+  if(!env.PHOTOS)return null;
+  try{const key=await mediaAnalysisObjectKey(user,row.id),object=env.PHOTOS.head?await env.PHOTOS.head(key):await env.PHOTOS.get(key);return mediaObjectValid(object,user,reference)?{key,object}:null;}catch{return null;}
+}
+async function mediaBookObservation(env,user,row){
+  if(row.owner_id!==user)return null;const reference=mediaArchiveReference(row);if(!reference)return null;
+  const answer=await database(env).prepare("SELECT content FROM journal_messages WHERE owner_id=? AND astronaut_id='personal' AND role='assistant' AND reply_to=? AND assistant_source LIKE 'media-analysis:%' ORDER BY created_at DESC,id DESC LIMIT 1").bind(user,row.id).first();
+  const legacy=String(row.content||'').match(/Распознанная речь: ([\s\S]*?)(?=\n(?:Самооценка самочувствия|Признаки исходного звука|Звук не декодирован|EmbeddingGemma 2|Видимый возраст|Сравнение кожи)|$)/),features=mediaPresentationFeatures(reference.features,reference.kind),stored=await mediaAnalysisObjectHead(env,user,row,reference);
+  return {kind:reference.kind,duration:reference.duration,transcript:mediaAnalysisText(typeof reference.transcript==='string'?reference.transcript.slice(0,40000):legacy?.[1]||''),features,analysis:answer?mediaAnalysisText(answer.content).slice(0,16000):'',status:answer?'analyzed':features?'measured':'pending',mediaUrl:stored?'/api/media-analysis/'+row.id+'/media':null};
+}
+function mediaByteRange(value,size){
+  if(!value)return null;if(!Number.isSafeInteger(size)||size<=0)return false;const match=value.match(/^bytes=(\d*)-(\d*)$/);if(!match||!match[1]&&!match[2])return false;
+  const first=match[1]?Number(match[1]):null,last=match[2]?Number(match[2]):null;if(first!==null&&!Number.isSafeInteger(first)||last!==null&&!Number.isSafeInteger(last))return false;
+  if(first===null){if(!last)return false;const length=Math.min(last,size);return {offset:size-length,length};}
+  if(first>=size||last!==null&&last<first)return false;const end=last===null?size-1:Math.min(last,size-1);return {offset:first,length:end-first+1};
+}
+async function mediaAnalysisFileRoute(request,env,user,id){
+  const row=await database(env).prepare("SELECT * FROM journal_messages WHERE id=? AND owner_id=? AND astronaut_id='personal' AND role='user' AND assistant_source='media-upload'").bind(id,user).first(),reference=row&&mediaArchiveReference(row);if(!reference)fail('not_found',404);
+  if(!['GET','HEAD'].includes(request.method))fail('method_not_allowed',405);
+  const stored=await mediaAnalysisObjectHead(env,user,row,reference);if(!stored)fail('not_found',404);
+  const size=stored.object.size,headers={'content-type':stored.object.httpMetadata.contentType,'cache-control':'private, no-store','x-content-type-options':'nosniff','content-disposition':'inline','cross-origin-resource-policy':'same-origin','accept-ranges':'bytes'},range=mediaByteRange(request.headers.get('range'),size);
+  if(range===false)return new Response(null,{status:416,headers:{...headers,'content-range':'bytes */'+size}});
+  headers['content-length']=String(range?range.length:size);if(range)headers['content-range']='bytes '+range.offset+'-'+(range.offset+range.length-1)+'/'+size;
+  if(request.method==='HEAD')return new Response(null,{status:range?206:200,headers});
+  const object=await env.PHOTOS.get(stored.key,range?{range}:undefined);if(!object)fail('not_found',404);
+  return new Response(object.body,{status:range?206:200,headers});
+}
 async function latestMediaAnalysis(db,user){
   const rows=(await db.prepare("SELECT id,content,created_at,references_json FROM journal_messages WHERE owner_id=? AND astronaut_id='personal' AND role='user' AND assistant_source='media-upload' ORDER BY created_at DESC,id DESC LIMIT 80").bind(user).all()).results,items=[];
   for(const row of rows){

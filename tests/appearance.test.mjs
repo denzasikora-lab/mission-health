@@ -7,6 +7,7 @@ import {gzipSync,gunzipSync} from 'node:zlib';
 const coreSource=await readFile(new URL('../public/appearance-core.js',import.meta.url),'utf8');
 const controller=await readFile(new URL('../public/appearance.js',import.meta.url),'utf8');
 const server=await readFile(new URL('../worker/index.js',import.meta.url),'utf8');
+const sampleScope={window:{},fetch:async()=>({ok:true,json:async()=>({items:[]})})};vm.runInNewContext(await readFile(new URL('../public/analysis-samples.js',import.meta.url),'utf8'),sampleScope);const controlSamples=sampleScope.window.missionAnalysisSamples;
 const sandbox={};vm.runInNewContext(coreSource,sandbox);const core=sandbox.MissionAppearanceCore;
 const clone=value=>JSON.parse(JSON.stringify(value));
 function fixture(scale=1){
@@ -38,7 +39,7 @@ test('Измененный свет приостанавливает все че
 test('Старая или неполная версия эталона не дает зеленого состояния новым признакам',()=>{const s=measured(),r=reference(s);assert.equal(r.version,2);const old=clone(r);old.version=1;assert.equal(core.referenceValid(old),false);assert.equal(core.comparison(s,old).valid,false);delete r.metrics.eyeBalance;assert.equal(core.referenceValid(r),false);s.metrics.jawWidth=NaN;assert.equal(core.comparison(s,reference()).valid,false);assert.throws(()=>reference(s),/invalid_reference_sample/);});
 test('Один всплеск не становится красной тревогой, поврежденный эталон отклоняется',()=>{assert.equal(core.level(4,0),'amber');assert.equal(core.level(4,2999),'amber');assert.equal(core.level(4,3000),'red');const r=reference();r.metrics.width.noise=0;assert.equal(core.referenceValid(r),false);assert.equal(core.comparison(measured(),r).valid,false);});
 
-function environment(storage=new Map()){
+function environment(storage=new Map(),samples=null){
   const nodes=new Map(),workers=[],frames=new Map(),timers=new Map();let now=0,seq=0,pendingBitmap=null,blockStorage=false;
   const context=new Proxy({}, {get:()=>()=>{}});
   class Element{
@@ -49,7 +50,7 @@ function environment(storage=new Map()){
   const node=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);};
   const document={hidden:false,getElementById:node,createElement:()=>new Element(),addEventListener(){}};
   class Worker{constructor(url){this.url=url;this.closed=false;this.sent=[];workers.push(this);}postMessage(v){this.sent.push(v);}terminate(){this.closed=true;}emit(data){this.onmessage({data});}}
-  const window={Worker,OffscreenCanvas:class{},createImageBitmap(){}};
+  const window={Worker,OffscreenCanvas:class{},createImageBitmap(){},missionAnalysisSamples:samples};
   const localStorage={getItem:k=>{if(blockStorage)throw new Error();return storage.get(k)||null;},setItem:(k,v)=>{if(blockStorage)throw new Error();storage.set(k,v);}};
   vm.runInNewContext(controller,{MissionAppearanceCore:core,window,document,Worker,localStorage,performance:{now:()=>now},Date,Math,JSON,setTimeout:(fn,delay)=>{timers.set(++seq,{fn,delay});return seq;},clearTimeout:id=>timers.delete(id),requestAnimationFrame:fn=>{frames.set(++seq,fn);return seq;},cancelAnimationFrame:id=>frames.delete(id),createImageBitmap:async()=>pendingBitmap?await pendingBitmap:{close(){}}});
   const input={videoWidth:1280,videoHeight:720,readyState:2,srcObject:{}};
@@ -60,6 +61,12 @@ function environment(storage=new Map()){
   function collect(){for(let i=0;i<24;i++)sample();}
   return {api,node,workers,frames,timers,input,tick,sample,begin,collect,storage,setBitmap:p=>pendingBitmap=p,blockStorage:()=>blockStorage=true};
 }
+test('Контрольные числа не сохраняются как личные и заменяются измерением и сохраненным результатом',()=>{
+  const e=environment(new Map(),controlSamples),cards=e.node('appearance-metrics').children;
+  assert.equal(cards.length,12);assert.ok(cards.every(card=>card.dataset.resultSource==='sample'&&/\d/.test(card.children[1].textContent)));assert.match(e.node('appearance-status').textContent,/Контрольный пример/);assert.equal(e.node('appearance-reset').disabled,true);e.api.stop();assert.equal(e.storage.size,0);
+  e.begin();assert.ok(cards.every(card=>card.dataset.resultSource!=='sample'));e.collect();for(let i=0;i<5;i++)e.sample();assert.ok(cards.every(card=>card.dataset.resultSource==='live'));e.api.stop();
+  const next=environment(e.storage,controlSamples);next.api.setIdentity({storageScope:'owner-a',name:'Egor Fedosov'});assert.ok(next.node('appearance-metrics').children.every(card=>card.dataset.resultSource==='saved'));assert.doesNotMatch(next.node('appearance-status').textContent,/Контрольный пример/);
+});
 test('Первое включение собирает настоящий эталон и повторное включение восстанавливает его',()=>{const e=environment();e.begin();e.collect();assert.equal(e.storage.size,1);for(let i=0;i<5;i++)e.sample();assert.equal(e.node('appearance-metrics').children[0].dataset.level,'green');e.api.stop();const next=environment(e.storage);next.begin();assert.match(next.node('appearance-reference').textContent,/Эталон/);for(let i=0;i<5;i++)next.sample();assert.equal([...next.storage.keys()].filter(key=>key.startsWith('mission-appearance-v2:')).length,1);assert.equal(next.node('appearance-metrics').children[0].dataset.level,'green');});
 test('Неподходящий кадр сбрасывает набор эталона, а не добавляется в него',()=>{const e=environment();e.begin();for(let i=0;i<20;i++)e.sample();e.sample({valid:false,reason:'Мало света'});for(let i=0;i<10;i++)e.sample();assert.equal(e.storage.size,0);assert.equal(e.node('appearance-progress').textContent,'10/24');});
 test('Эталон изолирован по аккаунту, полному имени и камере',()=>{const e=environment();e.begin();e.collect();const first=[...e.storage.keys()][0];for(const [owner,name,device]of [['owner-b','Egor Fedosov','camera-a'],['owner-a','Other Person','camera-a'],['owner-a','Egor Fedosov','camera-b']]){const next=environment(e.storage);next.begin(owner,name,device);next.sample();assert.equal(next.node('appearance-progress').textContent,'1/24');next.collect();}assert.equal(e.storage.size,4);assert.ok(e.storage.has(first));});

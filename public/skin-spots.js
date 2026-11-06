@@ -11,12 +11,15 @@
   const status=root.querySelector('#skin-spots-status'),referenceLabel=root.querySelector('#skin-spots-reference'),search=root.querySelector('#skin-spots-search'),list=root.querySelector('#skin-spots-items'),reset=root.querySelector('#skin-spots-reset');
   const names={'forehead':'Лоб','left-cheek':'Левая область кадра / щека','right-cheek':'Правая область кадра / щека'},reasons={need_camera:'Включи камеру для сравнения.',need_frames:'Нужен полный резкий кадр лица.',need_closeup:'Приблизь лицо: для отдельных пятен не хватает пикселей.',not_enough_detail:'Участки не удалось надежно выделить. Повтори крупный кадр и освещение.',no_reference:'Нужен эталон кожи.',unstable:'Ожидание трех устойчивых кадров.',conditions_changed:'Повтори свет, расстояние и ракурс эталона.',collecting:'Сбор эталона кожи'};
   let scope='',reference=null,samples=[],lastTime=0,latestTime=0,latest=null,report=core.unavailable('need_camera'),storageOk=true;
+  const sampleVisual=window.missionAnalysisSamples?.visual;let sampleAllowed=true;
   const key=()=> 'mission-skin-spots-v1:'+scope,fmt=n=>new Intl.NumberFormat('ru',{maximumFractionDigits:1}).format(n),hex=c=>'#'+['r','g','b'].map(k=>c[k].toString(16).padStart(2,'0')).join('');
   function render(){
-    list.replaceChildren();const compared=report.status==='compared';
-    for(const [index,card] of cards.entries()){card.value.textContent=compared?(index===0?report.newCount:report.changedCount):'-';card.node.setAttribute('data-result-source',compared?'current':'missing');card.status.textContent=compared?'Сравнение с эталоном':'Нет сравнения';}
-    status.textContent=compared?'Сравнены доступные участки / кандидаты требуют проверки':reasons[report.reason]||reasons.need_frames;
-    referenceLabel.textContent=reference?'Эталон '+new Date(reference.at).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'short'})+(storageOk?' / на этом устройстве':' / только этот сеанс'):'Лоб и две щеки / эталон '+samples.length+' из 5 кадров';
+    list.replaceChildren();const compared=report.status==='compared',sample=sampleAllowed&&Boolean(sampleVisual)&&!compared;
+    root.setAttribute('data-result-source',sample?'sample':compared?'current':'missing');
+    for(const [index,card] of cards.entries()){card.value.textContent=compared?(index===0?report.newCount:report.changedCount):sample?(index===0?sampleVisual.skin.newCount:sampleVisual.skin.changedCount):'-';card.node.setAttribute('data-result-source',compared?'current':sample?'sample':'missing');card.status.textContent=sample?'Контрольный пример':compared?'Сравнение с эталоном':'Нет сравнения';}
+    status.textContent=sample?'Контрольный пример / нулевые счетчики иллюстрируют интерфейс, кожа пользователя не измерялась':compared?'Сравнены доступные участки / кандидаты требуют проверки':reasons[report.reason]||reasons.need_frames;
+    referenceLabel.textContent=sample?'Контрольный пример / личного эталона нет':reference?'Эталон '+new Date(reference.at).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'short'})+(storageOk?' / на этом устройстве':' / только этот сеанс'):'Лоб и две щеки / эталон '+samples.length+' из 5 кадров';
+    if(sample){reset.disabled=true;search.textContent='Контрольный пример не сохраняется в личный архив.';}
     for(const item of report.items){
       const node=document.createElement('article'),title=document.createElement('strong'),detail=document.createElement('p'),colors=document.createElement('div');node.className='skin-spot-item';title.textContent=(item.change==='new'?'Новый контрастный участок':item.change==='changed'?'Участок изменился':'Участок сопоставлен')+' / '+names[item.region];
       detail.textContent='Экв. диаметр ≈ '+fmt(item.diameterPixels)+' px · площадь '+fmt(item.areaPixels)+' px²'+(item.baseline?' · площадь '+(item.areaChangePercent>0?'+':'')+fmt(item.areaChangePercent)+'% · цвет '+fmt(item.deltaE)+' ΔE':' · в эталоне не выделен');
@@ -25,11 +28,12 @@
     }
   }
   function setScope(value){
-    scope=value;reset.disabled=true;samples=[];lastTime=latestTime=0;latest=null;reference=null;storageOk=true;report=core.unavailable('need_camera');search.textContent='Сопоставление с прошлыми записями появится после анализа видео.';
+    sampleAllowed=false;scope=value;reset.disabled=true;samples=[];lastTime=latestTime=0;latest=null;reference=null;storageOk=true;report=core.unavailable('need_camera');search.textContent='Сопоставление с прошлыми записями появится после анализа видео.';
     try{const stored=JSON.parse(localStorage.getItem(key())||'null');if(core.referenceValid(stored))reference=stored;}catch{storageOk=false;}render();
   }
   function observe(value,time){
     if(!scope)return;
+    sampleAllowed=false;
     if(!value?.valid){samples=[];latest=null;report=core.unavailable(value?.reason||'need_frames');reset.disabled=true;render();return;}
     if(lastTime&&time-lastTime>2200)samples=[];lastTime=time;latestTime=time;latest=value;samples.push(value);if(samples.length>5)samples.shift();reset.disabled=samples.length<5||!core.stable(samples);
     if(!reference){
@@ -55,8 +59,8 @@
     }
     return {report:clean,crops};
   }
-  function pending(value){const clean=core.validate(value);if(clean?.status==='compared'&&clean.trackingKey===reference?.trackingKey&&!latest){report=clean;render();search.textContent='Размер и цвет измерены / ожидается векторизация записи.';}}
-  function encoded(value){const clean=core.validate(value);if(!clean||clean.status==='compared'&&clean.trackingKey!==reference?.trackingKey)return;if(!latest){report=clean;render();}const count=clean.items.filter(v=>v.vector).length;search.textContent=count?'Для '+count+' участков построены векторы / идет поиск прошлых записей.':'Векторы участков не получены / сравнение пикселей сохранено.';}
+  function pending(value){const clean=core.validate(value);if(clean?.status==='compared'&&clean.trackingKey===reference?.trackingKey&&!latest){sampleAllowed=false;report=clean;render();search.textContent='Размер и цвет измерены / ожидается векторизация записи.';}}
+  function encoded(value){const clean=core.validate(value);if(!clean||clean.status==='compared'&&clean.trackingKey!==reference?.trackingKey)return;sampleAllowed=false;if(!latest){report=clean;render();}const count=clean.items.filter(v=>v.vector).length;search.textContent=count?'Для '+count+' участков построены векторы / идет поиск прошлых записей.':'Векторы участков не получены / сравнение пикселей сохранено.';}
   function matches(value,trackingKey){if(trackingKey!==reference?.trackingKey||!Array.isArray(value)||value.length>4)return;search.textContent=value.length?'Найдены похожие участки в '+new Set(value.map(v=>v.recordId)).size+' прошлых записях. Сходство помогает сопоставлению, не подтверждает тип пятна.':'Сопоставимых прошлых векторов пока нет.';}
   window.missionSkinSpots={setScope,observe,pause,snapshot,pending,encoded,matches};render();
 })();

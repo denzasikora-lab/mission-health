@@ -228,12 +228,14 @@ test('Новая запись не подменяет расшифровку с�
 
 
 const voiceAnalysisSource=await readFile(new URL('../public/voice-analysis.js',import.meta.url),'utf8');
-function voiceAnalysisFixture({decode}={}){
+const analysisSamplesSource=await readFile(new URL('../public/analysis-samples.js',import.meta.url),'utf8'),audioControlManifest=JSON.parse(await readFile(new URL('../public/data/archive-preload.json',import.meta.url),'utf8'));
+function audioSamples(manifest=audioControlManifest){const sandbox={window:{},fetch:async path=>{assert.equal(path,'/data/archive-preload.json');return{ok:true,json:async()=>manifest};}};vm.runInNewContext(analysisSamplesSource,sandbox);return sandbox.window.missionAnalysisSamples;}
+function voiceAnalysisFixture({decode,samples}={}){
   class FeatureElement extends Element{
     constructor(tag){super();this.tag=tag;}
     querySelector(selector){const match=selector.match(/^\[data-voice-feature=(\w+)\] strong$/);if(!match)return null;const nodes=[...this.children];while(nodes.length){const item=nodes.shift();if(item.dataset.voiceFeature===match[1])return item.children.find(child=>child.tag==='strong');nodes.push(...item.children);}return null;}
   }
-  const host=new FeatureElement('section'),window={missionGauge:{markup:({value})=>'gauge:'+value}};
+  const host=new FeatureElement('section'),window={missionGauge:{markup:({value})=>'gauge:'+value},missionAnalysisSamples:samples};
   if(decode)window.AudioContext=class{decodeAudioData(){return decode;}close(){return Promise.resolve();}};
   const workers=[];
   class FeatureWorker{constructor(){workers.push(this);}postMessage(data){this.id=data.id;}terminate(){this.terminated=true;}}
@@ -242,6 +244,15 @@ function voiceAnalysisFixture({decode}={}){
   const panel=kind=>host.children.find(item=>item.dataset.voiceAnalysis===kind),feature=(kind,key)=>panel(kind).querySelector('[data-voice-feature='+key+'] strong');return{api:window.missionVoiceAnalysis,panel,feature,workers};
 }
 const savedVoice={kind:'audio',createdAt:'2026-11-05T08:10:00Z',features:{acoustic:{level:-25.4,quiet:.2,clipping:.001,seconds:5},model:'embeddinggemma-2:daa72c51243991dfcaf9f9137d2c573d8f7790c0:q4:768',tone:[{label:'neutral',similarity:.62}]},transcript:'Сохраненная речь'};
+test('Начальные акустические числа взяты из контрольных файлов и не мешают восстановить более старую личную запись',async()=>{
+  const samples=audioSamples(),f=voiceAnalysisFixture({samples});await samples.audio;await settle();
+  for(const item of audioControlManifest.items){const kind=item.observation.kind,a=item.observation.features.acoustic;assert.equal(f.panel(kind).dataset.resultSource,'sample');assert.ok(f.panel(kind).children[1].children.every(card=>card.dataset.resultSource==='sample'));assert.equal(f.feature(kind,'level').textContent,a.level.toLocaleString('ru-RU',{maximumFractionDigits:1})+' dBFS');assert.equal(f.feature(kind,'pauses').innerHTML,'gauge:'+a.quiet*100);assert.equal(f.feature(kind,'clipping').innerHTML,'gauge:'+a.clipping*100);assert.equal(f.feature(kind,'tone').textContent,'Синтезированная речь / Milena');assert.equal(f.panel(kind).children[4].children[0].textContent,'Текст контрольного образца');}
+  assert.equal(f.api.restore('audio',{...savedVoice,createdAt:'2025-01-01T00:00:00Z'}),true);assert.equal(f.panel('audio').dataset.resultSource,'saved');assert.equal(f.feature('audio','level').textContent,'-25 dBFS');assert.equal(f.feature('audio','tone').textContent,'Нейтральная / 0.62');
+});
+test('Поздний контрольный файл не подменяет новую запись и сбой ее декодирования',async()=>{
+  const pendingSample=deferred(),pendingDecode=deferred(),f=voiceAnalysisFixture({samples:{audio:pendingSample.promise},decode:pendingDecode.promise}),analysis=f.api.analyze('audio',new Blob(['bad']),[],null,'2026-11-06T08:00:00Z');
+  pendingSample.resolve(await audioSamples().audio);await settle();assert.equal(f.panel('audio').dataset.resultSource,'pending');assert.notEqual(f.feature('audio','tone').textContent,'Синтезированная речь / Milena');pendingDecode.resolve(null);await analysis;assert.equal(f.panel('audio').dataset.resultSource,'missing');assert.equal(f.feature('audio','level').textContent,'Нет измерения');
+});
 test('Без исходной записи карточки явно называют недостающие данные вместо прочерков',()=>{
   const f=voiceAnalysisFixture();for(const kind of ['audio','video']){for(const key of ['level','pauses','clipping'])assert.equal(f.feature(kind,key).textContent,'Нужна запись');assert.equal(f.feature(kind,'tone').textContent,'Нужен анализ голоса');}
 });

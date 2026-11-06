@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 
 const core=await readFile(new URL('../public/book-core.js',import.meta.url),'utf8'),source=await readFile(new URL('../public/book.js',import.meta.url),'utf8');
+const archiveSource=await readFile(new URL('../public/archive-content.js',import.meta.url),'utf8'),preload=JSON.parse(await readFile(new URL('../public/data/archive-preload.json',import.meta.url),'utf8'));
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
 const entry=(id,content='Текст записи '+id)=>({id,content,createdAt:'2026-11-0'+id+'T12:00:00Z',attachments:[]});
 class Node{
@@ -32,6 +33,7 @@ class Node{
   emit(type,event={}){event.target||=this;event.preventDefault||=()=>{event.prevented=true;};for(const handler of this.events[type]||[])handler(event);return event;}
   click(){if(!this.disabled)this.emit('click');}
   focus(){this.focused=true;}showModal(){this.open=true;}close(){if(this.open){this.open=false;this.emit('close');}}
+  pause(){this.paused=true;}
   setPointerCapture(id){this.captured.add(id);}hasPointerCapture(id){return this.captured.has(id);}releasePointerCapture(id){this.captured.delete(id);this.emit('lostpointercapture',{pointerId:id});}
   cloneNode(deep){const node=this.doc.createElement(this.tagName);node.className=this.className;node._text=this._text;node.dataset={...this.dataset};node.attributes={...this.attributes};if(deep)node.append(...this.children.map(child=>child.cloneNode(true)));return node;}
   getBoundingClientRect(){
@@ -40,16 +42,17 @@ class Node{
     return {left:0,top:0,width,height,right:width,bottom:height};
   }
 }
-async function fixture({entries=[entry('1'),entry('2'),entry('3')],width=390,older=[]}={}){
-  let now=0,id=0,selection=false;const timers=new Map(),requests=[],observers=[];
-  const doc={width,ids:new Map(),createElement(tag){return new Node(tag,this);},getElementById(key){return this.ids.get(key);},querySelector(selector){return this.body.querySelector(selector);}};
+async function fixture({entries=[entry('1'),entry('2'),entry('3')],width=390,older=[],withArchive=false}={}){
+  let now=0,id=0,selection=false;const timers=new Map(),requests=[],observers=[],favoriteIds=[],identities=[];
+  const doc={width,ids:new Map(),createElement(tag){return new Node(tag,this);},getElementById(key){return this.ids.get(key);},querySelector(selector){return this.body.querySelector(selector);},querySelectorAll(selector){return this.body.querySelectorAll(selector);}};
   doc.body=doc.createElement('body');const column=doc.createElement('main');column.className='main-column';doc.body.append(column);
   const window={innerHeight:900,location:{href:'https://mission.test/'},getComputedStyle:()=>({paddingLeft:'2px',paddingRight:'2px'}),getSelection:()=>({isCollapsed:!selection,anchorNode:doc.getElementById('book-spread'),focusNode:doc.getElementById('book-spread')}),events:{},addEventListener(type,handler){this.events[type]=handler;},missionDesign:{navigate(){}},scrollTo(){}};
-  const scope={window,document:doc,state:{workspace:'crew',view:'journal'},personalProfileId:'personal',crew:[],Intl,Date,URL,URLSearchParams,location:{search:''},performance:{now:()=>now},setTimeout:(handler,delay)=>{timers.set(++id,{handler,at:now+delay});return id;},clearTimeout:key=>timers.delete(key),ResizeObserver:class{constructor(handler){observers.push(handler);}observe(){}},journalApi:async path=>{requests.push(path);return {entries:path.includes('?cursor=')?older:entries,hasMore:!path.includes('?cursor=')&&older.length>0,cursor:'old',total:entries.length+older.length};}};
-  vm.runInNewContext(core,scope);vm.runInNewContext(source,scope);await settle();
+  if(withArchive){window.missionAppearance={setIdentity:value=>identities.push(value)};window.missionCheckin={current:()=>({score:75,label:'Хорошо'})};window.missionFavorites={button:item=>{favoriteIds.push(item.id);return doc.createElement('button');},badge:()=>doc.createElement('span')};}
+  const state={workspace:'crew',view:'journal'},scope={window,document:doc,state,personalProfileId:'personal',crew:[],Intl,Date,URL,URLSearchParams,location:{search:''},performance:{now:()=>now},fetch:async()=>({ok:true,json:async()=>preload}),setTimeout:(handler,delay)=>{timers.set(++id,{handler,at:now+delay});return id;},clearTimeout:key=>timers.delete(key),ResizeObserver:class{constructor(handler){observers.push(handler);}observe(){}},journalApi:async path=>{requests.push(path);if(path==='/api/me')return {storageScope:'a'.repeat(64)};if(path==='/api/actiwatch')return {latest:null};return {entries:path.includes('?cursor=')?older:entries,hasMore:!path.includes('?cursor=')&&older.length>0,cursor:'old',total:entries.length+older.length};}};
+  vm.runInNewContext(core,scope);if(withArchive)vm.runInNewContext(archiveSource,scope);vm.runInNewContext(source,scope);await settle();
   const node=key=>doc.getElementById(key),spread=node('book-spread');
   function pointer(type,x,y,{target=spread,pointerType='touch',pointerId=1,...rest}={}){return spread.emit(type,{clientX:x,clientY:y,pointerType,pointerId,isPrimary:true,button:0,target,...rest});}
-  return {node,spread,doc,window,entries,requests,open:()=>node('book-cover').click(),text:()=>spread.querySelectorAll('.book-page').filter(page=>page.getAttribute('aria-hidden')!=='true').map(page=>page.querySelector('.book-page-text')?.textContent||'').join('\n'),pointer,tap(x,target){pointer('pointerdown',x,40,{target});pointer('pointerup',x,40,{target});},swipe(dx,dy=0){pointer('pointerdown',width/2,100);pointer('pointermove',width/2+dx,100+dy);pointer('pointerup',width/2+dx,100+dy);},select:value=>selection=value,resize(value){doc.width=value;observers.forEach(handler=>handler());},advance(ms){now+=ms;for(const [key,value]of [...timers])if(value.at<=now){timers.delete(key);value.handler();}}};
+  return {node,spread,doc,window,entries,requests,favoriteIds,identities,open:()=>node('book-cover').click(),text:()=>spread.querySelectorAll('.book-page').filter(page=>page.getAttribute('aria-hidden')!=='true').map(page=>page.querySelector('.book-page-text')?.textContent||'').join('\n'),pointer,tap(x,target){pointer('pointerdown',x,40,{target});pointer('pointerup',x,40,{target});},swipe(dx,dy=0){pointer('pointerdown',width/2,100);pointer('pointermove',width/2+dx,100+dy);pointer('pointerup',width/2+dx,100+dy);},select:value=>selection=value,visible(value){state.view=value?'journal':'health';window.missionBook.render();},resize(value){doc.width=value;observers.forEach(handler=>handler());},advance(ms){now+=ms;for(const [key,value]of [...timers])if(value.at<=now){timers.delete(key);value.handler();}}};
 }
 
 test('Правая и левая половины страницы листают архив без нижней панели кнопок',async()=>{
@@ -59,7 +62,7 @@ test('Короткий горизонтальный свайп захватыв�
   const f=await fixture();f.open();f.pointer('pointerdown',200,100);assert.equal(f.spread.hasPointerCapture(1),true);f.pointer('pointerup',160,101);assert.equal(f.text(),'Текст записи 2');assert.equal(f.spread.hasPointerCapture(1),false);f.swipe(40,1);assert.equal(f.text(),'Текст записи 1');f.swipe(-90,150);assert.equal(f.text(),'Текст записи 1');assert.equal(f.spread.hasPointerCapture(1),false);
 });
 test('Ссылки, кнопки, выделение и длительное нажатие не вызывают перелистывание',async()=>{
-  const f=await fixture();f.open();for(const tag of ['a','button','video','input']){const node=f.doc.createElement(tag);f.spread.append(node);f.tap(350,node);assert.equal(f.text(),'Текст записи 1');node.remove();}
+  const f=await fixture();f.open();for(const tag of ['a','button','video','audio','input']){const node=f.doc.createElement(tag);f.spread.append(node);f.tap(350,node);assert.equal(f.text(),'Текст записи 1');node.remove();}
   f.select(true);f.tap(350);assert.equal(f.text(),'Текст записи 1');f.select(false);f.pointer('pointerdown',350,50,{pointerType:'mouse'});f.select(true);f.pointer('pointerup',350,50,{pointerType:'mouse'});assert.equal(f.text(),'Текст записи 1');f.select(false);f.pointer('pointerdown',350,50);f.advance(600);f.pointer('pointerup',350,50);assert.equal(f.text(),'Текст записи 1');
 });
 test('Отмена указателя и второй палец не перелистывают страницу, стрелки клавиатуры остаются доступны',async()=>{
@@ -77,4 +80,17 @@ test('Широкий экран не увеличивает емкость ст�
   const content=Array.from({length:90},(_,i)=>'Наблюдение '+i+': '+('длинная строка текста '.repeat(4))).join('\n');
   const normal=await fixture({entries:[entry('1',content)],width:1104}),wide=await fixture({entries:[entry('1',content)],width:1700});normal.open();wide.open();
   assert.equal(normal.spread.dataset.pages,2);assert.equal(wide.spread.dataset.pages,2);assert.equal(wide.text(),normal.text());
+});
+
+test('Пустой личный архив содержит предзагруженные видео и аудио, а текущие результаты не выдают их за личные',async()=>{
+  const f=await fixture({entries:[],withArchive:true});f.open();assert.ok(f.text().trim().length>0);assert.ok(f.spread.querySelector('video'));assert.equal(f.identities[0].name,'Astronaut');
+  const kinds=new Set(),contents=[],positions=new Set();for(let i=0;i<100;i++){const position=f.node('book-position').textContent;if(positions.has(position))break;positions.add(position);contents.push(f.text());for(const media of f.spread.querySelectorAll('audio,video'))kinds.add(media.tagName);f.tap(350);}
+  assert.deepEqual([...kinds].sort(),['AUDIO','VIDEO']);assert.ok(positions.size>=2);assert.ok(contents.some(text=>text.includes('Нет сравнения')));assert.ok(contents.some(text=>text.includes('Личная запись еще не сохранена')));assert.ok(!contents.join('\n').includes('"acoustic"'));assert.equal(f.favoriteIds.length,0);assert.match(f.node('book-position').textContent,/записей: 0/);
+});
+
+test('Плеер бывает только в первой части записи, останавливается при листании и уходе из архива',async()=>{
+  const value={...entry('1','Исходный текст'),observation:{kind:'video',duration:12,mediaUrl:'/api/media-analysis/12345678-1234-1234-1234-123456789abc/media',transcript:'Моя речь. '.repeat(150),analysis:'Личный анализ',features:{acoustic:{level:-25,quiet:.1,clipping:0,seconds:12}},status:'analyzed'}},f=await fixture({entries:[value],withArchive:true});f.open();
+  const first=f.spread.querySelector('video');first.paused=false;f.tap(350);assert.equal(first.paused,true);let found=false;
+  for(let i=0;i<100;i++){const media=f.spread.querySelector('video');if(media?.src?.startsWith('/api/')){found=true;assert.ok(f.spread.querySelector('.book-page').children.indexOf(media)<f.spread.querySelector('.book-page').children.findIndex(node=>node.classList.contains('book-page-text')));media.paused=false;f.visible(false);assert.equal(media.paused,true);break;}const position=f.node('book-position').textContent;f.tap(350);if(position===f.node('book-position').textContent)break;}
+  assert.equal(found,true);assert.ok(f.favoriteIds.every(id=>id==='1'));assert.equal(value.content,'Исходный текст');const second=await fixture({entries:[],withArchive:true});second.open();const active=second.spread.querySelector('video');active.paused=false;second.window.events.pagehide();assert.equal(active.paused,true);
 });

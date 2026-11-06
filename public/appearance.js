@@ -3,6 +3,7 @@
   const status=document.getElementById('appearance-status'),hint=document.getElementById('appearance-hint'),referenceLabel=document.getElementById('appearance-reference');
   const progress=document.getElementById('appearance-progress'),preview=document.getElementById('appearance-preview'),ctx=preview.getContext('2d');
   const resetButton=document.getElementById('appearance-reset'),cards=new Map();
+  const sampleVisual=window.missionAnalysisSamples?.visual;let sampleAllowed=true;
   const labels={green:'Близко к эталону',amber:'Перепроверить кадр',red:'Устойчивое отличие',neutral:'Нет сравнения'};
   let epoch=0,engine,ready=false,busy=false,active=false,frame=0,lastSent=0,timer,frameTimer,video,identity,scope='',cameraKey='',reference,collecting=false;
   let samples=[],recent=[],streaks={},lastValid=0,lastMeasurement=0,storageOk=true;
@@ -21,8 +22,16 @@
   function persistResult(){const id=resultKey();if(!id||!lastResult)return;resultMemory.set(id,lastResult);try{localStorage.setItem(id,JSON.stringify(lastResult));lastStored=Date.now();resultStorageOk=true;}catch{resultStorageOk=false;}}
   function displayValue(card,metric,item){card.value.textContent=(item.delta>0?'+':'')+item.delta.toLocaleString('ru-RU',{maximumFractionDigits:1,minimumFractionDigits:1})+' '+metric.unit;card.bar.style.setProperty('--signal',Math.min(item.z/4,1));}
   function neutral(reason){
-    for(const metric of core.metrics){const card=cards.get(metric.key),saved=lastResult?.values[metric.key];card.node.dataset.level='neutral';card.node.dataset.resultSource=saved?'saved':'missing';if(saved)displayValue(card,metric,saved);else{card.value.textContent='Нет сравнения';card.bar.style.setProperty('--signal',0);}card.label.textContent=(saved?'Последнее / ':'')+(reason||labels.neutral);card.node.setAttribute('aria-label',metric.title+': '+(saved?card.value.textContent+'. Последний результат от '+new Date(saved.at).toLocaleString('ru-RU')+'. ':'')+(reason||labels.neutral));}
+    for(const metric of core.metrics){
+      const card=cards.get(metric.key),saved=lastResult?.values[metric.key],sample=!saved&&sampleAllowed&&Number.isFinite(sampleVisual?.deltas[metric.key]);card.node.dataset.level='neutral';card.node.dataset.resultSource=saved?'saved':sample?'sample':'missing';
+      if(saved)displayValue(card,metric,saved);else if(sample)displayValue(card,metric,{delta:sampleVisual.deltas[metric.key],z:0});else{card.value.textContent='Нет сравнения';card.bar.style.setProperty('--signal',0);}
+      card.label.textContent=sample?'Контрольный пример / не личное измерение':(saved?'Последнее / ':'')+(reason||labels.neutral);card.node.setAttribute('aria-label',metric.title+': '+(sample?card.value.textContent+'. Контрольный пример, не измерение пользователя':(saved?card.value.textContent+'. Последний результат от '+new Date(saved.at).toLocaleString('ru-RU')+'. ':'')+(reason||labels.neutral)));
+    }
     streaks={};
+  }
+  function sampleSummary(){
+    if(!sampleVisual||!sampleAllowed||lastResult)return;
+    mark('Контрольный пример');hint.textContent='Иллюстративные изменения изображения / личные данные не измерялись.';referenceLabel.textContent='Контрольный пример / личного эталона нет';progress.textContent='Пример';resetButton.disabled=true;
   }
   for(const metric of core.metrics){
     const node=document.createElement('article');node.className='appearance-metric';node.dataset.level='neutral';node.dataset.resultSource='missing';
@@ -34,6 +43,7 @@
     cards.set(metric.key,{node,value,bar,label});
   }
   document.getElementById('appearance-metrics').prepend(...Array.from(cards.values(),card=>card.node));
+  neutral();sampleSummary();
   function key(){return storagePrefix+JSON.stringify([identity.storageScope,identity.name,cameraKey]);}
   function load(){
     reference=null;storageOk=true;
@@ -52,13 +62,13 @@
   function setIdentity(value){
     const next=value?.storageScope&&value.name?.trim()?{storageScope:value.storageScope,name:value.name.trim()}:null;
     if(next&&identity?.storageScope===next.storageScope&&identity?.name===next.name)return;
-    const wasActive=active||Boolean(video?.srcObject),input=video,device=cameraKey;stop();identity=next;scope=next?key():'';reference=null;ageFrames=[];ageSession++;window.missionApparentAge?.setIdentity(next);restoreResult();neutral('Камера выключена');
+    const wasActive=active||Boolean(video?.srcObject),input=video,device=cameraKey;stop();identity=next;sampleAllowed=true;scope=next?key():'';reference=null;ageFrames=[];ageSession++;window.missionApparentAge?.setIdentity(next);restoreResult();neutral('Камера выключена');
     if(lastResult){mark('Последнее сравнение / '+new Date(lastResult.at).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'short'}),'recorded');hint.textContent='Последний результат. Включи камеру для нового сравнения.';referenceLabel.textContent='Эталон / '+new Date(lastResult.referenceAt).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'short'});}
-    else{mark('Ожидание камеры');hint.textContent='Включи камеру и собери личный эталон для сравнения.';referenceLabel.textContent='Эталон / 24 кадра';}
+    else{mark('Ожидание камеры');hint.textContent='Включи камеру и собери личный эталон для сравнения.';referenceLabel.textContent='Эталон / 24 кадра';sampleSummary();}
     if(wasActive&&next)start(input,{key:device});
   }
   function start(input,device={}){
-    stop();ageFrames=[];ageSession++;video=input;device||={};cameraKey=device.key||JSON.stringify([device.deviceId||'',input.videoWidth,input.videoHeight]);
+    sampleAllowed=false;stop();ageFrames=[];ageSession++;video=input;device||={};cameraKey=device.key||JSON.stringify([device.deviceId||'',input.videoWidth,input.videoHeight]);
     if(!identity){mark('Нужно имя профиля');hint.textContent='Не удалось прочитать профиль. Обнови страницу.';return;}
     if(!window.Worker||!window.OffscreenCanvas||!window.createImageBitmap){mark('Анализ недоступен');hint.textContent='Браузер не поддерживает обработчик кадров.';return;}
     active=true;scope=key();load();restoreResult(true);window.missionApparentAge?.setScope(scope);window.missionSkinSpots?.setScope(scope);
@@ -146,7 +156,7 @@
   function stop(){
     epoch++;active=false;ready=busy=false;window.missionSkinSpots?.pause();clearTimeout(timer);clearTimeout(frameTimer);cancelAnimationFrame(frame);frame=0;
     engine?.terminate();engine=null;samples=[];recent=[];streaks={};lastValid=0;resetButton.disabled=true;
-    persistResult();neutral('Камера выключена');mark(lastResult?'Последнее сравнение / '+new Date(lastResult.at).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'short'}):'Ожидание камеры',lastResult?'recorded':'idle');progress.textContent=lastResult?resultStorageOk?'Сохранено':'Сеанс':'Нет кадра';progress.style.setProperty('--capture',0);ctx.clearRect(0,0,preview.width,preview.height);
+    persistResult();neutral('Камера выключена');mark(lastResult?'Последнее сравнение / '+new Date(lastResult.at).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'short'}):'Ожидание камеры',lastResult?'recorded':'idle');progress.textContent=lastResult?resultStorageOk?'Сохранено':'Сеанс':'Нет кадра';progress.style.setProperty('--capture',0);ctx.clearRect(0,0,preview.width,preview.height);sampleSummary();
   }
   resetButton.addEventListener('click',()=>{if(active&&ready)resetCapture();});
   document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});

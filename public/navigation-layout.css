@@ -1,4 +1,9 @@
 .shell{--mission-grid-inset:10px}
+/* На главной обе колонки заканчиваются на одной общей линии. */
+@container mission (min-width:1001px){
+  body[data-overview=true] .shell .mission-frame{align-items:stretch}
+  body[data-overview=true] .shell .mission-frame>.mission-rail{min-height:0;align-self:stretch}
+}
 .brand{color:inherit;text-decoration:none;cursor:pointer}.brand:hover{text-decoration:none}.brand:focus-visible{outline:2px solid var(--accent);outline-offset:5px;border-radius:8px}
 .mission-nav>[data-mission-nav=overview]{display:none}body[data-display=desktop] .mission-nav>[data-mission-nav=overview]{display:flex}
 @container mission (min-width:1001px){body[data-display=auto] .mission-nav>[data-mission-nav=overview]{display:flex}}

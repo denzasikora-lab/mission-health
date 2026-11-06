@@ -6,13 +6,18 @@
   document.querySelector('#appearance-metrics').append(root);document.querySelector('#appearance-extra-methods').append(methods);
   const value=root.querySelector('#apparent-age-value'),state=root.querySelector('#apparent-age-state'),referenceLabel=methods.querySelector('#apparent-age-reference'),button=methods.querySelector('#apparent-age-set-reference');
   const memory=new Map(),volatile=new Set(),results=new Map(),ownerScopes=new Map();let latest,currentScope='',displayed,ownerIdentity='';
+  const sampleVisual=window.missionAnalysisSamples?.visual;let sampleAllowed=true;
   const label=range=>range.max===null?range.min+' лет и старше':range.min+'-'+range.max+' лет';
+  function showSample(){
+    if(!sampleVisual||!sampleAllowed||displayed)return;
+    root.setAttribute('data-result-source','sample');value.textContent='≈ '+label(sampleVisual.age);state.textContent='Контрольный пример / иллюстрация диапазона, не оценка пользователя';referenceLabel.textContent='Контрольный пример / личного эталона нет';button.disabled=true;
+  }
   const key=input=>input?.context?.scope?'mission-apparent-age-v1:'+input.context.scope:null;
   function reference(input){const id=key(input);if(!id)return null;try{const item=memory.get(id)||JSON.parse(localStorage.getItem(id)||'null');return item?.method===core.method&&core.rangeValid(item.range)&&Number.isFinite(item.conditions?.light)&&item.conditions.distance>0&&Number.isFinite(Date.parse(item.at))?item:null;}catch{return memory.get(id)||null;}}
   const resultKey=scope=>'mission-apparent-age-result-v1:'+scope;
   function scopeOwner(scope){try{if(!scope.startsWith('mission-appearance-v2:'))return '';const parts=JSON.parse(scope.slice('mission-appearance-v2:'.length));return Array.isArray(parts)&&parts.length===3&&parts.every(value=>typeof value==='string')?JSON.stringify(parts.slice(0,2)):'';}catch{return '';}}
   function setIdentity(input){
-    ownerIdentity=input?.storageScope&&input.name?JSON.stringify([input.storageScope,input.name]):'';setScope('');if(!ownerIdentity)return;
+    ownerIdentity=input?.storageScope&&input.name?JSON.stringify([input.storageScope,input.name]):'';sampleAllowed=true;setScope('');showSample();if(!ownerIdentity)return;
     try{const scope=ownerScopes.get(ownerIdentity)||localStorage.getItem('mission-apparent-age-owner-v1:'+ownerIdentity);if(scopeOwner(scope)===ownerIdentity&&savedResult(scope))setScope(scope);}catch{}
   }
   function savedResult(scope){if(!scope)return null;try{const item=results.get(scope)||JSON.parse(localStorage.getItem(resultKey(scope))||'null'),report=core.validate(item?.report);return report?.status==='estimated'&&Number.isFinite(Date.parse(item.at))&&Number.isFinite(item.conditions?.light)&&Number.isFinite(item.conditions?.distance)&&item.conditions.distance>0?{report,conditions:item.conditions,at:item.at}:null;}catch{return results.get(scope)||null;}}
@@ -21,10 +26,11 @@
     const next=typeof scope==='string'?scope:'';if(next===currentScope)return;currentScope=next;latest=null;displayed=savedResult(next);button.disabled=true;
     root.setAttribute('data-result-source',displayed?'saved':'missing');value.textContent=displayed?'≈ '+label(displayed.report.range):'Нужна запись';state.textContent=displayed?'Последний анализ / '+stamp(displayed.at):'Запиши видео с двумя качественными кадрами лица';
     const saved=reference({context:{scope:next}});referenceLabel.textContent=saved?'Эталон: '+label(saved.range)+' / '+new Date(saved.at).toLocaleDateString('ru-RU'):'Эталон не выбран';
+    showSample();
   }
-  function begin(){latest=null;root.setAttribute('data-result-source',displayed?'saved':'pending');if(!displayed){referenceLabel.textContent='Эталон будет проверен после записи';value.textContent='Обработка';}state.textContent=(displayed?'Последний анализ / '+stamp(displayed.at)+'. Новая запись: ':'')+'проверка кадров и эмбеддера';button.disabled=true;}
+  function begin(){sampleAllowed=false;latest=null;root.setAttribute('data-result-source',displayed?'saved':'pending');if(!displayed){referenceLabel.textContent='Эталон будет проверен после записи';value.textContent='Обработка';}state.textContent=(displayed?'Последний анализ / '+stamp(displayed.at)+'. Новая запись: ':'')+'проверка кадров и эмбеддера';button.disabled=true;}
   function finish(report,input){
-    const scope=input?.context?.scope||'';if(ownerIdentity&&scopeOwner(scope)!==ownerIdentity)return core.unavailable('model_unavailable');if(scope!==currentScope)setScope(scope);
+    const scope=input?.context?.scope||'';if(ownerIdentity&&scopeOwner(scope)!==ownerIdentity)return core.unavailable('model_unavailable');sampleAllowed=false;if(scope!==currentScope)setScope(scope);
     const result=core.validate(report)||core.unavailable('model_unavailable'),saved=reference(input);
     result.comparison=core.compare(result,saved,input?.conditions);
     if(saved)result.reference={range:{...saved.range},at:saved.at};
@@ -42,6 +48,6 @@
     try{localStorage.setItem(id,JSON.stringify(saved));volatile.delete(id);}catch{volatile.add(id);}
     finish(report,input);
   });
-  value.textContent='Нужна запись';root.setAttribute('data-result-source','missing');
+  value.textContent='Нужна запись';root.setAttribute('data-result-source','missing');showSample();
   window.missionApparentAge={begin,finish,setScope,setIdentity};
 })();

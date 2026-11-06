@@ -174,12 +174,19 @@ export default {
       if(!asset||!['GET','HEAD'].includes(request.method))return new Response('Not found',{status:404});
       const binary=atob(asset.data),bytes=new Uint8Array(binary.length);
       for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+      if(/^(audio|video)\//.test(asset.type)&&!asset.encoding){
+        const headers={'content-type':asset.type,'cache-control':'public, max-age=3600','x-content-type-options':'nosniff','accept-ranges':'bytes'},range=mediaByteRange(request.headers.get('range'),bytes.length);
+        if(range===false)return new Response(null,{status:416,headers:{...headers,'content-range':'bytes */'+bytes.length}});
+        headers['content-length']=String(range?range.length:bytes.length);if(range)headers['content-range']='bytes '+range.offset+'-'+(range.offset+range.length-1)+'/'+bytes.length;
+        return new Response(request.method==='HEAD'?null:range?bytes.slice(range.offset,range.offset+range.length):bytes,{status:range?206:200,headers});
+      }
       return new Response(request.method==='HEAD'?null:bytes,{encodeBody:asset.encoding?'manual':'automatic',headers:{'content-type':asset.type,...(asset.encoding?{'content-encoding':asset.encoding}:{}),'cache-control':url.pathname==='/'?'no-cache':'public, max-age=3600','x-content-type-options':'nosniff'}});
     }
     try{
       const user=owner(request,env);
       if(request.method!=='GET'&&((request.headers.get('origin')&&request.headers.get('origin')!==url.origin)||request.headers.get('sec-fetch-site')==='cross-site'))fail('forbidden',403);
       if(url.pathname==='/api/media-analysis')return await mediaAnalysisRoute(request,env,user);
+      const mediaFileMatch=url.pathname.match(/^\/api\/media-analysis\/([a-f0-9-]{36})\/media$/i);if(mediaFileMatch)return await mediaAnalysisFileRoute(request,env,user,mediaFileMatch[1]);
       if(url.pathname==='/api/transcriptions/config')return await speechRoute(request,env,true);
       if(url.pathname==='/api/transcriptions')return await speechRoute(request,env);
       if(url.pathname==='/api/status'&&request.method==='GET')return json(await capabilities(env));
