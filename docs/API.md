@@ -1,13 +1,13 @@
 # Mission Health API and agent integration
 
-This document describes the API implemented in `worker/`. It is a collaboration contract for the current prototype, not a claim that an external health-analysis service is connected.
+This document describes the API implemented in `worker/` and the supported server-side provider configuration. Runtime settings select the active provider; model connectivity is separate from clinical validity.
 
 ## Two separate integration surfaces
 
 1. **Application API:** the browser calls the same-origin `/api/` routes below. These manage identity, chat, diary, recordings, tasks, and research-related imports.
-2. **Language-service adapter:** the Worker calls a configured OpenAI-compatible service using `LLM_BASE_URL`, `LLM_MODEL`, and `LLM_API_KEY`.
+2. **Language-service adapter:** the Worker supports Chat Completions and the Azure agent Responses protocol. The selected primary provider serves chat, diary answers, and recording analysis. Utility generation keeps its separate Chat Completions contract.
 
-A teammate's structured health-analysis agent is a third service. The supplied project document proposes input/output JSON but does not itself include a deployment address. The separately supplied Azure deployment was tested successfully; see the external-agent section below. Do not substitute the existing diary/chat endpoint for that agent API.
+A teammate's health-analysis agent is an upstream service. Its supplied Azure deployment was tested successfully and has a Responses adapter; see the external-agent section below. The proposed structured readings workflow is separate from the browser-facing diary/chat routes.
 
 ## Environments and authentication
 
@@ -198,7 +198,33 @@ Creating notes/tasks changes the local preview database. These examples do not e
 
 ## Current language-service contract
 
-The server sends:
+### Provider selection
+
+| Setting | Purpose |
+| --- | --- |
+| `LLM_PROVIDER` | `chat_completions` by default; set `azure_responses` for the Azure primary provider |
+| `AZURE_AGENT_ENDPOINT` | Full agent Responses URL including `?api-version=v1`; never substitute the resource root |
+| `AZURE_AGENT_API_KEY` | Runtime secret sent only to the configured Azure endpoint in the `api-key` header |
+| `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | Existing Chat Completions provider; retain these when enabling Azure because utility generation and the existing transcription configuration still use them |
+
+Nonsecret Azure configuration:
+
+```dotenv
+LLM_PROVIDER=azure_responses
+AZURE_AGENT_ENDPOINT=https://AstronautHealthAI.services.ai.azure.com/api/projects/AstronautHealthAI/agents/NASA-AI/endpoint/protocols/openai/responses?api-version=v1
+```
+
+Provision `AZURE_AGENT_API_KEY` through ignored local development settings or the hosted secret configuration. Do not include a real key in an example file or commit. Azure configuration does not require `LLM_MODEL`; the agent selects its deployed model. Unknown provider names, missing Azure credentials, invalid/non-HTTPS endpoints, failed/incomplete responses, and empty final output produce an availability error instead of a fabricated answer.
+
+The Azure adapter sends `input` with explicit `type: "message"` items preserving the existing ordered system prompt and conversation messages. Text/image content parts become `input_text`/`input_image` without discarding dates, image detail, or supplied frames. It sets `stream: false`, `store: false`, and `max_output_tokens`. Agent-level reasoning settings are not overridden: the verified dedicated endpoint rejects a request-level `reasoning` field. The configured URL is used as a full endpoint, with `api-version=v1` added only when no API version is supplied. Azure redirects are not followed. The adapter extracts assistant message `output_text` and ignores reasoning/tool payloads; protocol `status: completed` is required.
+
+Autocomplete, semantic story tags, and historical English translation explicitly use the existing Chat Completions utility provider even when Azure is the primary provider. This prevents a dedicated health agent's JSON instructions from replacing a text suffix, tag object, or translation array. If the utility provider is absent, those features keep their existing fallback/unavailable behavior; they do not silently send their inputs to the health agent. There is no automatic cross-provider retry. `AIR_GAP=1` blocks Azure even if old local model settings remain; the explicitly supported local utility path is unchanged.
+
+Ordinary chat and diary answers render only a narrowly validated health object (`NORMAL`/`ATTENTION`/`CRITICAL`, `alerts`, `summary`) as readable summary, status, and alerts. Other JSON stays unchanged, and utility callers always receive raw text for their existing parsers. Saved recording analyses identify Azure as `media-analysis:azure_responses/NASA-AI`, rather than attributing the answer to an unrelated utility model. Owner/profile boundaries, references, attachments, and reply IDs are unchanged.
+
+### Chat Completions
+
+The default provider and utility requests send:
 
 ```http
 POST {LLM_BASE_URL}/chat/completions
@@ -219,9 +245,9 @@ Authorization: Bearer {LLM_API_KEY}
 }
 ```
 
-`LLM_BASE_URL` excludes the final `/chat/completions` suffix. The example configuration uses an OpenAI-compatible provider; actual credentials remain in ignored `.dev.vars` or the hosted runtime settings. Different features override output limits, timeouts, retry counts, and redirect handling. Multimedia requests can include OpenAI-compatible `image_url` content parts. Responses must expose `choices[0].message.content` as text or supported text parts.
+`LLM_BASE_URL` excludes the final `/chat/completions` suffix. The example configuration uses an OpenAI-compatible provider; actual credentials remain in ignored `.dev.vars` or the hosted runtime settings. Different features override output limits, timeouts, retry counts, and redirect handling. Multimedia requests can include OpenAI-compatible `image_url` content parts. Responses must expose `choices[0].message.content` as text or supported text parts. Both transports preserve the existing retry budget: connection failures and HTTP 502/503/504 may retry; other statuses and invalid completed responses do not.
 
-The ordinary chat/diary result is plain-language text. It is not the structured `status`/`alerts`/`summary` object proposed in the external project document. Confirm that a teammate's service accepts this exact protocol before pointing the current adapter at it. A custom FastAPI endpoint or native Anthropic Messages endpoint is not automatically compatible.
+The browser-facing chat/diary result remains text. A custom FastAPI endpoint or native Anthropic Messages endpoint is not automatically compatible with either supported transport. Structured health-result validation and deterministic severity rules require their own application contract.
 
 Optional services use separate settings:
 
@@ -273,9 +299,9 @@ Official protocol references:
 - https://learn.microsoft.com/en-us/azure/foundry/agents/how-to/configure-agent
 - https://learn.microsoft.com/en-us/azure/foundry/agents/how-to/manage-hosted-sessions
 
-The live sample returns `alerts` as strings, while the proposed document describes alert objects. A separate Responses adapter is required: changing `LLM_BASE_URL` alone would still append `/chat/completions`, send the wrong body, and read the wrong response structure. The production diary/chat provider has not been replaced.
+The live sample returns `alerts` as strings, while the proposed document describes alert objects. The Worker now supports this endpoint through `LLM_PROVIDER=azure_responses`. Changing `LLM_BASE_URL` alone is still incorrect: that setting belongs to the separate Chat Completions adapter. Runtime configuration and a hosted smoke test determine whether a specific deployment uses Azure.
 
-Before integration, still confirm the following with the agent owner:
+Before implementing the document's structured readings workflow, confirm the following with the agent owner:
 
 - The intended production authentication and how backend credentials will be provisioned privately.
 - A complete request example and response example from the actual service.
@@ -287,7 +313,7 @@ Before integration, still confirm the following with the agent owner:
 
 The supplied design document states that an agent may raise, but never lower, the rule-engine severity. If that structured agent is implemented, enforce and test that invariant in application code rather than relying on a prompt alone. The documented thresholds are illustrative and are not validated medical limits.
 
-The external Azure agent is reachable, but this application does not yet expose a readings-ingestion or structured health-agent route matching the document. Add the adapter and its tests after agreeing on the remaining service contract. Keep diary/chat integration separate unless the team explicitly chooses to change it.
+The external Azure agent is reachable and has a provider adapter, but this application does not yet expose a readings-ingestion or structured health-agent route matching the document. Agree on that remaining contract before adding a rule-engine/agent pipeline. Selecting Azure for diary/chat does not itself implement that pipeline.
 
 ## Errors and compatibility
 

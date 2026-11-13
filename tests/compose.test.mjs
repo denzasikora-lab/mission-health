@@ -144,3 +144,7 @@ test('Standard helper preserves previous limits, retries, and redirect behavior'
   const f=fixture();let attempt=0;f.handler(()=>++attempt===1?new Response('unavailable',{status:503}):Response.json({choices:[{message:{content:'Normal answer'}}]}));
   const answer=await f.scope.completeLanguageMessages(f.env,[{role:'user',content:'Normal chat'}]);assert.equal(answer.text,'Normal answer');assert.equal(f.calls.length,2);assert.ok(f.calls.every(call=>call.body.max_completion_tokens===1536));assert.ok(f.calls.every(call=>!Object.hasOwn(call.options,'redirect')));
 });
+test('Autocomplete keeps its utility model when Azure is selected for primary chat',async()=>{
+  const f=fixture(),result=await f.run({environment:{LLM_PROVIDER:'azure_responses',AZURE_AGENT_ENDPOINT:'https://agent.test/responses?api-version=v1',AZURE_AGENT_API_KEY:'synthetic-azure-key'}});
+  assert.equal(result.status,200);assert.equal(f.calls.length,1);assert.equal(f.calls[0].url,'https://model.test/v1/chat/completions');assert.equal(f.calls[0].options.headers['api-key'],undefined);assert.ok(f.calls[0].body.messages[0].content.includes('Continue the exact supplied prefix'));assert.equal(f.calls[0].body.max_completion_tokens,256);
+});

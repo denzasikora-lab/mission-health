@@ -7,6 +7,7 @@ import {webcrypto} from 'node:crypto';
 const root=new URL('../',import.meta.url);
 const source=(await Promise.all(['activity','scheduler','personal','photos','stories','speech','training','book','index'].map(name=>readFile(new URL('worker/'+name+'.js',root),'utf8')))).join('\n').replace('export default','globalThis.app =');
 const migrations=await Promise.all((await readdir(new URL('drizzle/',root))).filter(name=>name.endsWith('.sql')).sort().map(name=>readFile(new URL('drizzle/'+name,root),'utf8')));
+const hostedMemoryMigration=await readFile(new URL('drizzle/0015_hosted_memory_reindex.sql',root),'utf8');
 const model='embeddinggemma-2:daa72c51243991dfcaf9f9137d2c573d8f7790c0:q4:text:256:v1';
 function fixture(options={}){
   const sql=new DatabaseSync(':memory:');for(const migration of options.beforeHundred?migrations.slice(0,10):migrations)sql.exec(migration);
@@ -16,7 +17,7 @@ function fixture(options={}){
     return {bind(...values){return {first:async()=>statement.get(...values)||null,all:async()=>({results:statement.all(...values)}),run:async()=>statement.run(...values)};}};
   }};
   let status=200,answer='Test response based on supplied context.';
-  const scope={URL,Request,Response,FormData,Blob,Uint8Array,TextEncoder,DataView,AbortSignal,crypto:webcrypto,atob,console:{warn(){},error(){}},fetch:async(url,options)=>{out.push({url,body:JSON.parse(options.body)});if(String(url).startsWith('http://trainer.internal/'))return Response.json({id:JSON.parse(options.body).id});return status===200?Response.json({choices:[{message:{content:answer}}]}):new Response('unavailable',{status});}};
+  const scope={URL,Request,Response,FormData,Blob,Uint8Array,TextEncoder,DataView,AbortSignal,crypto:webcrypto,atob,console:{warn(){},error(){}},fetch:async(url,options)=>{const body=JSON.parse(options.body);out.push({url,body});if(String(url).startsWith('http://trainer.internal/'))return Response.json({id:body.id});return status===200?Response.json(body.input?{status:'completed',output:[{type:'message',role:'assistant',content:[{type:'output_text',text:answer}]}]}:{choices:[{message:{content:answer}}]}):new Response('unavailable',{status});}};
   vm.runInNewContext(source,scope);
   const env={DB,PHOTOS,LLM_API_KEY:'test-key',LLM_BASE_URL:'https://model.test/v1',LLM_MODEL:'test-model'};
   const run=async(path,{owner='owner-a',method='GET',body,environment={},origin,name,email,nameEncoding,expectedScope}={})=>{
@@ -25,8 +26,14 @@ function fixture(options={}){
     return {status:response.status,headers:response.headers,body:response.headers.get('content-type')?.includes('application/json')?await response.json():await response.text()};
   };
   const note=async(score=70,profile='jessica-meir',owner='owner-a',content='Fatigue decreased after exercise.')=>run('/api/astronauts/'+profile+'/messages',{owner,method:'POST',body:{id:webcrypto.randomUUID(),content,language:'en',mode:'diary',attachments:[],wellbeing:score===null?null:{score,wellbeingScale:100}}});
-  return {sql,out,objects,run,note,migrateHundred:()=>{for(const migration of migrations.slice(10))sql.exec(migration);},validateHealth:scope.validatedStoryHealth,provider:(code,text)=>{status=code;if(text)answer=text;}};
+  return {sql,out,objects,run,note,migrateHundred:()=>{for(const migration of migrations.slice(10).filter(value=>value!==hostedMemoryMigration))sql.exec(migration);},validateHealth:scope.validatedStoryHealth,provider:(code,text)=>{status=code;if(text)answer=text;}};
 }
+test('Azure chat saves readable health output with the same owner and reply identity',async()=>{
+  const f=fixture(),environment={LLM_PROVIDER:'azure_responses',AZURE_AGENT_ENDPOINT:'https://agent.test/agents/NASA-AI/endpoint/protocols/openai/responses?api-version=v1',AZURE_AGENT_API_KEY:'synthetic-key'},id=webcrypto.randomUUID();
+  f.provider(200,JSON.stringify({status:'ATTENTION',alerts:['Synthetic heart-rate flag'],summary:'Review the synthetic sample.'}));
+  const result=await f.run('/api/chat',{method:'POST',environment,body:{id,content:'Synthetic sample',attachments:[]}});assert.equal(result.status,201);assert.equal(result.body.reply.content,'Review the synthetic sample.\n\nStatus: ATTENTION\nAlerts:\n- Synthetic heart-rate flag');assert.equal(result.body.reply.replyTo,id);assert.equal(f.out.length,1);assert.equal(f.out[0].body.input[0].role,'system');assert.ok(f.out[0].body.input[0].content.includes('ordinary conversation'));assert.equal(f.sql.prepare('SELECT owner_id FROM general_chat_messages WHERE reply_to=?').get(id).owner_id,'owner-a');
+  const retry=await f.run('/api/chat',{method:'POST',environment,body:{id,content:'Synthetic sample',attachments:[]}});assert.equal(retry.body.reply.id,result.body.reply.id);assert.equal(f.out.length,1);assert.equal((await f.run('/api/chat',{owner:'owner-b',environment})).body.messages.length,0);f.sql.close();
+});
 test('New visitors receive the Sara Khan demo persona without account name or email',async()=>{
   const f=fixture();
   for(const headers of [{},{name:'crown-bobby'},{email:'crown-bobby@example.test'},{name:'%D0%95%D0%B3%D0%BE%D1%80',nameEncoding:'percent-encoded-utf-8',email:'private@example.test'}]){
@@ -167,6 +174,15 @@ test('Migration invalidates only old vectors without rewriting text, scores, or 
   assert.equal(f.sql.prepare('SELECT summary FROM activity_events').get().summary,'Selected wellbeing / 8 from 10');
   const pending=await f.run('/api/astronauts/personal/book-index');
   assert.deepEqual(pending.body.entries.map(row=>row.id),[legacy.id]);assert.ok(pending.body.entries[0].content.includes('80/100'));assert.ok(pending.body.entries[0].content.includes('Original entry - score 8/10.'));
+});
+
+test('Moving hosted vector storage queues existing entries without changing their contents or browser vectors',()=>{
+  const f=fixture(),notes=[storedNote(f),storedNote(f,{owner:'owner-b'}),storedNote(f,{role:'assistant'})];
+  for(const note of notes)f.sql.prepare('INSERT INTO journal_text_vectors (message_id,owner_id,astronaut_id,model,vectors_json,indexed_at) VALUES (?,?,?,?,?,?)').run(note.id,note.owner,note.profile,model,'[]','2026-11-13T00:00:00Z');
+  const before=f.sql.prepare('SELECT id,owner_id,astronaut_id,role,content,created_at,wellbeing_json FROM journal_messages ORDER BY id').all();
+  f.sql.exec(hostedMemoryMigration);
+  assert.deepEqual(f.sql.prepare('SELECT id,owner_id,astronaut_id,role,content,created_at,wellbeing_json FROM journal_messages ORDER BY id').all(),before);
+  for(const note of notes){assert.equal(f.sql.prepare('SELECT vector_status FROM journal_messages WHERE id=?').get(note.id).vector_status,before.find(row=>row.id===note.id).role==='assistant'?'indexed':'pending');assert.ok(f.sql.prepare('SELECT * FROM journal_text_vectors WHERE message_id=?').get(note.id));}
 });
 
 test('Old JSON snapshots are normalized in responses without changing originals or owner boundaries',async()=>{

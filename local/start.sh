@@ -30,7 +30,7 @@ settings.chmod(0o600)
 PY
 npm run build
 WRANGLER_SEND_METRICS=false node_modules/.bin/wrangler d1 migrations apply DB --local --config wrangler.jsonc --persist-to .wrangler/state
-.venv/bin/python local/service.py &
+MEMORY_MODE=local .venv/bin/python local/service.py &
 memory_pid=$!
 trap 'kill "$memory_pid" 2>/dev/null || true' EXIT INT TERM
 .venv/bin/python - <<'PY'

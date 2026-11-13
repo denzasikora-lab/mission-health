@@ -57,7 +57,7 @@ Visual observations share one group, including facial geometry, apparent age, an
 
 Uploaded video comparisons use selected frames. Frame similarity helps retrieve earlier material; it does not measure pulse, respiration, or gait. Original recordings and derived results remain separate in the archive. Sample results must not be presented as measurements of the current user.
 
-Older non-English records are displayed through an owner-scoped English translation cache. Original records remain unchanged. Translation uses the same configured language service; if unavailable, an English status message is shown instead of untranslated text.
+Older non-English records are displayed through an owner-scoped English translation cache. Original records remain unchanged. Translation uses the configured utility language service; if unavailable, an English status message is shown instead of untranslated text.
 
 ## Personal memory and assistant
 
@@ -66,6 +66,18 @@ Diary messages are saved before indexing. An unavailable embedding service leave
 The configured language service receives the selected history and supporting material. When semantic memory is unavailable, the server can use saved history and bounded keyword retrieval. If a language service cannot answer, the interface can show original records with dates; that fallback is identified as retrieved evidence.
 
 Scheduled tasks can be created from explicit dates and times in chat, then edited, completed, or deleted in **Scheduled**. Wellbeing scores use an explicit scale; older 1-10 scores are normalized to 1-100 without changing their meaning.
+
+## Hosted text memory
+
+The Linux CPU service uses Qdrant and the text encoder of the pinned EmbeddingGemma 2 snapshot. Hosted mode requires an explicit bearer key, verifies the exported model manifest, and never loads Qwen. The CPU dependency set includes torchvision because the model processor imports it even with the image encoder disabled.
+
+Deployment files are in `deploy/t4/`. The t4 layout is `/home/t4/mission-health`, with separate user services `mission-health-qdrant.service` and `mission-health-memory.service`. Qdrant binds to loopback with a private API key and a 1 GiB memory ceiling. The embedder uses two CPU threads, one worker, and a 3 GiB ceiling. Existing VPN services are separate.
+
+Export the text artifact with `local/export_text_model.py`, install `local/requirements-cpu.txt` in the server venv, and verify the artifact before starting the service. Both installation scripts support a dry run and refuse to overwrite an existing deployment. Runtime credentials stay in the server's private `runtime/` directory, outside Git.
+
+`deploy/t4/activate_https.py` adds one authenticated memory proxy prefix to the existing app HTTPS server. First review its dry-run SHA256. Administrative activation requires that same hash, preserves the original app routes and TLS, validates Nginx, and restores the backup if validation or reload fails. Concurrent changes are rejected. Configure hosted `MEMORY_URL` and secret `MEMORY_API_KEY` only after verifying the HTTPS endpoint. Migration 0015 queues existing diary entries for reindexing without changing their text, scores, media, or browser vectors.
+
+Primary chat, diary answers, and media summaries can use the Azure Responses agent through `LLM_PROVIDER=azure_responses`, `AZURE_AGENT_ENDPOINT`, and secret `AZURE_AGENT_API_KEY`. Existing `LLM_*` Chat Completions settings remain available for utility features with strict output formats. Audio/video embeddings and local visual comparisons still run in the browser; moving text memory does not move those workloads.
 
 ## Local development
 
