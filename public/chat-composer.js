@@ -10,28 +10,28 @@
     const enabled=['chat','team'].includes(view.kind),s=enabled?view.chatAdapter.store(view.kind):null;
     view.chatTools.hidden=!enabled;view.chatFiles.hidden=!enabled;view.chatFiles.replaceChildren();
     view.chatClip.disabled=Boolean(s?.busy||s?.files?.length>=4);view.chatMic.disabled=Boolean(s?.busy||voices.get(view)?.processing);
-    const voice=voices.get(view),label=voice&&!voice.processing?'Остановить голосовой ввод':'Голосовой ввод';view.chatMic.setAttribute('aria-label',label);view.chatMic.title=label;view.chatMic.setAttribute('aria-pressed',String(Boolean(voice&&!voice.processing)));
+    const voice=voices.get(view),label=voice&&!voice.processing?'Stop voice input':'Voice input';view.chatMic.setAttribute('aria-label',label);view.chatMic.title=label;view.chatMic.setAttribute('aria-pressed',String(Boolean(voice&&!voice.processing)));
     for(const file of s?.files||[]){
-      const item=document.createElement('div');item.className='chat-pending-file';const name=document.createElement('span');name.textContent=file.name+(file.error?' / ошибка загрузки':file.id?'':' / загрузка...');
-      const remove=button('Убрать файл '+file.name,'<path d="m6 6 12 12M18 6 6 18"/>');remove.disabled=s.busy;remove.addEventListener('click',()=>{s.files=s.files.filter(value=>value!==file);s.pending=null;view.chatAdapter.render();});item.append(name,remove);view.chatFiles.append(item);
+      const item=document.createElement('div');item.className='chat-pending-file';const name=document.createElement('span');name.textContent=file.name+(file.error?' / upload error':file.id?'':' / uploading...');
+      const remove=button('Remove file '+file.name,'<path d="m6 6 12 12M18 6 6 18"/>');remove.disabled=s.busy;remove.addEventListener('click',()=>{s.files=s.files.filter(value=>value!==file);s.pending=null;view.chatAdapter.render();});item.append(name,remove);view.chatFiles.append(item);
     }
     resize(view);
   }
   async function upload(view,files){
     const kind=view.kind,s=view.chatAdapter.store(kind);if(!['chat','team'].includes(kind)||s.busy)return;
     for(const file of files){
-      if(s.files.length>=4){s.notice='К сообщению можно добавить до четырех файлов.';break;}
-      if(!file.size||file.size>20000000){s.notice='Файл должен быть от 1 байта до 20 МБ.';continue;}
+      if(s.files.length>=4){s.notice='You can attach up to four files to a message.';break;}
+      if(!file.size||file.size>20000000){s.notice='File size must be from 1 byte to 20 MB.';continue;}
       const item={name:file.name,bytes:file.size};s.files.push(item);s.pending=null;view.chatAdapter.render();
       try{const form=new FormData();form.set('room',kind==='team'?'team':'private');form.set('file',file);const response=await fetch('/api/chat-files',{method:'POST',body:form});const result=await response.json();if(!response.ok||!result.file?.id)throw new Error();Object.assign(item,result.file);}
-      catch{item.error=true;s.notice='Не удалось прикрепить файл. Убери его и выбери еще раз.';}
+      catch{item.error=true;s.notice='Could not attach the file. Remove it and select it again.';}
       view.chatAdapter.render();
     }
   }
   async function microphone(view){
     if(voices.has(view)){stop(view);return;}
     const kind=view.kind,s=view.chatAdapter.store(kind);if(s.busy)return;
-    s.dictating=true;const voice={cancelled:false,processing:false,chunks:[],store:s};s.voiceToken=voice;voices.set(view,voice);s.notice='Подключаю микрофон...';view.chatAdapter.render();
+    s.dictating=true;const voice={cancelled:false,processing:false,chunks:[],store:s};s.voiceToken=voice;voices.set(view,voice);s.notice='Connecting microphone...';view.chatAdapter.render();
     try{
       const response=await fetch('/api/transcriptions/config',{cache:'no-store'}),config=await response.json();voice.mode=config.airGap?'local':config.api?'api':'local';
       if(!response.ok||voice.mode==='local'&&!config.local)throw new Error('not_configured');
@@ -44,24 +44,24 @@
       voice.recorder.addEventListener('dataavailable',event=>{if(event.data.size)voice.chunks.push(event.data);});
       voice.recorder.addEventListener('stop',async()=>{
         voice.stream.getTracks().forEach(track=>track.stop());clearTimeout(voice.timer);if(voice.cancelled)return;
-        voice.processing=true;s.notice='Распознаю речь...';view.chatAdapter.render();
+        voice.processing=true;s.notice='Recognizing speech...';view.chatAdapter.render();
         try{
           const blob=new Blob(voice.chunks,{type:voice.recorder.mimeType});if(!blob.size)throw new Error();
           const form=new FormData();form.set('mode',voice.mode);form.set('file',blob,voice.recorder.mimeType.includes('mp4')?'voice.m4a':'voice.webm');
           const response=await fetch('/api/transcriptions',{method:'POST',body:form}),result=await response.json();if(!response.ok||!result.text?.trim())throw new Error();if(voice.cancelled)return;
           s.draft=(s.draft.trimEnd()+(s.draft.trim()?' ':'')+result.text.trim()).slice(0,6000);s.pending=null;s.notice='';
-        }catch{if(!voice.cancelled)s.notice='Не удалось распознать речь. Текст сообщения сохранен.';}
+        }catch{if(!voice.cancelled)s.notice='Could not recognize speech. Message text preserved.';}
         finally{releaseDraft(voice);if(voices.get(view)===voice)voices.delete(view);view.chatAdapter.render();}
       });
-      voice.recorder.start();voice.timer=setTimeout(()=>stop(view),90000);s.notice='Говори. Нажми микрофон еще раз, чтобы вставить текст.';
-    }catch(error){releaseDraft(voice);voice.stream?.getTracks().forEach(track=>track.stop());if(!voice.cancelled)s.notice=error.message==='not_configured'?'Распознавание речи не настроено.':'Не удалось включить микрофон. Проверь разрешение браузера.';if(voices.get(view)===voice)voices.delete(view);}
+      voice.recorder.start();voice.timer=setTimeout(()=>stop(view),90000);s.notice='Speak. Press the microphone again, to insert text.';
+    }catch(error){releaseDraft(voice);voice.stream?.getTracks().forEach(track=>track.stop());if(!voice.cancelled)s.notice=error.message==='not_configured'?'Speech recognition is not configured.':'Could not enable the microphone. Check browser permission.';if(voices.get(view)===voice)voices.delete(view);}
     view.chatAdapter.render();
   }
   function attach(view,adapter){
     view.chatAdapter=adapter;views.add(view);
     const tools=document.createElement('div');tools.className='chat-composer-tools';view.chatTools=tools;
-    view.chatClip=button('Прикрепить файл',icons.clip);view.chatMic=button('Голосовой ввод',icons.mic);
-    const picker=document.createElement('input');picker.type='file';picker.multiple=true;picker.hidden=true;picker.setAttribute('aria-label','Файлы сообщения');
+    view.chatClip=button('Attach file',icons.clip);view.chatMic=button('Voice input',icons.mic);
+    const picker=document.createElement('input');picker.type='file';picker.multiple=true;picker.hidden=true;picker.setAttribute('aria-label','Message files');
     view.chatFiles=document.createElement('div');view.chatFiles.className='chat-pending-files';view.input.before(view.chatFiles,picker);
     tools.append(view.chatClip,view.chatMic);view.form.querySelector('footer').prepend(tools);
     view.chatClip.addEventListener('click',()=>picker.click());picker.addEventListener('change',()=>{const files=[...picker.files];picker.value='';void upload(view,files);});

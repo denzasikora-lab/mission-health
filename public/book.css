@@ -23,7 +23,7 @@ body[data-book="true"] .mission-content .insight-column,body[data-book="true"] .
 
 .cover-nasa{display:block;width:96px;height:80px;object-fit:contain;flex:none;margin:4px 0}
 
-/* Обучение и события находятся внутри одной общей рамки архива. */
+/* Training and activity share one archive border. */
 #mission-book>.book-history-panel{display:grid;gap:22px;margin-block-start:24px;margin-block-end:0;padding:22px;min-width:0;border-radius:16px}
 #book-history-panel>.book-training{margin:0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
 #book-history-panel>.personal-activity{margin:0;padding:20px 0 0;border:0;border-top:1px solid var(--border);border-radius:0;background:transparent;box-shadow:none;min-width:0}
@@ -31,7 +31,7 @@ body[data-book="true"] .mission-content .insight-column,body[data-book="true"] .
 #mission-book .book-training button{max-width:100%;white-space:normal}
 @container mission (max-width:700px){#mission-book>.book-history-panel{margin-block-start:18px;padding:16px;gap:16px}#book-history-panel>.personal-activity{padding-top:16px}}
 
-/* Страница учитывает ширину текста; нижние панели заменены жестами и клавиатурой. */
+/* Pages account for text width; bottom navigation panels are replaced with gestures and keyboard controls. */
 .book-navigation,.book-bottom{display:none!important}
 .mission-book{--paper:#0a1d13;--ink:#dbe9dc;--paper-muted:#9bb29d;--paper-line:#92b79a38;--paper-edge:#31563b;--book-binding:#142e1e;--book-crease:#00160866}
 html[data-theme="light"] .mission-book{--paper:#faf8ef;--ink:#273f30;--paper-muted:#657360;--paper-line:#657a5438;--paper-edge:#d5d2b7;--book-binding:#97a083;--book-crease:#37533228}
@@ -66,7 +66,7 @@ html[data-theme="light"] .book-cover :is(.cover-open,.cover-kicker){color:#49613
   .book-page-running{font-size:9px}
 }
 
-/* Медиа и расшифровки читаются как разделы записи, технические объекты не выводятся. */
+/* Media and transcripts are rendered as entry sections, technical objects are not displayed. */
 .book-observation-media{display:block;width:100%;margin:12px 0 16px;border-radius:8px;background:var(--paper-line)}
 video.book-observation-media{height:210px;max-height:210px;object-fit:contain}
 audio.book-observation-media{height:54px;max-height:54px}

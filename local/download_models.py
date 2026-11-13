@@ -1,4 +1,4 @@
-"""Скачивает локальные модели для текстовой памяти и помощника."""
+"""Download local models for text memory and the assistant."""
 
 from pathlib import Path
 

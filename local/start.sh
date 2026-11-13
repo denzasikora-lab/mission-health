@@ -46,6 +46,6 @@ for attempt in range(90):
     except OSError:
         time.sleep(1)
 else:
-    raise SystemExit('Локальная память не запустилась. Проверьте вывод сервиса.')
+    raise SystemExit('Local memory failed to start. Check the service output.')
 PY
 WRANGLER_SEND_METRICS=false npm run dev

@@ -1,6 +1,6 @@
 {
-  "description": "Силуэты стран из предоставленного пользователем набора 03-solid. SVG скопированы без изменений.",
-  "geometry_source": "Natural Earth, Admin 0, 1:110m - по описанию исходного набора",
+  "description": "Country silhouettes from the user-provided collection 03-solid. SVG copied unchanged.",
+  "geometry_source": "Natural Earth, Admin 0, 1:110m - according to the original collection description",
   "reference": "https://www.naturalearthdata.com/downloads/110m-cultural-vectors/110m-admin-0-countries/",
   "files": [
     {

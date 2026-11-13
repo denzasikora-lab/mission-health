@@ -33,34 +33,34 @@ FIELDS = {
 
 
 def download(url):
-    """Прочитать открытый файл с ограничением времени ожидания.
+    """Read a public file with a timeout.
 
     Parameters
     ----------
     url : str
-        Адрес исходного файла.
+        Source file URL.
 
     Returns
     -------
     bytes
-        Полученные байты.
+        Received bytes.
     """
     with urllib.request.urlopen(url, timeout=45) as response:
         return response.read()
 
 
 def number(value):
-    """Преобразовать число, сохранив пропуски как null при экспорте.
+    """Convert a number, preserving missingas null during export.
 
     Parameters
     ----------
     value : str
-        Исходное значение из CSV.
+        Original value from CSV.
 
     Returns
     -------
     float or None
-        Конечное число или отсутствие измерения.
+        Finite number or missing measurement.
     """
     try:
         parsed = float(value)
@@ -98,7 +98,7 @@ def import_nasa():
     order = ["L-92", "L-44", "L-3", "R+1", "R+45", "R+82", "R+194"]
     rows.sort(key=lambda row: (row["astronaut_id"], order.index(row["timepoint"])))
     save_json(OUTPUT / "nasa-osd-575.json", {"id": "OSD-575", "mission": "Inspiration4", "year": 2021, "license": "CC0-1.0", "source": "https://osdr.nasa.gov/bio/repo/data/studies/OSD-575", "provenance": provenance, "verifiedValues": 364, "timepoints": order, "rows": rows})
-    print("NASA: 28 образцов, 364 значения сверены с исходными таблицами.", flush=True)
+    print("NASA: 28 samples, 364 values verified against source tables.", flush=True)
 
 
 def import_record(filename):
@@ -120,7 +120,7 @@ def import_record(filename):
     if wave_path.exists():
         waveforms = json.loads(wave_path.read_text())
     else:
-        # Загружается только начало потока; исходная частота 125 Гц сохраняется.
+        # Only the start of the stream is downloaded; original frequency 125 Hz is preserved.
         with urllib.request.urlopen(BIDMC + signal_name, timeout=45) as response:
             signal_reader = csv.DictReader(io.TextIOWrapper(response, encoding="utf-8-sig"))
             waveforms = []
@@ -145,7 +145,7 @@ def import_bidmc():
     license_text = download("https://physionet.org/files/bidmc/1.0.0/LICENSE")
     (OUTPUT / "BIDMC-LICENSE.txt").write_bytes(license_text)
     save_json(OUTPUT / "bidmc-index.json", {"id": "BIDMC", "version": "1.0.0", "source": "https://physionet.org/content/bidmc/1.0.0/", "doi": "10.13026/C2208R", "license": "ODC-By-1.0", "citation": "Pimentel et al. (2017), Toward a Robust Estimation of Respiratory Rate From Pulse Oximeters, IEEE Transactions on Biomedical Engineering, 64(8), 1914-1923.", "records": records})
-    print("BIDMC: 53 записи, по 481 числовому отсчету и 10 секунд ECG, дыхания и PPG.", flush=True)
+    print("BIDMC: 53 recordings, over 481 numeric sample and 10 seconds ECG, respiration and PPG.", flush=True)
 
 
 if __name__ == "__main__":

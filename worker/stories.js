@@ -36,7 +36,7 @@ async function storiesRoute(request,env,user,id,media,url){
       if(poster)await photoStore(env).put(posterKey,poster,{httpMetadata:{contentType:'image/jpeg'}});
       await database(env).prepare('INSERT INTO personal_stories (id,owner_id,author_name,caption,health_json,media_kind,object_key,poster_key,mime,bytes,width,height,duration_ms,digest,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(storyId,user,author,caption,health?JSON.stringify(health):null,kind,key,posterKey,mime,content.length,width,height,duration?Math.round(duration*1000):null,digest,new Date().toISOString()).run();
     }catch(error){await photoStore(env).delete([key,...(posterKey?[posterKey]:[])]);throw error}
-    if(typeof activityWrite==='function')await activityWrite(env,user,'story_published','Опубликовал сториз'+(caption?' / '+caption.slice(0,90):''),'story:'+storyId);
+    if(typeof activityWrite==='function')await activityWrite(env,user,'story_published','Published story'+(caption?' / '+caption.slice(0,90):''),'story:'+storyId);
     return json({story:storyView(await storyRow(env,user,storyId))},201);
   }
   const row=await storyRow(env,user,id);if(!row)fail('not_found',404);

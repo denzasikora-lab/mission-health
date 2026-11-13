@@ -31,7 +31,7 @@ function fixture({permission,configuration}={}){
   }
   const sandbox={window,document:{createElement:()=>new Node()},navigator:{mediaDevices:{getUserMedia:()=>{microphoneCalls++;return permission||Promise.resolve({getTracks:()=>tracks});}}},MediaRecorder:Recorder,Blob,FormData,setTimeout:()=>1,clearTimeout(){},fetch:async(url,options)=>{
     calls.push({url,options});if(url.endsWith('/config'))return configuration||{ok:true,json:async()=>({api:true,local:false})};
-    if(url==='/api/transcriptions')return {ok:true,json:async()=>({text:'распознанный текст'})};
+    if(url==='/api/transcriptions')return {ok:true,json:async()=>({text:'recognized text'})};
     if(url==='/api/chat-files')return {ok:true,json:async()=>({file:{id:'file-id',name:'check.txt',bytes:4}})};
     throw new Error(url);
   }};
@@ -39,21 +39,21 @@ function fixture({permission,configuration}={}){
   const adapter={store,render(){window.missionChatComposer.refresh(view);}};window.missionChatComposer.attach(view,adapter);
   return {view,store,calls,recorders,tracks,api:window.missionChatComposer,microphoneCalls:()=>microphoneCalls};
 }
-test('В беседах остаются скрепка и микрофон без кнопки расширения',()=>{
-  const f=fixture();assert.equal(f.view.chatTools.children.length,2);assert.equal(f.view.chatTools.children[0].attributes['aria-label'],'Прикрепить файл');assert.equal(f.view.chatTools.children[1].attributes['aria-label'],'Голосовой ввод');assert.equal(f.view.input.style.height,'80px');assert.equal(f.calls.length,0);
+test('Conversations retain attachments and microphone without an expand button',()=>{
+  const f=fixture();assert.equal(f.view.chatTools.children.length,2);assert.equal(f.view.chatTools.children[0].attributes['aria-label'],'Attach file');assert.equal(f.view.chatTools.children[1].attributes['aria-label'],'Voice input');assert.equal(f.view.input.style.height,'80px');assert.equal(f.calls.length,0);
 });
-test('Отмена до ответа конфигурации не запрашивает разрешение микрофона',async()=>{
+test('Cancellation before configuration returns does not request microphone permission',async()=>{
   let resolve;const configuration=new Promise(r=>{resolve=r;});const f=fixture({configuration});f.view.chatMic.click();f.api.contextChanged(f.view);resolve({ok:true,json:async()=>({api:true})});await settle();assert.equal(f.microphoneCalls(),0);assert.equal(f.store('chat').dictating,false);
 });
-test('Поздний доступ к микрофону после смены вкладки сразу освобождает дорожки',async()=>{
+test('Late microphone access after switching tabs immediately releases tracks',async()=>{
   let resolve;const permission=new Promise(r=>{resolve=r;});const f=fixture({permission});f.view.chatMic.click();await settle();f.api.contextChanged(f.view);f.view.kind='team';resolve({getTracks:()=>f.tracks});await settle();assert.equal(f.tracks[0].stopped,true);assert.equal(f.recorders.length,0);assert.equal(f.calls.filter(c=>c.url==='/api/transcriptions').length,0);assert.equal(f.store('chat').dictating,false);
 });
-test('Голосовой ввод добавляет распознанную речь в черновик без отправки сообщения',async()=>{
-  const f=fixture();f.store('chat').draft='Начало';f.view.chatMic.click();await settle();assert.equal(f.recorders[0].state,'recording');assert.equal(f.store('chat').dictating,true);f.view.chatMic.click();await settle();assert.equal(f.store('chat').draft,'Начало распознанный текст');assert.equal(f.store('chat').dictating,false);assert.equal(f.tracks[0].stopped,true);assert.equal(f.calls.filter(c=>c.url==='/api/transcriptions').length,1);assert.equal(f.calls.some(c=>c.url==='/api/chat'||c.url==='/api/team-chat'),false);
+test('Voice input adds transcribed speech to the draft without sending a message',async()=>{
+  const f=fixture();f.store('chat').draft='Start';f.view.chatMic.click();await settle();assert.equal(f.recorders[0].state,'recording');assert.equal(f.store('chat').dictating,true);f.view.chatMic.click();await settle();assert.equal(f.store('chat').draft,'Start recognized text');assert.equal(f.store('chat').dictating,false);assert.equal(f.tracks[0].stopped,true);assert.equal(f.calls.filter(c=>c.url==='/api/transcriptions').length,1);assert.equal(f.calls.some(c=>c.url==='/api/chat'||c.url==='/api/team-chat'),false);
 });
-test('При смене вкладки запись отменяется без отправки звука и изменения другого черновика',async()=>{
-  const f=fixture();f.view.chatMic.click();await settle();f.api.contextChanged(f.view);f.view.kind='team';f.store('team').draft='Команде';await settle();assert.equal(f.tracks[0].stopped,true);assert.equal(f.calls.some(c=>c.url==='/api/transcriptions'),false);assert.equal(f.store('team').draft,'Команде');assert.equal(f.store('chat').dictating,false);
+test('Switching tabs cancels recording without sending audio or modifying another draft',async()=>{
+  const f=fixture();f.view.chatMic.click();await settle();f.api.contextChanged(f.view);f.view.kind='team';f.store('team').draft='To crew';await settle();assert.equal(f.tracks[0].stopped,true);assert.equal(f.calls.some(c=>c.url==='/api/transcriptions'),false);assert.equal(f.store('team').draft,'To crew');assert.equal(f.store('chat').dictating,false);
 });
-test('Выбранный файл попадает в исходный командный черновик после переключения вкладки',async()=>{
+test('A selected file enters the original crew draft after switching tabs',async()=>{
   const f=fixture();f.view.kind='team';f.api.refresh(f.view);const picker=f.view.input.beforeNodes[1];picker.files=[Object.assign(new Blob(['test']),{name:'check.txt'})];picker.fire('change');f.view.kind='chat';await settle();assert.equal(f.store('team').files[0].id,'file-id');assert.equal(f.store('chat').files.length,0);assert.equal(f.calls[0].options.body.get('room'),'team');
 });

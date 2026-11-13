@@ -12,7 +12,7 @@ const crew=[
 ];
 const archived=(profile,id)=>({id,profile,title:id,image:'/'+id+'.jpg',credit:'NASA',source:'https://images.nasa.gov/'+id,createdAt:'2026-01-01T00:00:00Z'});
 const archive=[archived(crew[0].id,'jessica-1'),archived(crew[0].id,'jessica-2'),archived(crew[1].id,'jack-1'),archived(crew[2].id,'christina-1'),archived(crew[2].id,'christina-2')];
-const personal=(id,kind='photo')=>({id,kind,url:'/'+id+(kind==='video'?'.mp4':'.jpg'),poster:'/poster.jpg',author:'Алексей Орлов',caption:id,createdAt:'2026-01-01T00:00:00Z',duration:2});
+const personal=(id,kind='photo')=>({id,kind,url:'/'+id+(kind==='video'?'.mp4':'.jpg'),poster:'/poster.jpg',author:'Alex Morgan',caption:id,createdAt:'2026-01-01T00:00:00Z',duration:2});
 
 class Node{
   constructor(tag,document){this.tagName=tag.toUpperCase();this.document=document;this.children=[];this.attributes={};this.dataset={};this.style={};this.events={};this._text='';this.hidden=false;this.disabled=false;this.value='';this.open=false;this.currentTime=0;this.duration=2;this.paused=true;}
@@ -57,7 +57,7 @@ async function fixture({mine=[],items=archive}={}){
   let now=0,frameId=0;const frames=new Map();
   const document={ids:new Map(),hidden:false,events:{},createElement(tag){return new Node(tag,this);},getElementById(id){return this.ids.get(id);},querySelector(selector){return this.body.querySelector(selector);},addEventListener(type,handler){(this.events[type]||=[]).push(handler);}};
   document.body=document.createElement('body');const rail=document.createElement('aside'),nav=document.createElement('nav');nav.className='mission-nav';rail.append(nav);document.body.append(rail);
-  const window={missionDesign:{rail},missionProfileName:{name:'Алексей Орлов',load:async()=>({name:'Алексей Орлов',researcherId:'test'})},missionStoryTags:{mount:()=>({reset(){},flush(){}}),generate:()=>[],suggest:async()=>[]},missionStoryHealth:{render(){},snapshot:()=>({})},events:{},addEventListener(type,handler){(this.events[type]||=[]).push(handler);},dispatchEvent(){}};
+  const window={missionDesign:{rail},missionProfileName:{name:'Alex Morgan',load:async()=>({name:'Alex Morgan',researcherId:'test'})},missionStoryTags:{mount:()=>({reset(){},flush(){}}),generate:()=>[],suggest:async()=>[]},missionStoryHealth:{render(){},snapshot:()=>({})},events:{},addEventListener(type,handler){(this.events[type]||=[]).push(handler);},dispatchEvent(){}};
   const scope={window,document,crew,Intl,Date,Map,Event,performance:{now:()=>now},requestAnimationFrame:handler=>{frames.set(++frameId,handler);return frameId;},cancelAnimationFrame:id=>frames.delete(id),fetch:async path=>({ok:true,json:async()=>path==='/api/stories'?{stories:mine}:{items}}),setTimeout,clearTimeout,setInterval,clearInterval};
   vm.runInNewContext(source,scope);await settle();
   const viewer=document.getElementById('story-viewer'),row=document.querySelector('.stories-row'),media=viewer.querySelector('.story-view-media'),progress=viewer.querySelector('.story-progress');
@@ -67,35 +67,35 @@ async function fixture({mine=[],items=archive}={}){
   return {document,viewer,row,media,progress,frames,current,ready,advance,open:index=>row.children[index].children[0].click(),next:()=>viewer.querySelector('.next').click(),prev:()=>viewer.querySelector('.prev').click(),key:key=>viewer.dispatchEvent({type:'keydown',key}),pause:()=>document.getElementById('story-pause').click(),close:()=>document.getElementById('story-close').click(),title:()=>document.getElementById('story-view-title').textContent,author:()=>document.getElementById('story-view-author').textContent};
 }
 
-test('Выбранный профиль открывается с его первой сториз, переход вперед идет к следующему человеку',async()=>{
+test('The selected profile opens at its first story, moving forward reaches the next person',async()=>{
   const f=await fixture();f.open(2);assert.equal(f.author(),'Jack Hathaway');assert.equal(f.title(),'jack-1');f.next();assert.equal(f.author(),'Christina Koch');assert.equal(f.title(),'christina-1');assert.equal(f.viewer.open,true);
 });
 
-test('Вся лента без личных сториз проходит три профиля и циклически возвращается к первому',async()=>{
+test('Without personal stories, the feed cycles through three profiles and returns to the first',async()=>{
   const f=await fixture();f.open(1);const titles=[];for(let i=0;i<6;i++){titles.push(f.title());f.next();}
-  assert.deepEqual(titles,['jessica-1','jessica-2','jack-1','christina-1','christina-2','jessica-1']);assert.equal(f.viewer.open,true);assert.equal(f.viewer.querySelector('.next').getAttribute('aria-label'),'Следующая сториз');
+  assert.deepEqual(titles,['jessica-1','jessica-2','jack-1','christina-1','christina-2','jessica-1']);assert.equal(f.viewer.open,true);assert.equal(f.viewer.querySelector('.next').getAttribute('aria-label'),'Next story');
 });
 
-test('Переход назад из начала ленты открывает последнюю сториз и предыдущий профиль',async()=>{
+test('Moving back from the feed start opens the previous profile’s final story',async()=>{
   const f=await fixture();f.open(1);f.prev();assert.equal(f.title(),'christina-2');f.prev();assert.equal(f.title(),'christina-1');f.key('ArrowLeft');assert.equal(f.title(),'jack-1');f.key('ArrowRight');assert.equal(f.title(),'christina-1');
 });
 
-test('Личные сториз включены в общий цикл вперед и назад без пропусков',async()=>{
-  const f=await fixture({mine:[personal('mine-1'),personal('mine-2')]});f.open(0);assert.equal(f.current().src,'/mine-1.jpg');f.next();assert.equal(f.current().src,'/mine-2.jpg');f.next();assert.equal(f.title(),'jessica-1');f.prev();assert.equal(f.current().src,'/mine-2.jpg');f.prev();f.prev();assert.equal(f.title(),'christina-2');f.next();assert.equal(f.current().src,'/mine-1.jpg');assert.equal(f.author(),'Astronaut');assert.equal(f.row.children[0].children[0].title,'Моя сториз');
+test('Personal stories join the forward and backward cycle without gaps',async()=>{
+  const f=await fixture({mine:[personal('mine-1'),personal('mine-2')]});f.open(0);assert.equal(f.current().src,'/mine-1.jpg');f.next();assert.equal(f.current().src,'/mine-2.jpg');f.next();assert.equal(f.title(),'jessica-1');f.prev();assert.equal(f.current().src,'/mine-2.jpg');f.prev();f.prev();assert.equal(f.title(),'christina-2');f.next();assert.equal(f.current().src,'/mine-1.jpg');assert.equal(f.author(),'Astronaut');assert.equal(f.row.children[0].children[0].title,'My story');
 });
 
-test('Прогресс остается внутри текущего автора и сбрасывается при переходе к следующему',async()=>{
+test('Progress stays within the current author and resets for the next one',async()=>{
   const f=await fixture();f.open(1);assert.equal(f.progress.children.length,2);f.next();assert.equal(f.progress.children[0].firstChild.style.width,'100%');f.next();assert.equal(f.title(),'jack-1');assert.equal(f.progress.children.length,1);assert.notEqual(f.progress.children[0].firstChild.style.width,'100%');f.next();assert.equal(f.progress.children.length,2);
 });
 
-test('Автоматический переход фото пересекает границу профиля, пауза и закрытие останавливают просмотр',async()=>{
+test('Automatic photo progression crosses profile boundaries, pausing and closing stop playback',async()=>{
   const f=await fixture();f.open(1);f.next();f.ready();f.pause();f.advance(8000);assert.equal(f.title(),'jessica-2');f.pause();f.advance(7000);assert.equal(f.title(),'jack-1');f.ready();f.close();assert.equal(f.frames.size,0);f.advance(8000);assert.equal(f.viewer.open,false);assert.equal(f.media.children.length,0);
 });
 
-test('Конец видео переходит вперед один раз, запоздалое событие старого видео не меняет новую сториз',async()=>{
+test('Video ending advances once, late events from old videos do not change the current story',async()=>{
   const f=await fixture({mine:[personal('mine-video','video')]});f.open(0);f.ready();const video=f.current();video.currentTime=video.duration;f.advance(100);video.onended();assert.equal(f.title(),'jessica-1');video.onended();assert.equal(f.title(),'jessica-1');f.prev();const anotherVideo=f.current();f.next();anotherVideo.onended();assert.equal(f.title(),'jessica-1');
 });
 
-test('Пустые профили пропускаются, единственная сториз циклически остается доступной',async()=>{
+test('Empty profiles missingare skipped, a single story remains available cyclically',async()=>{
   const f=await fixture({items:[archive[2]]});assert.equal(f.row.children[1].children[0].disabled,true);f.open(2);f.next();assert.equal(f.title(),'jack-1');f.prev();assert.equal(f.title(),'jack-1');assert.equal(f.viewer.open,true);
 });

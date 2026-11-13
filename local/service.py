@@ -1,4 +1,4 @@
-"""Локальная векторная память и помощник дневников прототипа."""
+"""Local vector memory and assistant for prototype diaries."""
 
 import json
 import os
@@ -27,12 +27,12 @@ runtime = {}
 
 
 def local_key():
-    """Возвращает секрет локального сервиса.
+    """Return the local service secret.
 
     Returns
     -------
     str
-        Секрет, сохраненный вне отслеживаемых исходников.
+        Secret, stored outside tracked source files.
     """
     directory = ROOT / "local/runtime"
     directory.mkdir(parents=True, exist_ok=True)
@@ -48,7 +48,7 @@ API_KEY = os.environ.get("MEMORY_API_KEY") or local_key()
 
 @asynccontextmanager
 async def lifespan(app):
-    print("Загрузка EmbeddingGemma 2 для текстовых дневников.", flush=True)
+    print("Loading EmbeddingGemma 2 for text diaries.", flush=True)
     torch.set_num_threads(4)
     runtime["embedder"] = SentenceTransformer(
         str(ROOT / "local/models/embeddinggemma-2"),
@@ -66,9 +66,9 @@ async def lifespan(app):
         client.create_payload_index(COLLECTION, field, models.PayloadSchemaType.KEYWORD, wait=True)
     model_path = ROOT / "local/models/journal-assistant"
     if (model_path / "config.json").exists():
-        print("Загрузка локального помощника Qwen3.", flush=True)
+        print("Loading the local assistant Qwen3.", flush=True)
         runtime["llm"], runtime["tokenizer"] = load(str(model_path))
-    print("Локальная память готова.", flush=True)
+    print("Local memory is ready.", flush=True)
     yield
 
 
@@ -88,7 +88,7 @@ class Scope(BaseModel):
 class Entry(Scope):
     id: uuid.UUID
     text: str = Field(min_length=1, max_length=6000)
-    language: Literal["en", "ru", "ur", "zh", "ar", "es"]
+    language: Literal["en"]
     createdAt: str = Field(max_length=40)
 
 
@@ -97,23 +97,23 @@ class Search(Scope):
 
 
 class Answer(Search):
-    language: Literal["en", "ru", "ur", "zh", "ar", "es"]
+    language: Literal["en"]
     references: list[dict] = Field(default_factory=list, max_length=6)
     history: list[dict] = Field(default_factory=list, max_length=12)
 
 
 def scope_filter(scope):
-    """Ограничивает поиск владельцем и одним профилем.
+    """Restrict search to the owner and one profile.
 
     Parameters
     ----------
     scope : Scope
-        Владелец дневника и выбранный профиль.
+        Diary owner and selected profile.
 
     Returns
     -------
     models.Filter
-        Обязательные условия доступа к записям.
+        Required access conditions for records.
     """
     return models.Filter(must=[
         models.FieldCondition(key="owner_id", match=models.MatchValue(value=scope.ownerId)),
@@ -173,7 +173,7 @@ def search(query: Search):
 def answer(query: Answer):
     if "llm" not in runtime:
         raise HTTPException(503, "assistant_unavailable")
-    language = {"en": "English", "ru": "Russian", "ur": "Urdu", "zh": "Chinese", "ar": "Arabic", "es": "Spanish"}[query.language]
+    language = "English"
     references = [{"id": item.get("id"), "date": item.get("createdAt"), "text": str(item.get("content", ""))[:2000]}
                   for item in query.references]
     instruction = (

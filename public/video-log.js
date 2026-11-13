@@ -28,8 +28,8 @@
   const microphoneMeter = window.missionMedia.meter('video-log');
   const earthStation = () => locationName.dataset.station || 'HOUSTON / JOHNSON';
   const storageKey = suffix => 'mission-health-log-' + (identity?.researcherId || 'local') + '-' + suffix;
-  function normalized(value) { return String(value || '').replaceAll('\u0451', '\u0435').replaceAll('\u0401', '\u0415').replace(/[\u2013\u2014]/g, '-'); }
-  function filmName(value) { return normalized(value).trim().replace(/\s+/g, ' ') || 'Участник'; }
+  function normalized(value) { return String(value || '').replace(/[\u2013\u2014]/g, '-'); }
+  function filmName(value) { return normalized(value).trim().replace(/\s+/g, ' ') || 'Participant'; }
   async function loadIdentity() {
     const ticket = ++identityEpoch;
     try {
@@ -41,25 +41,25 @@
       try { entry = Math.max(1, Number(localStorage.getItem(storageKey('entry'))) || 1); } catch {}
       firstName.value = 'Astronaut'; lastName.value = '';
       updateSignature(); renderControls();
-    } catch { if (ticket === identityEpoch) message('Не удалось прочитать профиль. Обнови страницу после входа в аккаунт.', true); }
+    } catch { if (ticket === identityEpoch) message('Could not read the profile. Refresh the page after signing in.', true); }
   }
 
   function updateSignature() {
     researcher.value = 'Astronaut';
-    document.getElementById('video-log-title').textContent = 'Дневник';
+    document.getElementById('video-log-title').textContent = 'Diary';
     window.missionAppearance?.setIdentity({storageScope:identity?.storageScope,name:'Astronaut'});
   }
 
   function message(value, error = false) { notice.textContent = value; notice.dataset.error = String(error); }
   function renderPreview() {
-    // Живое видео видно сразу, пока нет надежной маски человека.
+    // Live video is visible immediately, until a reliable person mask is available.
     screen.dataset.preview = !stream ? 'idle' : backgroundChoice.value === 'room' || !portrait ? 'camera' : 'background';
-    canvas.setAttribute('aria-label', screen.dataset.preview === 'camera' ? 'Исходная камера без замены фона' : 'Камера видеодневника с выбранным оформлением');
+    canvas.setAttribute('aria-label', screen.dataset.preview === 'camera' ? 'Original camera without background replacement' : 'Video diary camera with selected appearance');
   }
   function renderControls() {
     renderPreview();
     const active = phase === 'live' || phase === 'recording';
-    cameraButton.textContent = phase === 'requesting' ? 'Отменить подключение' : phase === 'recording' ? 'Остановить запись' : phase === 'finishing' ? 'Подготовка записи' : active ? 'Выключить камеру' : 'Включить камеру';
+    cameraButton.textContent = phase === 'requesting' ? 'Cancel connection' : phase === 'recording' ? 'Stop recording' : phase === 'finishing' ? 'Preparing recording' : active ? 'Disable camera' : 'Enable camera';
     cameraButton.disabled = phase === 'finishing';
     cameraButton.setAttribute('aria-pressed', String(active));
     cameraButton.dataset.recording = String(phase === 'recording');
@@ -89,15 +89,15 @@
     clearTimeout(workerTimer); workerTimer = null;
     activeWorker?.terminate(); worker = null; workerReady = workerBusy = false;
     portrait?.close(); portrait = null; renderPreview();
-    message('Фон недоступен. Камера работает без замены фона.' + (phase === 'recording' ? ' Запись продолжается.' : ''));
+    message('Background unavailable. Camera works without background replacement.' + (phase === 'recording' ? ' Recording continues.' : ''));
   }
 
   function prepareBackground(attempt) {
     if (worker || backgroundChoice.value === 'room') return;
     if (!window.Worker || !window.OffscreenCanvas || !window.createImageBitmap) {
-      message('Камера работает без замены фона: обработка фона недоступна в этом браузере.'); return;
+      message('Camera works without background replacement: background processing is unavailable in this browser.'); return;
     }
-    message((phase === 'recording' ? 'Идет запись. ' : '') + 'Обрабатываю фон на устройстве.');
+    message((phase === 'recording' ? 'Recording. ' : '') + 'Processing background on your device.');
     worker = new Worker('/video-background-worker.js?v=20261030-camera-preview1');
     const activeWorker = worker;
     workerTimer = setTimeout(() => {
@@ -113,7 +113,7 @@
         portrait?.close(); portrait = data.hasPerson === false ? null : data.bitmap; workerBusy = false;
         if (!portrait) data.bitmap?.close();
         renderPreview();
-        if (portrait && !hadPortrait && phase === 'recording') message('Идет запись видео и голоса. Нажми «Остановить запись», когда закончишь.');
+        if (portrait && !hadPortrait && phase === 'recording') message('Recording video and audio. Press «Stop recording», when finished.');
       } else if (data.type === 'error') backgroundError(attempt, activeWorker);
     };
     worker.onerror = () => backgroundError(attempt, activeWorker);
@@ -122,21 +122,21 @@
 
   async function startCamera() {
     stopCamera(); microphoneMeter.prepare(); window.missionSpeech?.reset('video'); phase = 'requesting'; renderControls();
-    message('Разреши камеру и микрофон в браузере. Голос входит в запись.');
+    message('Allow camera and microphone access in your browser. Audio is included in the recording.');
     const attempt = epoch;
     try {
       await (identityPromise ||= loadIdentity());
       if (attempt !== epoch || !visible()) return;
       if (!identity || !researcher.value.trim()) {
         stopCamera(); phase = 'idle'; renderControls();
-        message('Не удалось прочитать имя профиля. Обнови страницу после входа в аккаунт.', true); return;
+        message('Could not read the profile name. Refresh the page after signing in.', true); return;
       }
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('unavailable');
       const incoming = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: { echoCancellation: true, noiseSuppression: true }
       });
-      // Разрешение после закрытия или отмены не должно возобновлять камеру.
+      // Permission granted after closing or cancelling must not reactivate the camera.
       if (attempt !== epoch || !visible()) { incoming.getTracks().forEach(track => track.stop()); return; }
       if(!incoming.getAudioTracks().length){incoming.getTracks().forEach(track=>track.stop());throw new Error('audio_required');}
       stream = incoming; video.srcObject = incoming; renderPreview(); await video.play();
@@ -146,10 +146,10 @@
       window.missionAppearance?.start(video,incoming.getVideoTracks?.()[0]?.getSettings?.());
       incoming.getTracks().forEach(track => track.addEventListener('ended', () => {
         if (attempt !== epoch) return;
-        stopCamera(); if (phase !== 'finishing') phase = 'idle'; renderControls(); message('Устройство отключено. Можно подключить камеру снова.', true);
+        stopCamera(); if (phase !== 'finishing') phase = 'idle'; renderControls(); message('Device disconnected. You can reconnect the camera.', true);
       }));
       cameraTimer = setTimeout(() => {
-        stopCamera(); if (phase !== 'finishing') phase = 'idle'; renderControls(); message('Камера выключена после трех минут просмотра.');
+        stopCamera(); if (phase !== 'finishing') phase = 'idle'; renderControls(); message('Camera stopped after three minutes of preview.');
       }, 180000);
       void recordWhenReady(attempt);
       if (backgroundChoice.value !== 'room') {
@@ -159,11 +159,11 @@
       if (attempt !== epoch) return;
       stopCamera(); phase = 'idle'; renderControls();
       const errors = {
-        NotAllowedError: 'Доступ закрыт. Разреши камеру и микрофон для сайта и повтори.',
-        NotFoundError: 'Камера или микрофон не найдены. Для записи нужны оба устройства.',
-        NotReadableError: 'Устройство занято. Закрой другое приложение с камерой и повтори.'
+        NotAllowedError: 'Access denied. Allow camera and microphone access for this site and retry.',
+        NotFoundError: 'Camera or microphone not found. Both devices are required for recording.',
+        NotReadableError: 'Device busy. Close other camera applications and retry.'
       };
-      message(errors[error.name] || 'Не удалось включить камеру. Повтори в Safari или Chrome.', true);
+      message(errors[error.name] || 'Could not enable the camera. Retry in Safari or Chrome.', true);
     }
   }
 
@@ -186,7 +186,7 @@
     const shade = context.createLinearGradient(0, canvas.height * .56, 0, canvas.height);
     shade.addColorStop(0, '#03151a00'); shade.addColorStop(1, '#03151acc');
     context.fillStyle = shade; context.fillRect(0, 0, canvas.width, canvas.height);
-    // Надписи и расположение взяты из выбранного кадра видеодневника Avatar.
+    // Captions and positioning follow the selected video diary reference Avatar.
     const cyan = '#53e6ec';
     context.lineWidth = 1.3; context.strokeStyle = cyan;
     context.beginPath(); context.roundRect(136, 80, 321, 25, 4); context.stroke();
@@ -235,7 +235,7 @@
     workerBusy = true; lastSegmentation = time;
     workerTimer = setTimeout(() => backgroundError(attempt, activeWorker), 5000);
     try {
-      // Промежуточный canvas работает и в Safari без преобразования video в bitmap.
+      // Intermediate canvas also works in Safari without conversion video in bitmap.
       segmentationContext.drawImage(video, 0, 0, 640, 360);
       const bitmap = await createImageBitmap(segmentationInput);
       if (attempt !== epoch || worker !== activeWorker || !visible()) { bitmap.close(); return; }
@@ -250,7 +250,7 @@
     lastDraw = time;
     context.fillStyle = backgroundChoice.value === 'room' ? '#000' : '#102027'; context.fillRect(0, 0, 1280, 720);
     if (backgroundChoice.value === 'room') {
-      // Предпросмотр заполняет область, в анализ уходит исходная дорожка камеры.
+      // Preview fills its container, analysis receives the original camera track.
       if (stream && video.readyState >= 2) cover(video);
       return;
     }
@@ -271,19 +271,19 @@
   function recordWhenReady(attempt) {
     if (attempt !== epoch || phase !== 'live' || autoRecordAttempt === attempt) return;
     autoRecordAttempt = attempt;
-    // Запись исходных дорожек не зависит от готовности оформления.
+    // Recording of original tracks does not depend on appearance readiness.
     startRecording();
   }
 
   function startRecording() {
     if (phase !== 'live') return;
     updateSignature();
-    if (!identity || !researcher.value.trim()) { message('Не удалось прочитать имя профиля. Обнови страницу после входа в аккаунт.', true); return; }
-    if (!window.MediaStream || !window.MediaRecorder) { message('Запись видео не поддерживается этим браузером. Попробуй Safari или Chrome.', true); return; }
+    if (!identity || !researcher.value.trim()) { message('Could not read the profile name. Refresh the page after signing in.', true); return; }
+    if (!window.MediaStream || !window.MediaRecorder) { message('Recording video is unsupported in this browser. Try Safari or Chrome.', true); return; }
     const audio = stream.getAudioTracks().length > 0;
     const types = audio ? ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/webm;codecs=vp8,opus', 'video/mp4', 'video/webm'] : ['video/mp4;codecs=avc1.42E01E', 'video/webm;codecs=vp8', 'video/mp4', 'video/webm'];
     const mimeType = types.find(type => MediaRecorder.isTypeSupported(type));
-    if (!mimeType) { message('Подходящий формат записи не найден. Попробуй другой браузер.', true); return; }
+    if (!mimeType) { message('No suitable recording format found. Try another browser.', true); return; }
     const chunks = [];
     const ageContext = window.missionAppearance?.ageContext?.();
     try {
@@ -293,7 +293,7 @@
       recording.captureObservation=()=>window.missionAppearance?.ageSnapshot?.(ageContext);
       let failed = false;
       recording.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
-      recording.onerror = () => { failed = true; stopCamera(); if (phase !== 'finishing') phase = 'idle'; renderControls(); message('Не удалось завершить запись. Повтори после подключения камеры.', true); };
+      recording.onerror = () => { failed = true; stopCamera(); if (phase !== 'finishing') phase = 'idle'; renderControls(); message('Could not finish recording. Retry after connecting the camera.', true); };
       recording.onstop = () => {
         const ageInput = recording.observationSnapshot||window.missionAppearance?.ageSnapshot?.(ageContext);
         window.missionSpeech?.stop('video');
@@ -304,7 +304,7 @@
         const duration = Math.max(.1,(performance.now()-recordingStarted)/1000);
         entry++;
         try { localStorage.setItem(storageKey('entry'), String(entry)); } catch {}
-        phase = 'idle'; renderControls(); message('Запись передана на анализ.');
+        phase = 'idle'; renderControls(); message('Recording sent for analysis.');
         void window.missionMedia.submit('video',blob,duration,ageInput);
       };
       recordingStarted = performance.now(); phase = 'recording';
@@ -312,10 +312,10 @@
       recordingTimer = setInterval(() => {
         if (performance.now() - recordingStarted >= 120000 && recording.state === 'recording') { phase = 'finishing'; recording.stop(); renderControls(); }
       }, 250);
-      renderControls(); message('Идет запись видео и голоса. Нажми «Остановить запись», когда закончишь.');
+      renderControls(); message('Recording video and audio. Press «Stop recording», when finished.');
     } catch {
       recordedStream?.getTracks().forEach(track => track.stop()); recordedStream = null; recorder = null;
-      window.missionSpeech?.stop('video');phase = 'live'; renderControls(); message('Не удалось начать запись. Повтори подключение камеры.', true);
+      window.missionSpeech?.stop('video');phase = 'live'; renderControls(); message('Could not start recording. Reconnect the camera.', true);
     }
   }
 
@@ -333,7 +333,7 @@
   document.querySelectorAll('[data-open-video-log]').forEach(button => button.addEventListener('click', open));
   cameraButton.addEventListener('click', () => {
     if (phase === 'requesting' || phase === 'live' || phase === 'recording') {
-      stopCamera(); if (phase !== 'finishing') phase = 'idle'; renderControls(); message('Камера выключена.');
+      stopCamera(); if (phase !== 'finishing') phase = 'idle'; renderControls(); message('Camera is off.');
     } else void startCamera();
   });
   backgroundChoice.addEventListener('change', () => {

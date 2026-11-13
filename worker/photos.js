@@ -55,7 +55,7 @@ async function comparePhoto(env,user,astronaut,id){
 async function photoContext(env,user,astronaut,ids,query){
   let current;
   if(ids.length)current=await photoRow(env,user,astronaut,ids[0]);
-  else if(/video|clip|vídeo|视频|видео|ролик|فيديو|photo|picture|image|face|skin|mole|foto|imagen|rostro|piel|lunar|照片|图片|脸|皮肤|痣|صور|وجه|جلد|شام|фото|сним|лиц|кож|родин/iu.test(query))current=await database(env).prepare('SELECT * FROM journal_photos WHERE owner_id=? AND astronaut_id=? ORDER BY created_at DESC LIMIT 1').bind(user,astronaut).first();
+  else if(/video|clip|photo|picture|image|face|skin|mole/iu.test(query))current=await database(env).prepare('SELECT * FROM journal_photos WHERE owner_id=? AND astronaut_id=? ORDER BY created_at DESC LIMIT 1').bind(user,astronaut).first();
   if(!current)return [];
   const comparison=await comparePhoto(env,user,astronaut,current.id),items=[{...comparison.current,position:'current',method:comparison.method,comparedCount:comparison.comparedCount},comparison.latest?{...comparison.latest,position:'previous'}:null,comparison.previous?{...comparison.previous,position:'similar',similarity:comparison.previous.similarity}:null].filter(Boolean);
   const unique=items.filter((item,i)=>items.findIndex(x=>x.id===item.id)===i),ready=[];

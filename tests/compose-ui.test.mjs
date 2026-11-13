@@ -35,54 +35,54 @@ function fixture(){
 }
 const settle=async()=>{await Promise.resolve();await Promise.resolve();};
 
-test('Пустое поле и ввод короче трех символов не вызывают генерацию',()=>{
-  const f=fixture();f.advance(2000);assert.equal(f.calls.length,0);f.type('  а ');f.advance(2000);assert.equal(f.calls.length,0);assert.equal(f.state.layer.hidden,true);assert.equal(f.state.hint.hidden,true);
+test('Empty input and fewer than three characters do not trigger generation',()=>{
+  const f=fixture();f.advance(2000);assert.equal(f.calls.length,0);f.type('  hi ');f.advance(2000);assert.equal(f.calls.length,0);assert.equal(f.state.layer.hidden,true);assert.equal(f.state.hint.hidden,true);
 });
-test('Быстрый набор делает один запрос после 700 мс паузы',()=>{
-  const f=fixture();f.type('При');f.advance(500);f.type('Привет');f.advance(699);assert.equal(f.calls.length,0);f.advance(1);assert.equal(f.calls.length,1);assert.equal(f.calls[0].path,'/api/compose');assert.deepEqual(f.calls[0].body,{prefix:'Привет'});
+test('Fast typing makes one request after 700 ms of inactivity',()=>{
+  const f=fixture();f.type('With');f.advance(500);f.type('Hello');f.advance(699);assert.equal(f.calls.length,0);f.advance(1);assert.equal(f.calls.length,1);assert.equal(f.calls[0].path,'/api/compose');assert.deepEqual(f.calls[0].body,{prefix:'Hello'});
 });
-test('Устаревший ответ не появляется после изменения текста, запрос отменяется',async()=>{
-  const f=fixture();f.type('Привет');f.advance(700);f.type('Сегодня');assert.equal(f.calls[0].signal.aborted,true);f.advance(700);assert.equal(f.calls.length,2);
-  f.calls[0].resolve({completion:' старое продолжение'});await settle();assert.equal(f.state.layer.hidden,true);
-  f.calls[1].resolve({completion:' хорошая погода'});await settle();assert.equal(f.state.prefixNode.textContent,'Сегодня');assert.equal(f.state.suffixNode.textContent,' хорошая погода');assert.equal(f.state.layer.hidden,false);
+test('A stale response does not appear after text changes, the request is cancelled',async()=>{
+  const f=fixture();f.type('Hello');f.advance(700);f.type('Today');assert.equal(f.calls[0].signal.aborted,true);f.advance(700);assert.equal(f.calls.length,2);
+  f.calls[0].resolve({completion:' old continuation'});await settle();assert.equal(f.state.layer.hidden,true);
+  f.calls[1].resolve({completion:' nice weather'});await settle();assert.equal(f.state.prefixNode.textContent,'Today');assert.equal(f.state.suffixNode.textContent,' nice weather');assert.equal(f.state.layer.hidden,false);
 });
-test('Tab принимает только показанное продолжение и вызывает обычный input без отправки',async()=>{
+test('Tab accepts only the shown continuation and triggers the normal input without sending',async()=>{
   const f=fixture();let draft='',submits=0;f.input.addEventListener('input',()=>{draft=f.input.value;});f.form.addEventListener('submit',()=>submits++);
-  f.type('Сегодня');f.advance(700);f.calls[0].resolve({completion:' чувствую себя хорошо'});await settle();
-  assert.equal(f.state.hint.hidden,false);const event=f.key('Tab');assert.equal(event.defaultPrevented,true);assert.equal(f.input.value,'Сегодня чувствую себя хорошо');assert.equal(draft,f.input.value);assert.equal(f.input.selectionStart,f.input.value.length);assert.equal(submits,0);assert.equal(f.state.hint.hidden,true);
+  f.type('Today');f.advance(700);f.calls[0].resolve({completion:' I feel well'});await settle();
+  assert.equal(f.state.hint.hidden,false);const event=f.key('Tab');assert.equal(event.defaultPrevented,true);assert.equal(f.input.value,'Today I feel well');assert.equal(draft,f.input.value);assert.equal(f.input.selectionStart,f.input.value.length);assert.equal(submits,0);assert.equal(f.state.hint.hidden,true);
 });
-test('Tab без подсказки и Shift+Tab сохраняют обычное поведение',async()=>{
-  const f=fixture();f.key('Escape');assert.equal(f.key('Tab').defaultPrevented,false);f.type('Сегодня');f.advance(700);f.calls[0].resolve({completion:' хорошая погода'});await settle();assert.equal(f.key('Tab',{shiftKey:true}).defaultPrevented,false);assert.equal(f.input.value,'Сегодня');
+test('Tab without a suggestion and Shift+Tab preserve normal behavior',async()=>{
+  const f=fixture();f.key('Escape');assert.equal(f.key('Tab').defaultPrevented,false);f.type('Today');f.advance(700);f.calls[0].resolve({completion:' nice weather'});await settle();assert.equal(f.key('Tab',{shiftKey:true}).defaultPrevented,false);assert.equal(f.input.value,'Today');
 });
-test('Enter не принимает продолжение и не мешает существующему обработчику отправки',async()=>{
-  const f=fixture();let sent='';f.input.addEventListener('keydown',event=>{if(event.key==='Enter')sent=f.input.value;});f.type('Сегодня');f.advance(700);f.calls[0].resolve({completion:' хорошая погода'});await settle();
-  assert.equal(f.key('Enter').defaultPrevented,false);assert.equal(sent,'Сегодня');assert.equal(f.state.layer.hidden,true);
+test('Enter does not accept completion or interfere with the existing send handler',async()=>{
+  const f=fixture();let sent='';f.input.addEventListener('keydown',event=>{if(event.key==='Enter')sent=f.input.value;});f.type('Today');f.advance(700);f.calls[0].resolve({completion:' nice weather'});await settle();
+  assert.equal(f.key('Enter').defaultPrevented,false);assert.equal(sent,'Today');assert.equal(f.state.layer.hidden,true);
 });
-test('Escape скрывает подсказку и отменяет текущий запрос',async()=>{
-  const f=fixture();f.type('Сегодня');f.advance(700);assert.equal(f.key('Escape').defaultPrevented,true);assert.equal(f.calls[0].signal.aborted,true);f.calls[0].resolve({completion:' хорошая погода'});await settle();assert.equal(f.state.layer.hidden,true);f.input.dispatchEvent(new Event('focus'));f.advance(1000);assert.equal(f.calls.length,1);
+test('Escape hides the suggestion and cancels the current request',async()=>{
+  const f=fixture();f.type('Today');f.advance(700);assert.equal(f.key('Escape').defaultPrevented,true);assert.equal(f.calls[0].signal.aborted,true);f.calls[0].resolve({completion:' nice weather'});await settle();assert.equal(f.state.layer.hidden,true);f.input.dispatchEvent(new Event('focus'));f.advance(1000);assert.equal(f.calls.length,1);
 });
-test('Составной ввод IME не вызывает запросов и не перехватывает Tab',async()=>{
-  const f=fixture();f.input.dispatchEvent(new Event('compositionstart'));f.type('Сегодня');f.advance(1000);assert.equal(f.calls.length,0);assert.equal(f.key('Tab',{isComposing:true}).defaultPrevented,false);
-  f.input.dispatchEvent(new Event('compositionend'));f.advance(700);assert.equal(f.calls.length,1);f.calls[0].resolve({completion:' хорошая погода'});await settle();assert.equal(f.state.layer.hidden,false);
+test('Composition input IME does not request suggestions or intercept Tab',async()=>{
+  const f=fixture();f.input.dispatchEvent(new Event('compositionstart'));f.type('Today');f.advance(1000);assert.equal(f.calls.length,0);assert.equal(f.key('Tab',{isComposing:true}).defaultPrevented,false);
+  f.input.dispatchEvent(new Event('compositionend'));f.advance(700);assert.equal(f.calls.length,1);f.calls[0].resolve({completion:' nice weather'});await settle();assert.equal(f.state.layer.hidden,false);
 });
-test('Каретка внутри текста, выделение и скрытое или занятое поле не генерируют подсказок',()=>{
+test('Caret inside text, selection and hidden or busy fields do not generate suggestions',()=>{
   for(const change of [f=>f.input.setSelectionRange(1,1),f=>f.input.setSelectionRange(0,f.input.value.length),f=>{f.input.disabled=true;},f=>{f.form.hidden=true;},f=>{f.input.visible=false;},f=>{f.input.dataset.activityArea='diary';}]){
-    const f=fixture();f.type('Сегодня');change(f);f.advance(700);assert.equal(f.calls.length,0);
+    const f=fixture();f.type('Today');change(f);f.advance(700);assert.equal(f.calls.length,0);
   }
 });
-test('Ошибка сервиса оставляет текст редактируемым и не блокирует следующий запрос',async()=>{
-  const f=fixture();f.type('Сегодня');f.advance(700);f.calls[0].reject(new Error('assistant_unavailable'));await settle();assert.equal(f.input.value,'Сегодня');assert.equal(Boolean(f.input.disabled),false);assert.equal(f.state.layer.hidden,true);
-  f.type('Сегодня я');f.advance(700);assert.equal(f.calls.length,2);f.calls[1].resolve({completion:' отдыхаю'});await settle();assert.equal(f.state.suffixNode.textContent,' отдыхаю');
+test('Service errors keep text editable and do not block the next request',async()=>{
+  const f=fixture();f.type('Today');f.advance(700);f.calls[0].reject(new Error('assistant_unavailable'));await settle();assert.equal(f.input.value,'Today');assert.equal(Boolean(f.input.disabled),false);assert.equal(f.state.layer.hidden,true);
+  f.type('Today I');f.advance(700);assert.equal(f.calls.length,2);f.calls[1].resolve({completion:' am resting'});await settle();assert.equal(f.state.suffixNode.textContent,' am resting');
 });
-test('Переносы, пробелы, шрифт и прокрутка передаются визуальному слою без изменения ввода',async()=>{
-  const f=fixture();f.type('Сегодня\n  я');f.advance(700);f.calls[0].resolve({completion:' отдыхаю'});await settle();assert.equal(f.state.prefixNode.textContent,'Сегодня\n  я');assert.equal(f.state.layer.style.fontSize,'13px');assert.equal(f.state.layer.style.paddingLeft,'4px');assert.equal(f.state.layer.style.width,'300px');
+test('Line breaks, spaces, font and scrolling reach the visual layer without changing input',async()=>{
+  const f=fixture();f.type('Today\n  I');f.advance(700);f.calls[0].resolve({completion:' am resting'});await settle();assert.equal(f.state.prefixNode.textContent,'Today\n  I');assert.equal(f.state.layer.style.fontSize,'13px');assert.equal(f.state.layer.style.paddingLeft,'4px');assert.equal(f.state.layer.style.width,'300px');
   f.input.scrollTop=17;f.input.scrollLeft=3;f.input.dispatchEvent(new Event('scroll'));assert.equal(f.state.layer.scrollTop,17);assert.equal(f.state.layer.scrollLeft,3);
 });
-test('Подсказка отбрасывается после потери фокуса или переключения контекста',async()=>{
-  const f=fixture();f.type('Сегодня');f.advance(700);f.document.activeElement=null;f.input.dispatchEvent(new Event('blur'));f.calls[0].resolve({completion:' хорошая погода'});await settle();assert.equal(f.state.layer.hidden,true);
-  f.document.activeElement=f.input;f.type('Сегодня я');f.advance(700);f.input.dataset.activityArea='diary';f.mutate();assert.equal(f.calls[1].signal.aborted,true);f.calls[1].resolve({completion:' отдыхаю'});await settle();assert.equal(f.state.layer.hidden,true);
+test('Suggestions are discarded after blur or context change',async()=>{
+  const f=fixture();f.type('Today');f.advance(700);f.document.activeElement=null;f.input.dispatchEvent(new Event('blur'));f.calls[0].resolve({completion:' nice weather'});await settle();assert.equal(f.state.layer.hidden,true);
+  f.document.activeElement=f.input;f.type('Today I');f.advance(700);f.input.dataset.activityArea='diary';f.mutate();assert.equal(f.calls[1].signal.aborted,true);f.calls[1].resolve({completion:' am resting'});await settle();assert.equal(f.state.layer.hidden,true);
 });
-test('Длинный кириллический черновик передается целиком, принятие не превышает maxlength',async()=>{
-  const long=fixture();long.type('я'.repeat(4100));long.advance(700);assert.equal(long.calls.length,1);assert.equal(long.calls[0].body.prefix.length,4100);
-  const f=fixture();f.input.maxLength=12;f.type('Сегодня');f.advance(700);f.calls[0].resolve({completion:' хорошая погода'});await settle();f.key('Tab');assert.equal(f.input.value,'Сегодня хоро');assert.equal(f.input.value.length,12);
+test('A long Unicode draft is sent in full, acceptance does not exceed maxlength',async()=>{
+  const long=fixture();long.type('I'.repeat(4100));long.advance(700);assert.equal(long.calls.length,1);assert.equal(long.calls[0].body.prefix.length,4100);
+  const f=fixture();f.input.maxLength=12;f.type('Today');f.advance(700);f.calls[0].resolve({completion:' nice weather'});await settle();f.key('Tab');assert.equal(f.input.value,'Today nice w');assert.equal(f.input.value.length,12);
 });

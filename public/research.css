@@ -2,7 +2,7 @@
 @container mission (max-width:1100px){.research-layout{grid-template-columns:190px minmax(0,1fr)}.research-stats,.research-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.research-heading{display:block}.research-badge{margin-top:15px}.research-notes{grid-template-columns:1fr}.research-wave-grid{grid-template-columns:1fr}.research-wave svg{height:130px}}
 @container mission (max-width:780px){.research-layout{grid-template-columns:1fr}.research-sidebar{position:static;display:flex;flex-wrap:wrap;gap:6px;padding:12px}.research-sidebar h2,.research-sidebar-note{display:none}.dataset-button{width:auto;flex:1;margin:0;padding:10px;min-width:120px}.dataset-symbol{width:30px;height:36px;font-size:.8rem}.dataset-button small{display:none}.research-heading,.research-chart,.research-table-panel{padding:22px}.research-controls{padding:18px;gap:12px}.research-heading h2{font-size:1.5rem}.research-svg{min-height:190px}.research-library{grid-template-columns:1fr}.workspace-switch{width:100%;margin-inline:0}.workspace-switch button{flex:1;padding:11px 12px;font-size:.85rem}.research-stats{gap:10px}.research-stat{padding:16px}.research-playback{gap:9px}.research-playback output{min-width:85px}.research-metric-grid .metric-card{min-height:140px}.research-chart-head{display:block}.research-note{padding:20px 22px}}
 
-/* Сетки учитывают доступную ширину блока, включая узкий режим компьютера. */
+/* Grids account for available container width, including narrow desktop mode. */
 .mission-content #research-workspace{grid-template-columns:240px minmax(0,1fr)}
 #research-workspace{min-width:0;max-width:100%}
 #research-workspace .research-sidebar{container:research-navigation/inline-size;min-width:0;max-width:100%}

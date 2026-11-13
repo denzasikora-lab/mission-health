@@ -1,4 +1,4 @@
-"""Заглушка распознавания речи для локального изолированного контура."""
+"""Speech recognition stub for an isolated local environment."""
 
 import hmac
 import json
@@ -7,28 +7,28 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
 def transcribe_audio(payload, content_type):
-    """Передает звуковую дорожку подключаемой локальной модели.
+    """Pass the audio track to a connected local model.
 
     Parameters
     ----------
     payload : bytes
-        Тело multipart-запроса с полями file, model и response_format.
+        Body multipart-request with fields file, model and response_format.
     content_type : str
-        Тип содержимого с границей multipart.
+        Content type with boundary multipart.
 
     Returns
     -------
     str
-        Распознанный текст после подключения локальной модели.
+        Recognized text after connecting a local model.
     """
     raise NotImplementedError("local_model_not_connected")
 
 
 class SpeechHandler(BaseHTTPRequestHandler):
-    """Обрабатывает только локальные запросы без внешних сетевых обращений."""
+    """Handle local requests only without external network calls."""
 
     def reply(self, status, value):
-        """Возвращает JSON без кеширования."""
+        """Return JSON without caching."""
         body = json.dumps(value, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -38,12 +38,12 @@ class SpeechHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        """Сообщает, что адаптер запущен, а локальная модель еще не подключена."""
+        """Report, that the adapter has started, but the local model is not yet connected."""
         self.reply(200 if self.path == "/health" else 404,
                    {"adapter": "local", "modelConnected": False} if self.path == "/health" else {"error": "not_found"})
 
     def do_POST(self):
-        """Принимает контракт транскрибации и явно сообщает о незаполненной заглушке."""
+        """Accept the transcription contract and explicitly report the unconfigured stub."""
         if self.path != "/v1/audio/transcriptions":
             self.reply(404, {"error": "not_found"})
             return
@@ -64,10 +64,10 @@ class SpeechHandler(BaseHTTPRequestHandler):
         self.reply(200, {"text": value})
 
     def log_message(self, format, *args):
-        """Выводит только адрес маршрута и код, без звука и содержимого запроса."""
+        """Log only the route and status code, without audio or request contents."""
         print(format % args, flush=True)
 
 
 if __name__ == "__main__":
-    print("Локальный адаптер: http://127.0.0.1:8092. Модель пока не подключена.", flush=True)
+    print("Local adapter: http://127.0.0.1:8092. No model connected yet.", flush=True)
     ThreadingHTTPServer(("127.0.0.1", 8092), SpeechHandler).serve_forever()

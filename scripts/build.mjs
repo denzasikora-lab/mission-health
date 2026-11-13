@@ -25,4 +25,4 @@ const source=(await readFile('public/story-tags-core.js','utf8'))+'\n'+(await re
 await writeFile('dist/server/index.js','const assets='+JSON.stringify(assets)+';\n'+source);
 await cp('.openai/hosting.json','dist/.openai/hosting.json');
 try{await cp('drizzle','dist/.openai/drizzle',{recursive:true})}catch(error){if(error.code!=='ENOENT')throw error}
-console.log('Собран сервер и '+Object.keys(assets).length+' ресурсов.');
+console.log('Built server and '+Object.keys(assets).length+' assets.');

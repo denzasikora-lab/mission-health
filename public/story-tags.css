@@ -10,7 +10,7 @@
 
 
 
-/* Очистка подписи остается справа внутри поля и не перекрывает текст. */
+/* Caption clearing stays inside the field on the right without covering text. */
 .story-caption-field{position:relative;display:block;min-width:0;width:100%}
 .story-capture-form .story-caption-field input{padding-inline-end:44px}
 .story-caption-field .story-caption-clear{position:absolute;inset-inline-end:6px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:32px;height:32px;padding:6px;border:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer}

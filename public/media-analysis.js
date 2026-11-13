@@ -13,13 +13,13 @@
           window.missionVoiceAnalysis?.restore?.(item.kind,item);
           if(state.jobs.length||!item.analysis||state.savedId===item.id)continue;
           state.saved?.remove();const root=document.createElement('article'),heading=document.createElement('header'),answer=document.createElement('div');root.className='media-analysis-job';answer.className='media-analysis-answer';
-          heading.textContent='Последний сохраненный анализ / '+new Date(item.createdAt).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'short'});answer.textContent=item.analysis;root.append(heading,answer);state.root.append(root);state.root.hidden=false;state.saved=root;state.savedId=item.id;
+          heading.textContent='Latest saved analysis / '+new Date(item.createdAt).toLocaleString('en-GB',{dateStyle:'short',timeStyle:'short'});answer.textContent=item.analysis;root.append(heading,answer);state.root.append(root);state.root.hidden=false;state.saved=root;state.savedId=item.id;
         }
       }catch{}
     })();
     try{await restoring;}finally{restoring=null;}
   }
-  function updateQueue(){for(const [index,item]of queue.entries())item.status.textContent='В очереди анализа / '+(index+1);}
+  function updateQueue(){for(const [index,item]of queue.entries())item.status.textContent='Queued for analysis / '+(index+1);}
   async function pump(){
     if(processing)return;processing=true;
     try{while(queue.length){const job=queue.shift();job.phase='processing';updateQueue();await send(job);job.resolve?.();job.resolve=null;}}
@@ -43,33 +43,33 @@
   async function submit(kind,blob,duration,ageInput=null){
     if(kind==='video')window.missionSkinSpots?.pending(ageInput?.skin?.report);
     const state=states.get(kind),root=document.createElement('article'),heading=document.createElement('header'),status=document.createElement('p'),answer=document.createElement('div'),retry=document.createElement('button');root.className='media-analysis-job';
-    const createdAt=new Date().toISOString();heading.textContent=(kind==='audio'?'Аудио':'Видео')+' / '+new Date(createdAt).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'});status.setAttribute('role','status');answer.className='media-analysis-answer';retry.type='button';retry.textContent='Повторить анализ';retry.hidden=true;root.append(heading,status,answer,retry);state.root.append(root);state.root.hidden=false;
-    // Речь и самооценка относятся к остановленной записи, независимо от следующих записей.
+    const createdAt=new Date().toISOString();heading.textContent=(kind==='audio'?'Audio':'Video')+' / '+new Date(createdAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});status.setAttribute('role','status');answer.className='media-analysis-answer';retry.type='button';retry.textContent='Retry analysis';retry.hidden=true;root.append(heading,status,answer,retry);state.root.append(root);state.root.hidden=false;
+    // Speech and wellbeing belong to the stopped recording, independently of later recordings.
     const transcriptTask=Promise.resolve(window.missionSpeech?.finish?.(kind==='audio'?'voice':'video')).catch(()=>'');
     const job={kind,root,status,answer,retry,phase:'new',payload:{id:crypto.randomUUID(),kind,blob,duration,createdAt,frames:null,features:undefined,ageInput,transcript:'',transcriptTask,report:window.missionCheckin?.current()||null}};state.jobs.push(job);retry.addEventListener('click',()=>void enqueue(job));return enqueue(job);
   }
   async function send(job){
     try{
-      const item=job.payload;job.status.textContent='Подготавливаю запись для анализа...';
+      const item=job.payload;job.status.textContent='Preparing recording for analysis...';
       if(item.kind==='video'&&!item.frames)item.frames=await frames(item.blob,item.duration);
       if(item.features===undefined)item.features=await window.missionVoiceAnalysis?.analyze(item.kind,item.blob,item.frames||[],item.ageInput,item.createdAt);
       if(!item.transcript)item.transcript=await item.transcriptTask||'';
       window.missionVoiceAnalysis?.transcript(item.kind,item.transcript);
       const form=new FormData();if(item.features)form.set('features',JSON.stringify(item.features));for(const key of ['id','kind','duration','transcript','createdAt'])form.set(key,String(item[key]));form.set('file',item.blob,'recording.'+(item.blob.type.includes('mp4')?'mp4':'webm'));for(const frame of item.frames||[])form.append('frame',frame,'frame.jpg');
       if(item.report)form.set('wellbeing',JSON.stringify(item.report));
-      job.status.textContent='NasaGPT анализирует запись...';
+      job.status.textContent='NasaGPT is analyzing the recording...';
       const response=await fetch('/api/media-analysis',{method:'POST',body:form,signal:AbortSignal.timeout(150000)}),result=await response.json();
       if(!response.ok||result.status!=='analyzed')throw Object.assign(new Error(result.error||'media_analysis_unavailable'),{saved:result.saved});
-      if(item.kind==='video'&&item.features?.skin)window.missionSkinSpots?.matches(result.skinMatches||[],item.features.skin.trackingKey);job.phase='complete';job.status.textContent='Анализ сохранен в архиве';job.answer.textContent=result.analysis;window.missionVoiceAnalysis?.transcript(item.kind,result.transcript||item.transcript);job.payload=null;
+      if(item.kind==='video'&&item.features?.skin)window.missionSkinSpots?.matches(result.skinMatches||[],item.features.skin.trackingKey);job.phase='complete';job.status.textContent='Analysis saved in archive';job.answer.textContent=result.analysis;window.missionVoiceAnalysis?.transcript(item.kind,result.transcript||item.transcript);job.payload=null;
       void window.missionBook?.refresh();void window.missionActivity?.refresh();
-    }catch(error){job.phase='failed';job.status.textContent=error.saved?'Запись сохранена. Анализ пока недоступен.':'Не удалось отправить запись на анализ.';job.retry.hidden=false;}
+    }catch(error){job.phase='failed';job.status.textContent=error.saved?'Recording saved. Analysis currently unavailable.':'Could not send recording for analysis.';job.retry.hidden=false;}
   }
   function meter(prefix){
     const value=document.getElementById(prefix+'-level'),fill=document.getElementById(prefix+'-level-fill'),name=document.getElementById(prefix+'-input-name');let engine,input,analyser,samples,frame=0,last=0,generation=0;
-    function reset(){value.textContent='-';fill.style.width='0%';name.textContent='Не выбран';}
+    function reset(){value.textContent='-';fill.style.width='0%';name.textContent='Not selected';}
     function stop(){generation++;cancelAnimationFrame(frame);frame=0;try{input?.disconnect();analyser?.disconnect();}catch{}if(engine&&engine.state!=='closed')void engine.close().catch(()=>{});engine=input=analyser=samples=null;reset();}
     function prepare(){stop();const Engine=window.AudioContext||window.webkitAudioContext;if(!Engine)return;try{engine=new Engine();void engine.resume().catch(()=>{});}catch{engine=null;}}
-    function attach(stream){if(!engine)return;try{input=engine.createMediaStreamSource(stream);analyser=engine.createAnalyser();analyser.fftSize=2048;samples=new Float32Array(analyser.fftSize);input.connect(analyser);name.textContent='Микрофон';const current=generation;function tick(time){if(current!==generation)return;frame=requestAnimationFrame(tick);if(time-last<100)return;last=time;if(engine.state!=='running'){reset();return;}analyser.getFloatTimeDomainData(samples);const rms=Math.sqrt(samples.reduce((sum,v)=>sum+v*v,0)/samples.length),db=Math.max(-90,20*Math.log10(Math.max(rms,.000001)));value.textContent=Math.round(db)+' dBFS';fill.style.width=Math.min(100,Math.max(0,(db+65)/65*100))+'%';}frame=requestAnimationFrame(tick);}catch{reset();}}
+    function attach(stream){if(!engine)return;try{input=engine.createMediaStreamSource(stream);analyser=engine.createAnalyser();analyser.fftSize=2048;samples=new Float32Array(analyser.fftSize);input.connect(analyser);name.textContent='Microphone';const current=generation;function tick(time){if(current!==generation)return;frame=requestAnimationFrame(tick);if(time-last<100)return;last=time;if(engine.state!=='running'){reset();return;}analyser.getFloatTimeDomainData(samples);const rms=Math.sqrt(samples.reduce((sum,v)=>sum+v*v,0)/samples.length),db=Math.max(-90,20*Math.log10(Math.max(rms,.000001)));value.textContent=Math.round(db)+' dBFS';fill.style.width=Math.min(100,Math.max(0,(db+65)/65*100))+'%';}frame=requestAnimationFrame(tick);}catch{reset();}}
     return{prepare,attach,stop};
   }
   window.addEventListener?.('mission-diary-open',()=>void restore());

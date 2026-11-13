@@ -29,21 +29,21 @@ function fixture(){
   return {input,clear,mounted,section,list,calls,advance,type,dialog,observers,tags:()=>list.children.map(node=>node.textContent)};
 }
 const settle=async()=>{await Promise.resolve();await Promise.resolve();await Promise.resolve();};
-test('Крестик появляется у текста и сразу очищает подпись, теги и возвращает фокус',()=>{
-  const f=fixture();assert.equal(f.clear.hidden,true);assert.equal(f.section.hidden,true);f.type('как я поймал катенка');f.advance(140);assert.ok(f.tags().includes('#Kittens'));assert.equal(f.section.hidden,false);assert.equal(f.clear.hidden,false);f.clear.dispatchEvent(new Event('click'));assert.equal(f.input.value,'');assert.deepEqual(f.tags(),[]);assert.equal(f.section.hidden,true);assert.equal(f.clear.hidden,true);assert.equal(f.input.focused,true);f.advance(1000);assert.equal(f.calls.length,0);
+test('The clear control appears beside text, clears the caption immediately, and tags, then restores focus',()=>{
+  const f=fixture();assert.equal(f.clear.hidden,true);assert.equal(f.section.hidden,true);f.type('how I caught a kitten');f.advance(140);assert.ok(f.tags().includes('#Kittens'));assert.equal(f.section.hidden,false);assert.equal(f.clear.hidden,false);f.clear.dispatchEvent(new Event('click'));assert.equal(f.input.value,'');assert.deepEqual(f.tags(),[]);assert.equal(f.section.hidden,true);assert.equal(f.clear.hidden,true);assert.equal(f.input.focused,true);f.advance(1000);assert.equal(f.calls.length,0);
 });
-test('Быстрый набор вызывает один подбор по последней версии подписи',()=>{
-  const f=fixture();f.type('Котенок');f.advance(500);f.type('Котенок играет дома');f.advance(649);assert.equal(f.calls.length,0);f.advance(1);assert.equal(f.calls.length,1);assert.equal(f.calls[0].path,'/api/story-tags');assert.equal(JSON.parse(f.calls[0].options.body).caption,'Котенок играет дома');
+test('Fast typing selects tags once for the latest caption',()=>{
+  const f=fixture();f.type('Kitten');f.advance(500);f.type('Kitten playing at home');f.advance(649);assert.equal(f.calls.length,0);f.advance(1);assert.equal(f.calls.length,1);assert.equal(f.calls[0].path,'/api/story-tags');assert.equal(JSON.parse(f.calls[0].options.body).caption,'Kitten playing at home');
 });
-test('Ответ старого запроса не возвращает теги после очистки подписи',async()=>{
-  const f=fixture();f.type('Котенок дома');f.advance(650);f.clear.dispatchEvent(new Event('click'));assert.equal(f.calls[0].options.signal.aborted,true);f.calls[0].resolve({tags:['#Kittens','#NASA'],source:'model'});await settle();assert.deepEqual(f.tags(),[]);assert.equal(f.input.value,'');
+test('Old responses cannot restore tags after clearing the caption',async()=>{
+  const f=fixture();f.type('Kitten at home');f.advance(650);f.clear.dispatchEvent(new Event('click'));assert.equal(f.calls[0].options.signal.aborted,true);f.calls[0].resolve({tags:['#Kittens','#NASA'],source:'model'});await settle();assert.deepEqual(f.tags(),[]);assert.equal(f.input.value,'');
 });
-test('Смена подписи отменяет старый подбор и показывает результат только нового',async()=>{
-  const f=fixture();f.type('Котенок дома');f.advance(650);f.type('Тренировка экипажа');f.advance(650);f.calls[1].resolve({tags:['#CrewFitness','#Teamwork','#NASA'],source:'model'});await settle();f.calls[0].resolve({tags:['#Kittens','#NASA'],source:'model'});await settle();assert.ok(f.tags().includes('#CrewFitness'));assert.ok(!f.tags().includes('#Kittens'));assert.ok(f.tags().every(tag=>/^#[A-Za-z0-9]+$/.test(tag)));
+test('Caption changes cancel previous selection and show only the new result',async()=>{
+  const f=fixture();f.type('Kitten at home');f.advance(650);f.type('Crew workout');f.advance(650);f.calls[1].resolve({tags:['#CrewFitness','#Teamwork','#NASA'],source:'model'});await settle();f.calls[0].resolve({tags:['#Kittens','#NASA'],source:'model'});await settle();assert.ok(f.tags().includes('#CrewFitness'));assert.ok(!f.tags().includes('#Kittens'));assert.ok(f.tags().every(tag=>/^#[A-Za-z0-9]+$/.test(tag)));
 });
-test('Составной ввод не отправляет незавершенную подпись, закрытие отменяет запрос',()=>{
-  const f=fixture();f.input.dispatchEvent(new Event('compositionstart'));f.type('Котенок');f.advance(1000);assert.equal(f.calls.length,0);f.input.dispatchEvent(new Event('compositionend'));f.advance(650);assert.equal(f.calls.length,1);f.dialog.dispatchEvent(new Event('close'));assert.equal(f.calls[0].options.signal.aborted,true);
+test('Composition input does not send incomplete captions, closing cancels the request',()=>{
+  const f=fixture();f.input.dispatchEvent(new Event('compositionstart'));f.type('Kitten');f.advance(1000);assert.equal(f.calls.length,0);f.input.dispatchEvent(new Event('compositionend'));f.advance(650);assert.equal(f.calls.length,1);f.dialog.dispatchEvent(new Event('close'));assert.equal(f.calls[0].options.signal.aborted,true);
 });
-test('Кнопка очистки не меняет подпись во время публикации, сброс убирает ее',()=>{
-  const f=fixture();f.type('Текст');f.input.disabled=true;f.observers[0]();assert.equal(f.clear.disabled,true);f.clear.dispatchEvent(new Event('click'));assert.equal(f.input.value,'Текст');f.input.disabled=false;f.input.value='';f.mounted.reset();assert.equal(f.clear.hidden,true);assert.deepEqual(f.tags(),[]);
+test('The clear button does not modify captions during publication, reset removes it',()=>{
+  const f=fixture();f.type('Text');f.input.disabled=true;f.observers[0]();assert.equal(f.clear.disabled,true);f.clear.dispatchEvent(new Event('click'));assert.equal(f.input.value,'Text');f.input.disabled=false;f.input.value='';f.mounted.reset();assert.equal(f.clear.hidden,true);assert.deepEqual(f.tags(),[]);
 });

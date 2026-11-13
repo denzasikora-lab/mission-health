@@ -1,4 +1,4 @@
-/* Поиск локального контраста в сопоставленных участках кожи. Это не классификатор родинок. */
+/* Find local contrast in aligned skin areas. This is not a mole classifier. */
 (() => {
   const method='aligned-face-spots-v1',width=128,height=96,regions=['forehead','left-cheek','right-cheek'];
   const median=values=>{const a=[...values].sort((x,y)=>x-y);return a.length?a[Math.floor(a.length/2)]:NaN;};
@@ -22,7 +22,7 @@
       if(((x-width/2)/(width*.40))**2+((y-height/2)/(height*.37))**2>=1)continue;
       const x0=x-radius,y0=y-radius,x1=x+radius+1,y1=y+radius+1,stride=width+1;
       const mean=(integral[y1*stride+x1]-integral[y0*stride+x1]-integral[y1*stride+x0]+integral[y0*stride+x0])/((x1-x0)*(y1-y0));
-      // Одиночные отсчеты подавляются усреднением трех соседей.
+      // Isolated samples are suppressed by averaging three neighbors.
       const v=(luma[y*width+x-1]+2*luma[y*width+x]+luma[y*width+x+1])/4;
       if(Math.abs(v-mean)>=18)mask[y*width+x]=v<mean?1:2;
       else{const average=(chromaIntegral[y1*stride+x1]-chromaIntegral[y0*stride+x1]-chromaIntegral[y1*stride+x0]+chromaIntegral[y0*stride+x0])/((x1-x0)*(y1-y0)),i=(y*width+x)*4;if(Math.abs(pixels[i]-pixels[i+1]-average)>=18)mask[y*width+x]=3;}
@@ -39,7 +39,7 @@
       if(diameterPixels<4||area>n*.12||area/(boxWidth*boxHeight)<.28||Math.max(boxWidth/boxHeight,boxHeight/boxWidth)>3.5)continue;
       const channels=[0,1,2].map(c=>indices.map(i=>pixels[i*4+c])),color={r:median(channels[0]),g:median(channels[1]),b:median(channels[2])};
       const measured=lab(color.r,color.g,color.b);
-      // Светлый ореол локального фильтра вокруг темного пятна не является вторым участком.
+      // A local filter’s light halo around a dark spot is not a second area.
       if(delta(measured,background)<6)continue;
       spots.push({x:indices.reduce((s,i)=>s+i%width,0)/area/width,y:indices.reduce((s,i)=>s+Math.floor(i/width),0)/area/height,areaPixels,diameterPixels,relativeArea:area/n,color,lab:measured,box:{x:minX,y:minY,width:boxWidth,height:boxHeight},tone:tone===1?'dark':tone===2?'light':'color'});
     }

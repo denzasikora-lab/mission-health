@@ -5,7 +5,7 @@ import {readFile} from 'node:fs/promises';
 
 const source=await readFile(new URL('../public/profile-name.js',import.meta.url),'utf8');
 const scopeA='a'.repeat(64),scopeB='b'.repeat(64),prefix='mission-profile-name:';
-const person=(storageScope=scopeA,name='Егор Федосов')=>({storageScope,name,researcherId:'123 456 789'});
+const person=(storageScope=scopeA,name='Egor Fedosov')=>({storageScope,name,researcherId:'123 456 789'});
 const copy=value=>JSON.parse(JSON.stringify(value));
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
 
@@ -19,72 +19,72 @@ function fixture(storage=new Map()){
   return {api:window.missionProfileName,requests,events,storage,listeners,respond,boot};
 }
 
-test('Профиль загружается один раз, имя нормализуется и кешируется по полному идентификатору владельца',async()=>{
-  const storage=new Map([[prefix+scopeA,'Устаревшее имя'],['mission-health-log-123 456 789-name','Чужой старый кеш']]),f=fixture(storage);
-  await f.boot(person(scopeA,'  \u0415гор   Ф\u0451досов \u2014 МКС  '));
-  assert.equal(f.api.name,'Егор Федосов - МКС');assert.equal(f.api.identity.storageScope,scopeA);
-  assert.equal(storage.get(prefix+scopeA),'Егор Федосов - МКС');assert.equal(f.requests.length,1);assert.equal(f.requests[0].url,'/api/me');assert.equal(f.requests[0].options.cache,'no-store');
+test('The profile loads once, names are normalized and cached by full owner identifier',async()=>{
+  const storage=new Map([[prefix+scopeA,'Stale name'],['mission-health-log-123 456 789-name','Another owner’s old cache']]),f=fixture(storage);
+  await f.boot(person(scopeA,'  Egor   Fedosov \u2014 ISS  '));
+  assert.equal(f.api.name,'Egor Fedosov - ISS');assert.equal(f.api.identity.storageScope,scopeA);
+  assert.equal(storage.get(prefix+scopeA),'Egor Fedosov - ISS');assert.equal(f.requests.length,1);assert.equal(f.requests[0].url,'/api/me');assert.equal(f.requests[0].options.cache,'no-store');
   assert.deepEqual(f.events,['mission-profile-change']);await f.api.load();assert.equal(f.requests.length,1);
 });
 
-test('Последовательные сохранения не отправляются параллельно и последнее имя становится основным',async()=>{
-  const f=fixture();await f.boot();const first=f.api.set('Первое имя'),last=f.api.set('  Последнее   имя  ');await settle();
-  assert.equal(f.requests.length,2);assert.equal(f.requests[1].options.method,'PUT');assert.equal(f.requests[1].options.headers['x-mission-profile-scope'],scopeA);assert.deepEqual(JSON.parse(f.requests[1].options.body),{name:'Первое имя'});
-  f.respond(1,person(scopeA,'Первое имя'));await first;await settle();assert.equal(f.requests.length,3);assert.deepEqual(JSON.parse(f.requests[2].options.body),{name:'Последнее имя'});
-  f.respond(2,person(scopeA,'Последнее имя'));await last;assert.equal(f.api.name,'Последнее имя');assert.equal(f.storage.get(prefix+scopeA),'Последнее имя');
+test('Sequential saves do not run in parallel and the last name becomes current',async()=>{
+  const f=fixture();await f.boot();const first=f.api.set('First name'),last=f.api.set('  Last   name  ');await settle();
+  assert.equal(f.requests.length,2);assert.equal(f.requests[1].options.method,'PUT');assert.equal(f.requests[1].options.headers['x-mission-profile-scope'],scopeA);assert.deepEqual(JSON.parse(f.requests[1].options.body),{name:'First name'});
+  f.respond(1,person(scopeA,'First name'));await first;await settle();assert.equal(f.requests.length,3);assert.deepEqual(JSON.parse(f.requests[2].options.body),{name:'Last name'});
+  f.respond(2,person(scopeA,'Last name'));await last;assert.equal(f.api.name,'Last name');assert.equal(f.storage.get(prefix+scopeA),'Last name');
 });
 
-test('Ошибка сохранения не меняет последнее принятое имя, кеш и события',async()=>{
-  const f=fixture();await f.boot();const before=copy(f.api.identity),pending=f.api.set('Не сохранено');await settle();f.respond(1,{error:'unavailable'},503);
+test('Save failure preserves the last accepted name, cache and events',async()=>{
+  const f=fixture();await f.boot();const before=copy(f.api.identity),pending=f.api.set('Not saved');await settle();f.respond(1,{error:'unavailable'},503);
   await assert.rejects(pending,/profile_unavailable/);assert.deepEqual(copy(f.api.identity),before);assert.equal(f.storage.get(prefix+scopeA),before.name);assert.deepEqual(f.events,['mission-profile-change']);
 });
 
-test('Неверные имена и управляющие символы отклоняются без PUT',async()=>{
+test('Invalid names and control characters are rejected without PUT',async()=>{
   const f=fixture();await f.boot();
-  for(const value of ['', '   ', null, undefined, 42, {}, 'a'.repeat(101), 'Имя\nФамилия', 'Имя\tФамилия', 'Имя\u0000', 'Имя\u007f'])await assert.rejects(f.api.set(value),/invalid_name/);
-  assert.equal(f.requests.length,1);assert.equal(f.api.name,'Егор Федосов');
+  for(const value of ['', '   ', null, undefined, 42, {}, 'a'.repeat(101), 'First name\nLast name', 'First name\tLast name', 'First name\u0000', 'First name\u007f'])await assert.rejects(f.api.set(value),/invalid_name/);
+  assert.equal(f.requests.length,1);assert.equal(f.api.name,'Egor Fedosov');
 });
 
-test('Новая загрузка владельца изолирована от запоздалого предыдущего ответа',async()=>{
+test('New owner loading is isolated from late previous responses',async()=>{
   const f=fixture(),first=f.api.load(),second=f.api.load(true);assert.equal(f.requests.length,2);
-  f.respond(1,person(scopeB,'Другой владелец'));await second;f.respond(0,person(scopeA,'Первый владелец'));await first;
-  assert.equal(f.api.identity.storageScope,scopeB);assert.equal(f.api.name,'Другой владелец');assert.equal(f.storage.has(prefix+scopeA),false);assert.equal(f.storage.get(prefix+scopeB),'Другой владелец');assert.deepEqual(f.events,['mission-profile-change']);
+  f.respond(1,person(scopeB,'Another owner'));await second;f.respond(0,person(scopeA,'First owner'));await first;
+  assert.equal(f.api.identity.storageScope,scopeB);assert.equal(f.api.name,'Another owner');assert.equal(f.storage.has(prefix+scopeA),false);assert.equal(f.storage.get(prefix+scopeB),'Another owner');assert.deepEqual(f.events,['mission-profile-change']);
 });
 
-test('Поздний PUT прежнего владельца не заменяет новый профиль и его кеш',async()=>{
-  const f=fixture();await f.boot();const save=f.api.set('Имя прежнего владельца');await settle();const switched=f.api.load(true);f.respond(2,person(scopeB,'Новый владелец'));await switched;f.respond(1,person(scopeA,'Имя прежнего владельца'));
-  await assert.rejects(save,/profile_changed/);assert.equal(f.api.name,'Новый владелец');assert.equal(f.storage.get(prefix+scopeA),'Егор Федосов');assert.equal(f.storage.get(prefix+scopeB),'Новый владелец');
+test('Late PUT from the previous owner does not replace the new profile or cache',async()=>{
+  const f=fixture();await f.boot();const save=f.api.set('Previous owner’s name');await settle();const switched=f.api.load(true);f.respond(2,person(scopeB,'New owner'));await switched;f.respond(1,person(scopeA,'Previous owner’s name'));
+  await assert.rejects(save,/profile_changed/);assert.equal(f.api.name,'New owner');assert.equal(f.storage.get(prefix+scopeA),'Egor Fedosov');assert.equal(f.storage.get(prefix+scopeB),'New owner');
 });
 
-test('Очередь старого владельца не отправляет следующий PUT после смены аккаунта',async()=>{
-  const f=fixture();await f.boot();const first=f.api.set('Первое имя'),last=f.api.set('Следующее имя');const firstRejected=assert.rejects(first,/profile_changed/),lastRejected=assert.rejects(last,/profile_changed/);await settle();
-  const switched=f.api.load(true);f.respond(2,person(scopeB,'Новый владелец'));await switched;f.respond(1,person(scopeA,'Первое имя'));await firstRejected;await lastRejected;
-  assert.equal(f.requests.filter(item=>item.options.method==='PUT').length,1);assert.equal(f.api.name,'Новый владелец');
+test('The old owner’s queue does not send the next PUT after account switching',async()=>{
+  const f=fixture();await f.boot();const first=f.api.set('First name'),last=f.api.set('Next name');const firstRejected=assert.rejects(first,/profile_changed/),lastRejected=assert.rejects(last,/profile_changed/);await settle();
+  const switched=f.api.load(true);f.respond(2,person(scopeB,'New owner'));await switched;f.respond(1,person(scopeA,'First name'));await firstRejected;await lastRejected;
+  assert.equal(f.requests.filter(item=>item.options.method==='PUT').length,1);assert.equal(f.api.name,'New owner');
 });
 
-test('Сохранение во время обновления дожидается подтверждения текущего владельца',async()=>{
-  const f=fixture();await f.boot();const refresh=f.api.load(true),save=f.api.set('Новое имя');await settle();assert.equal(f.requests.length,2);
-  f.respond(1,person(scopeB,'Другой владелец'));await refresh;await settle();assert.equal(f.requests.length,3);assert.equal(f.requests[2].options.headers['x-mission-profile-scope'],scopeB);
-  f.respond(2,person(scopeB,'Новое имя'));await save;assert.equal(f.api.identity.storageScope,scopeB);assert.equal(f.api.name,'Новое имя');
+test('Saving during refresh waits for current owner confirmation',async()=>{
+  const f=fixture();await f.boot();const refresh=f.api.load(true),save=f.api.set('New name');await settle();assert.equal(f.requests.length,2);
+  f.respond(1,person(scopeB,'Another owner'));await refresh;await settle();assert.equal(f.requests.length,3);assert.equal(f.requests[2].options.headers['x-mission-profile-scope'],scopeB);
+  f.respond(2,person(scopeB,'New name'));await save;assert.equal(f.api.identity.storageScope,scopeB);assert.equal(f.api.name,'New name');
 });
 
-test('Событие хранения обновляет только полный идентификатор активного владельца',async()=>{
+test('Storage events update only the active owner’s full identifier',async()=>{
   const f=fixture();await f.boot();const storage=f.listeners.get('storage');storage({key:prefix+scopeB});storage({key:'mission-health-log-123 456 789-name'});assert.equal(f.requests.length,1);
-  storage({key:prefix+scopeA});assert.equal(f.requests.length,2);f.respond(1,person(scopeA,'Имя из другого окна'));await settle();assert.equal(f.api.name,'Имя из другого окна');
+  storage({key:prefix+scopeA});assert.equal(f.requests.length,2);f.respond(1,person(scopeA,'Name from another window'));await settle();assert.equal(f.api.name,'Name from another window');
   assert.ok([...f.storage.keys()].every(key=>/^mission-profile-name:[a-f0-9]{64}$/.test(key)));
 });
 
-test('Некорректный идентификатор владельца из ответа не становится профилем',async()=>{
-  const f=fixture(),pending=f.api.load();f.respond(0,person('123 456 789','Неверный профиль'));await assert.rejects(pending,/profile_unavailable/);
+test('An invalid owner identifier in a response cannot become a profile',async()=>{
+  const f=fixture(),pending=f.api.load();f.respond(0,person('123 456 789','Invalid profile'));await assert.rejects(pending,/profile_unavailable/);
   assert.equal(f.api.identity,null);assert.equal(f.api.name,'');assert.equal(f.storage.size,0);assert.deepEqual(f.events,[]);
 });
 
-test('Запоздалый GET не заменяет имя после успешного сохранения',async()=>{
-  const f=fixture();await f.boot();const save=f.api.set('Сохраненное имя');await settle();const refresh=f.api.load(true);f.respond(1,person(scopeA,'Сохраненное имя'));await save;f.respond(2,person());await refresh;
-  assert.equal(f.api.name,'Сохраненное имя');assert.equal(f.storage.get(prefix+scopeA),'Сохраненное имя');
+test('Delayed GET does not replace the name after a successful save',async()=>{
+  const f=fixture();await f.boot();const save=f.api.set('Saved name');await settle();const refresh=f.api.load(true);f.respond(1,person(scopeA,'Saved name'));await save;f.respond(2,person());await refresh;
+  assert.equal(f.api.name,'Saved name');assert.equal(f.storage.get(prefix+scopeA),'Saved name');
 });
 
-test('Неудачная последняя правка сохраняет предыдущее успешно записанное имя очереди',async()=>{
-  const f=fixture();await f.boot();const first=f.api.set('Успешное имя'),last=f.api.set('Неудачное имя'),lastRejected=assert.rejects(last,/profile_unavailable/);await settle();f.respond(1,person(scopeA,'Успешное имя'));await first;await settle();f.respond(2,{error:'unavailable'},503);await lastRejected;
-  assert.equal(f.api.name,'Успешное имя');assert.equal(f.storage.get(prefix+scopeA),'Успешное имя');
+test('A failed final edit preserves the previous successful queued name',async()=>{
+  const f=fixture();await f.boot();const first=f.api.set('Successful name'),last=f.api.set('Failed name'),lastRejected=assert.rejects(last,/profile_unavailable/);await settle();f.respond(1,person(scopeA,'Successful name'));await first;await settle();f.respond(2,{error:'unavailable'},503);await lastRejected;
+  assert.equal(f.api.name,'Successful name');assert.equal(f.storage.get(prefix+scopeA),'Successful name');
 });

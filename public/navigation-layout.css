@@ -1,5 +1,5 @@
 .shell{--mission-grid-inset:10px}
-/* На главной обе колонки заканчиваются на одной общей линии. */
+/* Both home columns end on the same line. */
 @container mission (min-width:1001px){
   body[data-overview=true] .shell .mission-frame{align-items:stretch}
   body[data-overview=true] .shell .mission-frame>.mission-rail{min-height:0;align-self:stretch}
@@ -7,7 +7,7 @@
 .brand{color:inherit;text-decoration:none;cursor:pointer}.brand:hover{text-decoration:none}.brand:focus-visible{outline:2px solid var(--accent);outline-offset:5px;border-radius:8px}
 .mission-nav>[data-mission-nav=overview]{display:none}body[data-display=desktop] .mission-nav>[data-mission-nav=overview]{display:flex}
 @container mission (min-width:1001px){body[data-display=auto] .mission-nav>[data-mission-nav=overview]{display:flex}}
-/* Одинаковые границы строк сохраняют общие центры кнопок, аватаров и навигации. */
+/* Matching row boundaries keep shared control centers, avatars and navigation. */
 @container mission (max-width:1000px){
   .shell .topbar{margin-inline:0;padding-inline:var(--mission-grid-inset);flex-wrap:wrap}
   .shell .topbar .brand{flex-basis:100%;width:100%}
@@ -28,7 +28,7 @@
   .shell .mission-frame .mission-nav>button>span{white-space:nowrap}
   .shell .mission-frame .mission-nav>[data-mission-nav=overview]{display:none}
 }
-/* Архив переходит к расположению в столбик раньше остальных разделов. */
+/* The archive switches to stacked layout earlier than other sections. */
 @container mission (min-width:1001px) and (max-width:1050px){
   body[data-book=true] .shell .mission-frame>.mission-rail{margin-block:0 16px}
   body[data-book=true] .shell .mission-frame>.mission-content{margin-block-start:0}

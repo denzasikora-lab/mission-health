@@ -2,7 +2,7 @@
   "author": "djaiss",
   "source": "https://github.com/djaiss/mapsicon",
   "revision": "33ba28808f8d32b5bae0ffada9cadd07073852e1",
-  "usage": "Контуры стран из коллекции Mapsicon. Автор разрешает использование с указанием авторства и запрещает перепродажу коллекции.",
-  "changes": "Удалены метаданные и объявления внешнего DTD, оставлена только геометрия SVG. Размер значков установлен в 32 пикселя.",
+  "usage": "Country outlines from the collection Mapsicon. The author permits use with attribution and prohibits reselling the collection.",
+  "changes": "Metadata and external declarations removed DTD, geometry only SVG. Icon size set to 32 pixels.",
   "countries": 242
 }

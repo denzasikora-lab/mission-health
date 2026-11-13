@@ -39,30 +39,30 @@
     const began = performance.now();
     recorder = recording;
     recording.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
-    recording.onerror = () => { failed = true; finalizing = true; stopSignal(); renderStatus('Не удалось завершить аудиозапись.', true); };
+    recording.onerror = () => { failed = true; finalizing = true; stopSignal(); renderStatus('Could not finish audio recording.', true); };
     recording.onstop = () => {
       recorder = null; finalizing = false; stopSignal();
-      if (failed || !chunks.length) { renderStatus('Аудиозапись не сохранена. Попробуй еще раз.', true); return; }
+      if (failed || !chunks.length) { renderStatus('Audio recording not saved. Try again.', true); return; }
       const blob = new Blob(chunks, {type:recording.mimeType}),duration=Math.max(.1,(performance.now()-began)/1000);
-      renderStatus('Запись передана на анализ.');void window.missionMedia.submit('audio',blob,duration);
+      renderStatus('Recording sent for analysis.');void window.missionMedia.submit('audio',blob,duration);
     };
     recording.start(250);
-    recordingTimer = setTimeout(() => { stopSignal(); renderStatus('Подготавливаю аудиозапись.'); }, 120000);
+    recordingTimer = setTimeout(() => { stopSignal(); renderStatus('Preparing audio recording.'); }, 120000);
   }
 
   function renderStatus(message = '', error = false) {
     const active = source === 'mic', waiting = source === 'requesting';
-    micButton.querySelector('span').textContent = active ? 'Остановить аудиозапись' : waiting ? 'Отменить подключение' : finalizing ? 'Подготовка записи' : 'Начать аудиозапись';
+    micButton.querySelector('span').textContent = active ? 'Stop audio recording' : waiting ? 'Cancel connection' : finalizing ? 'Preparing recording' : 'Start audio recording';
     micButton.disabled = finalizing;
     micButton.setAttribute('aria-pressed', String(active));
     micButton.dataset.recording = String(active && recorder?.state === 'recording');
     window.missionDiary.lock('audio', active || finalizing);
     stage.dataset.source = source;
     stage.dataset.style = style;
-    document.getElementById('voice-source').textContent = active ? 'ЗАПИСЬ АУДИО' : waiting ? 'ПОДКЛЮЧЕНИЕ МИКРОФОНА' : finalizing ? 'ПОДГОТОВКА ЗАПИСИ' : 'ОЖИДАНИЕ';
-    document.getElementById('voice-stage-hint').textContent = active ? 'Волна реагирует на твой голос' : waiting ? 'Разреши микрофон в браузере' : 'Нажми «Аудио», чтобы начать запись';
-    document.getElementById('voice-input-name').textContent = active ? 'Микрофон' : 'Не выбран';
-    notice.textContent = message || (active ? 'Идет аудиозапись. Нажми «Аудио», чтобы остановить.' : waiting ? 'Ожидаю разрешение на доступ к микрофону.' : finalizing ? 'Подготавливаю аудиозапись.' : 'Микрофон выключен.');
+    document.getElementById('voice-source').textContent = active ? 'RECORDING AUDIO' : waiting ? 'CONNECTING MICROPHONE' : finalizing ? 'PREPARING RECORDING' : 'WAITING';
+    document.getElementById('voice-stage-hint').textContent = active ? 'The waveform responds to your voice' : waiting ? 'Allow microphone access in your browser' : 'Press Audio to start recording';
+    document.getElementById('voice-input-name').textContent = active ? 'Microphone' : 'Not selected';
+    notice.textContent = message || (active ? 'Recording audio. Press «Audio», to stop.' : waiting ? 'Waiting for microphone permission.' : finalizing ? 'Preparing audio recording.' : 'Microphone is off.');
     notice.dataset.error = String(error);
     document.querySelectorAll('[data-voice-style]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.voiceStyle === style)));
     if(styleChoice)styleChoice.value=style;
@@ -73,10 +73,10 @@
     if (finalizing) return;
     stopSignal();
     if (!navigator.mediaDevices?.getUserMedia || !(window.AudioContext || window.webkitAudioContext)) {
-      renderStatus('Этот браузер не поддерживает микрофон. Открой сайт в Safari или Chrome по HTTPS.', true);
+      renderStatus('This browser does not support microphone access. Open the site in Safari or Chrome over HTTPS.', true);
       return;
     }
-    if (!window.MediaRecorder) { renderStatus('Запись аудио не поддерживается этим браузером.', true); return; }
+    if (!window.MediaRecorder) { renderStatus('Recording audio is unsupported in this browser.', true); return; }
     const attempt = sequence;
     source = 'requesting'; renderStatus();
     try {
@@ -86,7 +86,7 @@
       const resume = engine.resume();
       void resume.catch(() => {});
       const incoming = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
-      // Позднее разрешение не должно включать микрофон после отмены или закрытия окна.
+      // Delayed permission must not enable the microphone after cancellation or closing.
       if (attempt !== sequence || !visible()) { incoming.getTracks().forEach(track => track.stop()); return; }
       stream = incoming; window.missionSpeech?.start('voice', incoming);
       await resume;
@@ -101,18 +101,18 @@
       frequencies = new Uint8Array(analyser.frequencyBinCount);
       incoming.getAudioTracks().forEach(track => track.addEventListener('ended', () => {
         if (attempt !== sequence) return;
-        stopSignal(); renderStatus('Микрофон отключен. Можно подключить его снова.', true);
+        stopSignal(); renderStatus('Microphone disconnected. You can reconnect it.', true);
       }));
       source = 'mic'; startedAt = performance.now(); startRecording(incoming); renderStatus();
     } catch (error) {
       if (attempt !== sequence) return;
       recorder = null; finalizing = false; stopSignal();
       const messages = {
-        NotAllowedError: 'Доступ к микрофону закрыт. Разреши его для этого сайта в настройках браузера и повтори.',
-        NotFoundError: 'Микрофон не найден. Подключи устройство и повтори.',
-        NotReadableError: 'Не удалось открыть микрофон. Проверь, не занят ли он другим приложением.'
+        NotAllowedError: 'Microphone access denied. Allow it for this site in browser settings and retry.',
+        NotFoundError: 'Microphone not found. Connect a device and retry.',
+        NotReadableError: 'Could not open microphone. Check, whether another application is using it.'
       };
-      renderStatus(messages[error.name] || (error.message === 'recording_unsupported' ? 'Подходящий формат аудиозаписи не найден.' : 'Не удалось начать аудиозапись. Повтори подключение.'), true);
+      renderStatus(messages[error.name] || (error.message === 'recording_unsupported' ? 'No suitable audio recording format found.' : 'Could not start audio recording. Reconnect.'), true);
     }
   }
 
@@ -149,7 +149,7 @@
     const ink = document.documentElement?.dataset?.theme === 'light' ? '24,101,62' : '217,255,235';
     const motion = reducedMotion.matches ? 0 : time * .00016;
     const amplitude = 8 + level * 50;
-    // Частицы формируют стоячие волны; спектр голоса меняет рисунок и высоту поверхности.
+    // Particles form standing waves; the voice spectrum changes the pattern and surface height.
     const harmonic = frequencies ? frequencies.slice(2, 22).reduce((sum, value) => sum + value, 0) / 5100 : level * .35;
     const rows = 65, columns = width < 500 ? 100 : 180;
     for (let row = 0; row < rows; row++) {
@@ -208,7 +208,7 @@
     const haze=context.createRadialGradient(center,height*.58,0,center,height*.58,width*.52);
     haze.addColorStop(0,`rgba(${lightTheme?'53,139,125':'64,161,231'},${.2+energy*.15})`);haze.addColorStop(1,'rgba(29,90,144,0)');
     context.fillStyle=haze;context.fillRect(0,0,width,height);
-    // Изогнутые линии задают глубину голубого экрана вокруг звуковой голограммы.
+    // Curved lines give the blue screen depth around the audio hologram.
     for(let line=0;line<7;line++){
       const y=height*(.07+line*.14);
       context.beginPath();context.moveTo(-width*.04,y-height*.055);
@@ -228,7 +228,7 @@
     light.addColorStop(0,`rgba(${ink},0)`);light.addColorStop(.25,`rgba(${ink},.22)`);light.addColorStop(.8,`rgba(${ink},.72)`);light.addColorStop(1,`rgba(${ink},.08)`);
     context.strokeStyle=light;
     const columns=width<500?72:112;
-    // Высота и плотность центральных световых нитей реагируют на существующий сигнал микрофона.
+    // Height and density of central light strands respond to the current microphone signal.
     for(let layer=0;layer<3;layer++)for(let column=0;column<columns;column++){
       const u=column/(columns-1)*2-1,envelope=Math.exp(-u*u*4.5);
       const bin=frequencies?frequencies[Math.min(frequencies.length-1,5+Math.floor(column/columns*80))]/255:energy*Math.abs(Math.sin(column*.91+motion));

@@ -25,7 +25,7 @@ async function trainingRoute(request,env,user,profile,id){
   if(request.method==='GET'){
     let connected=false;if(trainingEndpoint(env,''))try{connected=(await trainerRequest(env,'/health')).ready===true}catch{}
     const {results}=await db.prepare('SELECT * FROM journal_training_jobs WHERE owner_id=? AND astronaut_id=? ORDER BY created_at DESC LIMIT 5').bind(user,profile).all();
-    return json({examples:count.total,minimum:20,connected,model:'Qwen3 / локальная модель',jobs:results.map(trainingJob)});
+    return json({examples:count.total,minimum:20,connected,model:'Qwen3 / local model',jobs:results.map(trainingJob)});
   }
   if(request.method!=='POST')fail('method_not_allowed',405);
   const raw=await request.text();if(raw.length>1000)fail('invalid_input',400);let input;try{input=JSON.parse(raw)}catch{fail('invalid_input',400)}
@@ -35,9 +35,9 @@ async function trainingRoute(request,env,user,profile,id){
   const active=await db.prepare("SELECT id FROM journal_training_jobs WHERE owner_id=? AND astronaut_id=? AND status IN ('queued','running','unconfirmed') LIMIT 1").bind(user,profile).first();if(active)fail('training_already_running',409);
   const {results}=await db.prepare("SELECT content,wellbeing_json,MAX(created_at) AS latest FROM journal_messages WHERE owner_id=? AND astronaut_id=? AND role='note' AND length(content)>=80 GROUP BY content ORDER BY latest DESC LIMIT 500").bind(user,profile).all();
   const date=new Date().toISOString(),progress=JSON.stringify({step:0,total:200,adapterReady:false});
-  // Сначала сохраняется идентификатор запуска, чтобы повтор запроса не создавал второе обучение.
+  // Save the run identifier first, so retrying does not create a second training job.
   await db.prepare('INSERT INTO journal_training_jobs (id,owner_id,astronaut_id,status,example_count,progress_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)').bind(input.id,user,profile,'queued',results.length,progress,date,date).run();
   try{const accepted=await trainerRequest(env,'/jobs',{id:input.id,ownerId:user,profile,entries:results.map(diaryDocument)});if(accepted.id!==input.id)fail('trainer_unavailable',503)}catch(error){await db.prepare('UPDATE journal_training_jobs SET status=?,updated_at=? WHERE id=? AND owner_id=? AND astronaut_id=?').bind('unconfirmed',date,input.id,user,profile).run();throw error}
-  if(typeof activityWrite==='function')await activityWrite(env,user,'training_queued','Запустил fine-tuning / LoRA / '+results.length+' записей','training:'+input.id);
+  if(typeof activityWrite==='function')await activityWrite(env,user,'training_queued','Started fine-tuning / LoRA / '+results.length+' entries','training:'+input.id);
   return json({job:{id:input.id,status:'queued',examples:results.length,createdAt:date,updatedAt:date,progress:JSON.parse(progress)}},202);
 }

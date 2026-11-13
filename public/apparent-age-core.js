@@ -1,4 +1,4 @@
-/* Видимый возраст: экспериментальная классификация по сходству, без оценки биологического старения. */
+/* Apparent age: experimental similarity-based classification, without estimating biological aging. */
 (() => {
   const method='embeddinggemma2-text-age-v1';
   const bands=Array.from({length:9},(_,i)=>({min:i*10,max:i===8?null:i*10+9}));
@@ -24,7 +24,7 @@
     }
     const low=Math.min(...votes),high=Math.max(...votes);
     const scores=bands.map((_,band)=>({band,similarity:median(matrix.map(row=>(row[band*2]+row[band*2+1])/2))}));
-    // Разброс более чем на две соседние группы запрещает вывод числового диапазона.
+    // A spread beyond two adjacent groups prevents a numeric range.
     const stable=high-low<=1;
     return{method,status:stable?'estimated':'uncertain',reason:stable?'consensus':'unstable',samples:faces.length,range:stable?{min:bands[low].min,max:bands[high].max}:null,scores,votes};
   }

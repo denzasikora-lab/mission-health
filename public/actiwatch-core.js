@@ -10,60 +10,60 @@
   const name = value => String(value).replace(/^\uFEFF/, '').trim().toLowerCase().replace(/\s+/g, ' ');
 
   function epoch(value) {
-    if (!Number.isInteger(value) || value < 1 || value > 120) fail('Длительность эпохи должна быть целым числом от 1 до 120 секунд.');
+    if (!Number.isInteger(value) || value < 1 || value > 120) fail('Epoch duration must be an integer from 1 to 120 seconds.');
     return value;
   }
 
   function number(value, label) {
     if (value === null) return null;
-    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) fail(`${label}: требуется неотрицательное число или null.`);
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) fail(`${label}: requires a nonnegative number or null.`);
     return value;
   }
 
   function calendar(year, month, day, hour, minute, second, millisecond = 0) {
-    if (year < 0 || year > 9999 || month < 1 || month > 12 || day < 1 || day > 31 || hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) fail('Некорректная дата или время в записи.');
+    if (year < 0 || year > 9999 || month < 1 || month > 12 || day < 1 || day > 31 || hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) fail('Invalid record date or time.');
     const check = new Date(0);
     check.setUTCFullYear(year, month - 1, day);
     check.setUTCHours(hour, minute, second, millisecond);
     const value = check.getTime();
-    if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) fail('Несуществующая календарная дата в записи.');
+    if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) fail('Nonexistent calendar date in record.');
     return value;
   }
 
   function iso(value) {
-    if (typeof value !== 'string') fail('Время эпохи должно быть строкой ISO с часовым поясом.');
+    if (typeof value !== 'string') fail('Epoch time must be a string ISO with a time zone.');
     const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|[+-]\d{2}:\d{2})$/);
-    if (!match) fail('Время эпохи должно быть строкой ISO с часовым поясом.');
+    if (!match) fail('Epoch time must be a string ISO with a time zone.');
     const [, year, month, day, hour, minute, second, fraction, zone] = match;
     let offset = 0;
     if (zone !== 'Z') {
       const hours = Number(zone.slice(1, 3)), minutes = Number(zone.slice(4, 6));
-      if (hours > 14 || minutes > 59 || (hours === 14 && minutes !== 0)) fail('Некорректный часовой пояс ISO.');
+      if (hours > 14 || minutes > 59 || (hours === 14 && minutes !== 0)) fail('Invalid time zone ISO.');
       offset = (zone[0] === '-' ? -1 : 1) * (hours * 60 + minutes);
     }
     return calendar(+year, +month, +day, +hour, +minute, +second, Number((fraction || '').padEnd(3, '0'))) - offset * 60000;
   }
 
   function localTime(date, time, options) {
-    if (!['MDY', 'DMY', 'YMD'].includes(options.dateOrder)) fail('Для Date и Time явно выбери формат даты MDY, DMY или YMD.');
+    if (!['MDY', 'DMY', 'YMD'].includes(options.dateOrder)) fail('For Date and Time explicitly select the date format MDY, DMY or YMD.');
     const offset = options.utcOffsetMinutes;
-    if (!own(options, 'utcOffsetMinutes') || !Number.isInteger(offset) || Math.abs(offset) > 840) fail('Для Date и Time явно укажи смещение UTC в минутах.');
+    if (!own(options, 'utcOffsetMinutes') || !Number.isInteger(offset) || Math.abs(offset) > 840) fail('For Date and Time explicitly specify the offset UTC in minutes.');
     const parts = date.match(/^(\d{1,4})[\/.\-](\d{1,2})[\/.\-](\d{1,4})$/);
-    if (!parts) fail('Дата не соответствует выбранному числовому формату.');
+    if (!parts) fail('Date does not match the selected numeric format.');
     const values = parts.slice(1), ordered = Object.fromEntries(options.dateOrder.split('').map((key, index) => [key, values[index]]));
-    if (ordered.Y.length !== 4) fail('Год должен содержать четыре цифры.');
+    if (ordered.Y.length !== 4) fail('Year must have four digits.');
     const clock = time.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
-    if (!clock) fail('Некорректное время в столбце Time.');
+    if (!clock) fail('Invalid time in column Time.');
     let hours = Number(clock[1]);
     if (clock[4]) {
-      if (hours < 1 || hours > 12) fail('Некорректное время AM/PM.');
+      if (hours < 1 || hours > 12) fail('Invalid time AM/PM.');
       hours = hours % 12 + (clock[4].toUpperCase() === 'PM' ? 12 : 0);
     }
     return calendar(+ordered.Y, +ordered.M, +ordered.D, hours, +clock[2], +(clock[3] || 0)) - offset * 60000;
   }
 
   function csv(text) {
-    if (typeof text !== 'string' || text.length > 16000000) fail('CSV должен быть текстом размером не более 16 МБ.');
+    if (typeof text !== 'string' || text.length > 16000000) fail('CSV must be text no larger than 16 MB.');
     const rows = [];
     let row = [], field = '', quoted = false, closed = false;
     for (let index = 0; index < text.length; index++) {
@@ -80,15 +80,15 @@
           row = [];
         }
       } else if (character === '"') {
-        if (field.trim() || closed) fail('Некорректные кавычки CSV.');
+        if (field.trim() || closed) fail('Invalid quotation marks CSV.');
         field = ''; quoted = true;
       } else {
-        if (closed && !/\s/.test(character)) fail('Некорректный текст после кавычек CSV.');
+        if (closed && !/\s/.test(character)) fail('Invalid text after quotation marks CSV.');
         field += character;
       }
-      if (rows.length > MAX_ROWS + 1000) fail('Слишком много строк CSV.');
+      if (rows.length > MAX_ROWS + 1000) fail('Too many rows CSV.');
     }
-    if (quoted) fail('Незакрытые кавычки CSV.');
+    if (quoted) fail('Unclosed quotation marks CSV.');
     row.push(field.trim());
     if (row.some(value => value !== '')) rows.push(row);
     return rows;
@@ -96,7 +96,7 @@
 
   function numericCell(value, label) {
     if (missing(value)) return null;
-    if (!/^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(value)) fail(`${label}: некорректное числовое значение.`);
+    if (!/^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(value)) fail(`${label}: invalid numeric value.`);
     return number(Number(value), label);
   }
 
@@ -114,30 +114,30 @@
       }
       if (seconds !== undefined) return epoch(seconds);
     }
-    fail('Укажи длительность эпохи в секундах: в файле нет однозначной метадаты.');
+    fail('Specify the epoch duration in secondss: the file has no unambiguous metadata.');
   }
 
   function validate(recording) {
-    if (!plain(recording) || recording.version !== 1 || recording.sourceFormat !== 'actiware-csv') fail('Неподдерживаемый формат записи Actiwatch.');
+    if (!plain(recording) || recording.version !== 1 || recording.sourceFormat !== 'actiware-csv') fail('Unsupported recording format Actiwatch.');
     const epochSeconds = epoch(recording.epochSeconds);
-    if (!Array.isArray(recording.rows) || recording.rows.length < 2 || recording.rows.length > MAX_ROWS) fail('Запись должна содержать от 2 до 50000 эпох.');
-    if (!Array.isArray(recording.warnings) || recording.warnings.length > 30 || recording.warnings.some(value => typeof value !== 'string' || value.length > 250)) fail('Некорректный список предупреждений.');
+    if (!Array.isArray(recording.rows) || recording.rows.length < 2 || recording.rows.length > MAX_ROWS) fail('Recording must contain between 2 to 50000 epochs.');
+    if (!Array.isArray(recording.warnings) || recording.warnings.length > 30 || recording.warnings.some(value => typeof value !== 'string' || value.length > 250)) fail('Invalid warning list.');
     const rows = recording.rows.map(row => {
-      if (!plain(row)) fail('Некорректная строка эпохи.');
+      if (!plain(row)) fail('Invalid epoch row.');
       const timestamp = new Date(iso(row.timestamp)).toISOString();
-      if (!['sleep', 'wake', 'unknown'].includes(row.sleepState)) fail('Некорректная классификация сна.');
-      if (row.offWrist !== null && typeof row.offWrist !== 'boolean') fail('Статус ношения должен быть boolean или null.');
-      if (typeof row.excluded !== 'boolean') fail('Признак исключения должен быть boolean.');
-      return { timestamp, activity: number(row.activity, 'Активность'), lightLux: number(row.lightLux, 'Освещенность'), sleepState: row.sleepState, offWrist: row.offWrist, excluded: row.excluded };
+      if (!['sleep', 'wake', 'unknown'].includes(row.sleepState)) fail('Invalid sleep classification.');
+      if (row.offWrist !== null && typeof row.offWrist !== 'boolean') fail('Wear status must be boolean or null.');
+      if (typeof row.excluded !== 'boolean') fail('Exclusion flag must be boolean.');
+      return { timestamp, activity: number(row.activity, 'Activity'), lightLux: number(row.lightLux, 'Illuminance'), sleepState: row.sleepState, offWrist: row.offWrist, excluded: row.excluded };
     }).sort((left, right) => left.timestamp.localeCompare(right.timestamp));
     for (let index = 1; index < rows.length; index++) {
-      if (iso(rows[index].timestamp) - iso(rows[index - 1].timestamp) < epochSeconds * 1000) fail('Обнаружены дубликаты или перекрывающиеся эпохи.');
+      if (iso(rows[index].timestamp) - iso(rows[index - 1].timestamp) < epochSeconds * 1000) fail('Duplicate or overlapping epochs detected.');
     }
     return { version: 1, sourceFormat: 'actiware-csv', epochSeconds, rows, warnings: [...new Set(recording.warnings)] };
   }
 
   function parseCSV(text, options = {}) {
-    if (!plain(options)) fail('Параметры импорта должны быть объектом.');
+    if (!plain(options)) fail('Import options must be an object.');
     const data = csv(text);
     const aliases = {
       timestamp: ['timestamp', 'datetime', 'date time'], date: ['date'], time: ['time'], activity: ['activity'],
@@ -149,17 +149,17 @@
       const header = data[index].map(name), candidate = {};
       for (const [key, names] of Object.entries(aliases)) {
         const matches = header.flatMap((value, position) => names.includes(value) ? [position] : []);
-        if (matches.length > 1) fail('Повторяющиеся столбцы в заголовке CSV.');
+        if (matches.length > 1) fail('Duplicate header columns CSV.');
         if (matches.length) candidate[key] = matches[0];
       }
       if (own(candidate, 'activity') && (own(candidate, 'timestamp') || own(candidate, 'date') && own(candidate, 'time'))) { headerIndex = index; columns = candidate; break; }
     }
-    if (headerIndex < 0) fail('Не найден английский заголовок с Activity и Date/Time или Timestamp.');
+    if (headerIndex < 0) fail('No English header found with Activity and Date/Time or Timestamp.');
     const epochSeconds = own(options, 'epochSeconds') ? epoch(options.epochSeconds) : metadataEpoch(data.slice(0, headerIndex));
     const warnings = new Set();
-    if (!own(columns, 'sleepState')) warnings.add('В файле нет классификации сна.');
-    if (!own(columns, 'lightLux')) warnings.add('В файле нет белого или фотопического света в lux.');
-    if (!own(columns, 'offWrist')) warnings.add('В файле нет признака снятых часов.');
+    if (!own(columns, 'sleepState')) warnings.add('The file contains no sleep classification.');
+    if (!own(columns, 'lightLux')) warnings.add('The file contains no white or photopic light in lux.');
+    if (!own(columns, 'offWrist')) warnings.add('The file has no watch removal indicator.');
     const rows = data.slice(headerIndex + 1).map(values => {
       const cell = key => own(columns, key) ? (values[columns[key]] || '').trim() : '';
       const timestamp = own(columns, 'timestamp') ? iso(cell('timestamp')) : localTime(cell('date'), cell('time'), options);
@@ -167,16 +167,16 @@
       let sleepState = 'unknown', offWrist = null;
       if (sleep === '0') sleepState = 'sleep';
       else if (sleep === '1') sleepState = 'wake';
-      else if (!missing(sleep)) warnings.add('Неизвестные метки сна оставлены без классификации.');
+      else if (!missing(sleep)) warnings.add('Unknown sleep labels were left unclassified.');
       if (wrist === '0') offWrist = false;
       else if (wrist === '1') offWrist = true;
-      else if (!missing(wrist)) warnings.add('Неизвестные метки ношения оставлены без классификации.');
+      else if (!missing(wrist)) warnings.add('Unknown wear labels were left unclassified.');
       const excluded = interval === 'excluded';
-      if (interval && !['active', 'rest', 'rest-sleep', 'rest-s', 'excluded', 'n/a', 'nan'].includes(interval)) fail('Неизвестный Interval Status: требуется текстовый экспорт Actiware.');
-      return { timestamp: new Date(timestamp).toISOString(), activity: numericCell(cell('activity'), 'Активность'), lightLux: numericCell(cell('lightLux'), 'Освещенность'), sleepState, offWrist, excluded };
+      if (interval && !['active', 'rest', 'rest-sleep', 'rest-s', 'excluded', 'n/a', 'nan'].includes(interval)) fail('Unknown Interval Status: a text export is required Actiware.');
+      return { timestamp: new Date(timestamp).toISOString(), activity: numericCell(cell('activity'), 'Activity'), lightLux: numericCell(cell('lightLux'), 'Illuminance'), sleepState, offWrist, excluded };
     });
     const result = validate({ version: 1, sourceFormat: 'actiware-csv', epochSeconds, rows, warnings: [...warnings] });
-    if (result.rows.some((row, index) => index && iso(row.timestamp) - iso(result.rows[index - 1].timestamp) > epochSeconds * 1000)) result.warnings.push('В записи есть пропуски между эпохами.');
+    if (result.rows.some((row, index) => index && iso(row.timestamp) - iso(result.rows[index - 1].timestamp) > epochSeconds * 1000)) result.warnings.push('The recording contains missingbetween epochs.');
     return result;
   }
 
@@ -194,7 +194,7 @@
       coveredSeconds += seconds;
       if (!suitable) continue;
       if (row.activity !== null) {
-        // Counts нельзя делить пропорционально времени без исходных отсчетов внутри эпохи.
+        // Counts cannot be prorated by time without original within-epoch samples.
         if (seconds === value.epochSeconds) { activityCounts += row.activity; activityEpochs++; }
         if (row.sleepState !== 'unknown') {
           sleepScoredSeconds += seconds;
@@ -207,7 +207,7 @@
         maxLightLux = maxLightLux === null ? row.lightLux : Math.max(maxLightLux, row.lightLux);
       }
     }
-    if (!Number.isFinite(activityCounts) || !Number.isFinite(lightSum)) fail('Слишком большие значения: числовой итог Actiwatch выходит за допустимый диапазон.');
+    if (!Number.isFinite(activityCounts) || !Number.isFinite(lightSum)) fail('Values are too large: numeric total Actiwatch is outside the allowed range.');
     return { start: new Date(start).toISOString(), end: new Date(end).toISOString(), epochSeconds: value.epochSeconds, rowCount: value.rows.length, validSeconds, offWristSeconds, excludedSeconds, latest24h: {
       start: new Date(windowStart).toISOString(), end: new Date(end).toISOString(), coveredSeconds, sleepScoredSeconds,
       sleepSeconds: sleepScoredSeconds ? sleepSeconds : null, wakeSeconds: sleepScoredSeconds ? wakeSeconds : null,

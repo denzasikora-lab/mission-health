@@ -21,7 +21,7 @@
   }
   function starter(state){
     const hasConversation=state.form.closest('.personal-conversation')?.querySelector('.personal-message');
-    return hasConversation?'Хочу продолжить наш разговор.':'Хочу обсудить свое самочувствие.';
+    return hasConversation?'I want to continue our conversation.':'I want to discuss how I feel.';
   }
   function schedule(state){
     clear(state);
@@ -56,7 +56,7 @@
     const wrapper=document.createElement('div'),layer=document.createElement('div'),prefixNode=document.createElement('span'),suffixNode=document.createElement('span'),hint=document.createElement('span');
     wrapper.className='compose-ghost-wrap';layer.className='compose-ghost-layer';layer.setAttribute('aria-hidden','true');layer.hidden=true;
     prefixNode.className='compose-ghost-prefix';suffixNode.className='compose-ghost-suffix';layer.append(prefixNode,suffixNode);
-    hint.className='compose-tab-hint';hint.id='compose-tab-hint-'+(++sequence);hint.textContent='Tab - принять';hint.hidden=true;
+    hint.className='compose-tab-hint';hint.id='compose-tab-hint-'+(++sequence);hint.textContent='Tab - accept';hint.hidden=true;
     input.before(wrapper);wrapper.append(layer,input);form.querySelector('footer').append(hint);
     const described=input.getAttribute('aria-describedby');input.setAttribute('aria-describedby',[described,hint.id].filter(Boolean).join(' '));
     const state={input,form,wrapper,layer,prefixNode,suffixNode,hint,version:0,completion:'',prefix:'',controller:null,timer:null,composing:false,dismissed:null};states.set(input,state);active.add(state);

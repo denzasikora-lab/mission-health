@@ -17,7 +17,7 @@
   ];
   const target=panel.querySelector('[data-home-metric=activity]');
   if(!target)return;
-  const watch=document.createElement('button');watch.type='button';watch.className='home-body-watch';watch.setAttribute('aria-label','Посмотреть движение / Actiwatch');watch.title='Actiwatch';
+  const watch=document.createElement('button');watch.type='button';watch.className='home-body-watch';watch.setAttribute('aria-label','View movement / Actiwatch');watch.title='Actiwatch';
   watch.innerHTML='<svg viewBox="0 0 20 34" aria-hidden="true"><path class="watch-band" d="M6 1h8l1 10v12l-1 10H6L5 23V11Z"/><rect class="watch-case" x="2" y="9" width="16" height="16" rx="4"/><rect class="watch-screen" x="4.5" y="12" width="11" height="10" rx="2"/><path class="watch-pulse" d="m6 18 2-2 2 3 2-3h2"/></svg>';figure.append(watch);
   const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.classList.add('body-connections');svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');
   const connections=definitions.flatMap(definition=>{
@@ -53,7 +53,7 @@
         route=[[sx,sy],[laneX,sy],[laneX,ty],[tx,ty]];
       }else{
         tx=box.left+box.width/2-area.left;ty=(side==='top'?box.bottom:box.top)-area.top;
-        // Горизонтальные участки проходят между рядами, вертикальные остаются в колонке фигуры.
+        // Horizontal segments pass between rows, vertical segments stay inside the figure column.
         const laneX=centralLeft+centralWidth*((side==='top'?.18:.3)+lane*.24)-area.left;
         const laneY=(side==='top'?topBottom+(middleTop-topBottom)*fraction:middleBottom+(bottomTop-middleBottom)*fraction)-area.top;
         route=[[sx,sy],[laneX,sy],[laneX,laneY],[tx,laneY],[tx,ty]];

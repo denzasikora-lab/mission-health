@@ -1,16 +1,16 @@
-Отделение человека от фона: Google MediaPipe Tasks Vision 1.2.0 и Selfie Segmenter Landscape.
-Библиотека: https://www.npmjs.com/package/@mediapipe/tasks-vision/v/1.2.0
-Лицензия библиотеки: Apache-2.0.
+Person segmentation from background: Google MediaPipe Tasks Vision 1.2.0 and Selfie Segmenter Landscape.
+Library: https://www.npmjs.com/package/@mediapipe/tasks-vision/v/1.2.0
+License library: Apache-2.0.
 Copyright Google LLC / MediaPipe Authors.
-Документация модели: https://developers.google.com/edge/mediapipe/solutions/vision/image_segmenter
-Модель: https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite
-Загрузчик и WASM берутся из официального npm-пакета через jsDelivr с фиксированной версией 1.2.0. Кадры обрабатываются только на устройстве.
-Фон лаборатории создан встроенным генератором изображений по выбранному пользователем кадру видеодневника Avatar (2009), с удалением людей и надписей.
+Model documentation: https://developers.google.com/edge/mediapipe/solutions/vision/image_segmenter
+A model: https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite
+Loader and WASM come from the official npm-package through jsDelivr with a pinned version 1.2.0. Frames are processed on your device only.
+The laboratory background was generated from a user-selected video diary frame Avatar (2009), with people and captions removed.
 
-Локальное сравнение внешнего вида: Google MediaPipe Face Landmarker, версия модели float16/1.
-Модель: https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
-Документация: https://developers.google.com/edge/mediapipe/solutions/vision/face_landmarker
-Для обработчика внешнего вида WASM и загрузчик поставляются локально из того же пакета Tasks Vision 1.2.0. Модель не является медицинским изделием.
+Local appearance comparison: Google MediaPipe Face Landmarker, model version float16/1.
+A model: https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+Documentation: https://developers.google.com/edge/mediapipe/solutions/vision/face_landmarker
+For the appearance processor WASM and loader are served locally from the same package Tasks Vision 1.2.0. The model is not a medical device.
 SHA256 face-landmarker-v1.task: 64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff
 SHA256 vision_wasm_nosimd_internal.js: e9b2b799e0f1078f5538b300a57835b823742c37e2646308a03f0f25b39fdcdc
 SHA256 vision_wasm_nosimd_internal.wasm: ed5e5e5812490bd90d6a440290845ff9e4c516f696847a28a0c0e0573470d469

@@ -1,4 +1,4 @@
-"""Запускает локальные задания LoRA без обращения к внешним сервисам."""
+"""Run local jobs LoRA without calling external services."""
 
 import hashlib
 import hmac
@@ -24,7 +24,7 @@ STEPS = 200
 
 
 def save_state(folder, state):
-    """Атомарно сохраняет состояние задания в локальном закрытом каталоге."""
+    """Atomically save job state in a private local directory."""
     target = folder / "state.json"
     temporary = folder / "state.tmp"
     temporary.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
@@ -32,22 +32,22 @@ def save_state(folder, state):
 
 
 def ready():
-    """Проверяет локальную модель и установленный MLX без загрузки весов."""
+    """Check the local model and installed MLX without downloading weights."""
     return (MODEL / "config.json").exists() and importlib.util.find_spec("mlx_lm") is not None
 
 
 def training_command(folder):
-    """Возвращает фиксированную команду обучения без интерпретации пользовательского текста.
+    """Return a fixed training command without interpreting user text.
 
     Parameters
     ----------
     folder : Path
-        Каталог отдельного задания с подготовленными данными.
+        Separate job directory with prepared data.
 
     Returns
     -------
     list[str]
-        Аргументы процесса MLX с локальными путями.
+        Process arguments MLX with local paths.
     """
     return [sys.executable, "-u", "-m", "mlx_lm.lora", "--model", str(MODEL),
             "--data", str(folder / "data"), "--train", "--fine-tune-type", "lora",
@@ -58,7 +58,7 @@ def training_command(folder):
 
 
 def execute(folder, state):
-    """Обучает адаптер и фиксирует только настоящий прогресс процесса."""
+    """Train the adapter and record actual process progress only."""
     environment = dict(os.environ, HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1",
                        WANDB_MODE="disabled", HF_HUB_DISABLE_TELEMETRY="1",
                        PYTHONIOENCODING="utf-8")
@@ -100,10 +100,10 @@ def execute(folder, state):
 
 
 class TrainingHandler(BaseHTTPRequestHandler):
-    """Принимает локальный контракт заданий и не активирует готовые адаптеры автоматически."""
+    """Accept local jobs without automatically activating completed adapters."""
 
     def reply(self, status, body):
-        """Возвращает состояние без текста дневника и внутренних путей."""
+        """Return status without diary text or internal paths."""
         value = json.dumps(body, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -113,14 +113,14 @@ class TrainingHandler(BaseHTTPRequestHandler):
         self.wfile.write(value)
 
     def authorized(self):
-        """Проверяет ключ закрытого обработчика."""
+        """Check the private handler key."""
         if not KEY or not hmac.compare_digest(self.headers.get("Authorization", ""), "Bearer " + KEY):
             self.reply(401, {"error": "unauthorized"})
             return False
         return True
 
     def do_GET(self):
-        """Показывает готовность или сохраненное состояние одного задания."""
+        """Show readiness or saved state for one job."""
         if not self.authorized():
             return
         if self.path == "/health":
@@ -141,7 +141,7 @@ class TrainingHandler(BaseHTTPRequestHandler):
         self.reply(200, {key: value for key, value in state.items() if key != "owner"})
 
     def do_POST(self):
-        """Создает задание по явному запросу или останавливает существующий процесс."""
+        """Create a job on explicit request or stop an existing process."""
         if not self.authorized():
             return
         length = int(self.headers.get("Content-Length", "0"))
@@ -192,7 +192,7 @@ class TrainingHandler(BaseHTTPRequestHandler):
                 self.reply(503, {"error": "trainer_not_ready"})
                 return
             (folder / "data").mkdir(parents=True, mode=0o700)
-            samples = [{"messages": [{"role": "user", "content": "Запиши личное наблюдение в стиле автора дневника."},
+            samples = [{"messages": [{"role": "user", "content": "Write a personal observation in the diary author’s style."},
                                      {"role": "assistant", "content": entry}]} for entry in entries]
             split = max(2, len(samples) // 10)
             for name, rows in (("train", samples[split:]), ("valid", samples[:split])):
@@ -207,14 +207,14 @@ class TrainingHandler(BaseHTTPRequestHandler):
             self.reply(202, {"id": identifier, "status": "queued"})
 
     def log_message(self, format, *args):
-        """Не выводит запросы с данными дневника в общий журнал."""
+        """Do not write requests containing diary data to the shared log."""
         pass
 
 
 if __name__ == "__main__":
     os.umask(0o077)
     if not KEY:
-        raise SystemExit("Задай TRAINING_KEY для закрытого локального обработчика.")
+        raise SystemExit("Set TRAINING_KEY for the private local handler.")
     JOBS.mkdir(parents=True, exist_ok=True, mode=0o700)
-    print("Локальный обработчик LoRA: http://127.0.0.1:8093", flush=True)
+    print("Local handler LoRA: http://127.0.0.1:8093", flush=True)
     ThreadingHTTPServer(("127.0.0.1", 8093), TrainingHandler).serve_forever()

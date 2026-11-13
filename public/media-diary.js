@@ -8,8 +8,8 @@
   if(backgroundChoice){backgroundChoice.classList.add('diary-background-choice');panels.video.querySelector('.log-controls').prepend(backgroundChoice);}
   const voiceViews=panels.audio.querySelector('.voice-view-control'),voiceActions=panels.audio.querySelector('.voice-actions');
   if(voiceViews&&voiceActions){
-    const choice=document.createElement('select');choice.id='voice-style';choice.className='diary-voice-choice';choice.setAttribute('aria-label','Вид голосовой волны');choice.title='Вид голосовой волны';
-    for(const button of voiceViews.querySelectorAll('[data-voice-style]')){const option=document.createElement('option');option.value=button.dataset.voiceStyle;option.textContent={silo:'Silo',particles:'Частицы',wave:'Волна'}[option.value]||button.textContent;option.title=button.textContent;option.selected=button.getAttribute('aria-pressed')==='true';choice.append(option);}
+    const choice=document.createElement('select');choice.id='voice-style';choice.className='diary-voice-choice';choice.setAttribute('aria-label','Voice waveform style');choice.title='Voice waveform style';
+    for(const button of voiceViews.querySelectorAll('[data-voice-style]')){const option=document.createElement('option');option.value=button.dataset.voiceStyle;option.textContent={silo:'Silo',particles:'Particles',wave:'Wave'}[option.value]||button.textContent;option.title=button.textContent;option.selected=button.getAttribute('aria-pressed')==='true';choice.append(option);}
     voiceViews.remove();voiceActions.append(choice);
   }
   const audioStage=panels.audio.querySelector('.voice-stage');
@@ -17,11 +17,11 @@
     const capture=document.createElement('div');capture.className='diary-audio-capture';audioStage.before(capture);
     for(const node of [audioStage,panels.audio.querySelector('.voice-readings'),voiceActions,document.getElementById('voice-notice')])if(node)capture.append(node);
   }
-  const compactLabels={'Включить камеру':'Камера','Выключить камеру':'Выключить','Новая запись':'Еще запись','Начать запись':'Запись','Остановить запись':'Стоп','Подготовка записи':'Обработка','Включить микрофон':'Микрофон','Выключить микрофон':'Выключить','Отменить подключение':'Отмена','Посмотреть демо':'Демо','Остановить демо':'Стоп демо'};
+  const compactLabels={'Enable camera':'Camera','Disable camera':'Disable','New recording':'Record again','Start recording':'Recording','Stop recording':'Stop','Preparing recording':'Processing','Enable microphone':'Microphone','Disable microphone':'Disable','Cancel connection':'Cancel','View demo':'Demo','Stop demo':'Stop demo'};
   for(const id of ['video-log-camera','voice-mic']){
     const button=document.getElementById(id);if(!button)continue;
     button.classList.add('diary-compact-button');
-    const syncLabel=()=>{const label=button.textContent.trim();button.title=label;button.setAttribute('aria-label',label);button.dataset.compactLabel=id==='voice-mic'?'Аудио':compactLabels[label]||label;};
+    const syncLabel=()=>{const label=button.textContent.trim();button.title=label;button.setAttribute('aria-label',label);button.dataset.compactLabel=id==='voice-mic'?'Audio':compactLabels[label]||label;};
     syncLabel();new MutationObserver(syncLabel).observe(button,{childList:true,subtree:true,characterData:true});
   }
   function alignHeading(){
@@ -53,7 +53,7 @@
     if(!panels[mode])return;
     if(!active)window.missionDesign.navigate('diary');
     else render();
-    // Переход к аудио не прерывает уже работающую камеру.
+    // Switching to audio does not interrupt an active camera.
     if(mode==='audio')panels.audio.scrollIntoView({behavior:'smooth',block:'start'});
     else window.scrollTo({top:0,behavior:'auto'});
   }

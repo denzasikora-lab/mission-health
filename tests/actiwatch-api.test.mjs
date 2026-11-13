@@ -77,7 +77,7 @@ function fixture(t) {
     console: {warn() {}, error() {}},
     fetch: async (url, options) => {
       outgoing.push({url, body: options?.body});
-      throw new Error('Сетевые вызовы запрещены в изолированной проверке');
+      throw new Error('Network calls are forbidden in this isolated check');
     }
   };
   vm.runInNewContext(source, scope);
@@ -98,7 +98,7 @@ function fixture(t) {
   return {sql, run, upload, recording, objects, storageCalls, outgoing, core: scope.MissionActiwatch};
 }
 
-test('Экспорт CSV проходит реальный парсер и сохраняется как каноническая запись', async t => {
+test('Export CSV passes the actual parser and is saved as a canonical record', async t => {
   const f = fixture(t), value = f.recording();
   assert.equal(value.rows[0].timestamp, '2026-10-29T09:00:00.000Z');
   assert.equal(value.epochSeconds, 30);
@@ -116,7 +116,7 @@ test('Экспорт CSV проходит реальный парсер и со�
   assert.deepEqual(saved.body.import.summary, clone(f.core.summarize(value)));
 });
 
-test('Импорт создает личную заметку и событие без обращения к языковой модели', async t => {
+test('Import creates a personal note and activity without calling the language model', async t => {
   const f = fixture(t), saved = await f.upload();
   const note = f.sql.prepare('SELECT * FROM journal_messages').get();
   assert.equal(note.id, saved.body.import.diaryMessageId);
@@ -125,17 +125,17 @@ test('Импорт создает личную заметку и событие 
   assert.equal(note.role, 'note');
   assert.equal(note.assistant_source, 'actiwatch');
   assert.equal(note.vector_status, 'pending');
-  assert.ok(note.content.includes('Активность полных эпох: 12 counts'));
-  assert.ok(note.content.includes('Белый свет: среднее 50.0 лк'));
-  assert.ok(note.content.includes('не предоставил в этой записи пульс, SpO2, ЭКГ или температуру'));
+  assert.ok(note.content.includes('Complete epoch activity: 12 counts'));
+  assert.ok(note.content.includes('White light: mean 50.0 lx'));
+  assert.ok(note.content.includes('did not provide pulse in this recording, SpO2, ECG or temperature'));
   const events = (await f.run('/api/activity')).body.events;
   assert.equal(events.length, 1);
   assert.equal(events[0].kind, 'actiwatch_imported');
-  assert.ok(events[0].summary.includes('4 эпох'));
+  assert.ok(events[0].summary.includes('4 epochs'));
   assert.equal(f.outgoing.length, 0);
 });
 
-test('Сводка и профиль клиента игнорируются при расчете серверных данных', async t => {
+test('Client summary and profile are ignored when calculating server data', async t => {
   const f = fixture(t), saved = await f.upload({filename: 'export\nname.csv', extra: {
     summary: {latest24h: {sleepSeconds: 999999, activityCounts: 999999}},
     profile: 'jessica-meir', diaryMessageId: webcrypto.randomUUID(), source: 'live-watch'
@@ -148,10 +148,10 @@ test('Сводка и профиль клиента игнорируются п�
   const note = f.sql.prepare('SELECT * FROM journal_messages').get();
   assert.equal(note.astronaut_id, 'personal');
   assert.ok(!note.content.includes('999999'));
-  assert.ok(note.content.includes('без прямого подключения к часам'));
+  assert.ok(note.content.includes('without direct watch connection'));
 });
 
-test('Отсутствующие каналы и неизвестные метки не превращаются в нули или сон', async t => {
+test('Missing channels and unknown labels do not become zeros or sleep', async t => {
   const f = fixture(t), value = clone(f.core.parseCSV([
     'Timestamp,Activity,Sleep/Wake Score',
     '2026-10-29T09:00:00Z,NaN,2',
@@ -167,12 +167,12 @@ test('Отсутствующие каналы и неизвестные метк
   assert.equal(downloaded.body.recording.rows[0].offWrist, null);
   assert.equal(downloaded.body.recording.rows[0].sleepState, 'unknown');
   const text = f.sql.prepare('SELECT content FROM journal_messages').get().content;
-  assert.ok(text.includes('Сон по неподвижности не вычислялся'));
-  assert.ok(text.includes('Пригодных измерений активности нет'));
-  assert.ok(text.includes('Пригодных измерений белого света нет'));
+  assert.ok(text.includes('Sleep was not inferred from inactivity'));
+  assert.ok(text.includes('No usable activity measurements'));
+  assert.ok(text.includes('No usable white-light measurements'));
 });
 
-test('Без входа недоступны список импорт и скачивание', async t => {
+test('Listing imports and downloading require authentication', async t => {
   const f = fixture(t), saved = await f.upload();
   for (const [path, method] of [['/api/actiwatch', 'GET'], ['/api/actiwatch', 'POST'], ['/api/actiwatch/' + saved.body.import.id, 'GET']]) {
     const result = await f.run(path, {owner: null, method, ...(method === 'POST' ? {body: {}} : {})});
@@ -182,7 +182,7 @@ test('Без входа недоступны список импорт и ска
   assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM actiwatch_imports').get().n, 1);
 });
 
-test('Чужое происхождение и межсайтовая отправка отклоняются до сохранения', async t => {
+test('Foreign origins and cross-site submissions are rejected before saving', async t => {
   const f = fixture(t);
   for (const headers of [{origin: 'https://other.test'}, {'sec-fetch-site': 'cross-site'}]) {
     const result = await f.upload({headers});
@@ -194,7 +194,7 @@ test('Чужое происхождение и межсайтовая отпра
   assert.equal(f.outgoing.length, 0);
 });
 
-test('Метаданные и исходная запись видны только владельцу', async t => {
+test('Metadata and original recording are visible only to the owner', async t => {
   const f = fixture(t), saved = await f.upload(), id = saved.body.import.id;
   const own = await f.run('/api/actiwatch');
   assert.equal(own.body.imports.length, 1);
@@ -210,7 +210,7 @@ test('Метаданные и исходная запись видны толь�
   assert.equal((await f.run('/api/activity', {owner: 'owner-b'})).body.events.length, 0);
 });
 
-test('Повтор того же ID и содержимого не дублирует файл заметку или событие', async t => {
+test('Repeating the same ID and content does not duplicate a file, note, or activity', async t => {
   const f = fixture(t), id = webcrypto.randomUUID();
   const first = await f.upload({id}), second = await f.upload({id});
   assert.equal(second.status, 200);
@@ -223,7 +223,7 @@ test('Повтор того же ID и содержимого не дублир�
   assert.equal((await f.run('/api/activity')).body.events.length, 1);
 });
 
-test('Тот же файл с новым ID и именем дедуплицируется внутри владельца', async t => {
+test('The same file with a new ID and name is deduplicated within the owner', async t => {
   const f = fixture(t), first = await f.upload({filename: 'first.csv'});
   const again = await f.upload({filename: 'renamed.csv'});
   assert.equal(again.status, 200);
@@ -234,7 +234,7 @@ test('Тот же файл с новым ID и именем дедуплицир
   assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM journal_messages').get().n, 1);
 });
 
-test('Одинаковое содержимое разных владельцев хранится независимо', async t => {
+test('Identical content from different owners is stored independently', async t => {
   const f = fixture(t), first = await f.upload(), second = await f.upload({owner: 'owner-b'});
   assert.equal(second.status, 201);
   assert.notEqual(first.body.import.id, second.body.import.id);
@@ -244,7 +244,7 @@ test('Одинаковое содержимое разных владельце�
   assert.equal((await f.run('/api/actiwatch', {owner: 'owner-b'})).body.imports.length, 1);
 });
 
-test('Коллизия ID другого владельца и подмена содержимого дают конфликт', async t => {
+test('Collision ID with another owner and content substitution cause a conflict', async t => {
   const f = fixture(t), id = webcrypto.randomUUID();
   await f.upload({id});
   assert.equal((await f.upload({id, owner: 'owner-b'})).status, 409);
@@ -255,10 +255,10 @@ test('Коллизия ID другого владельца и подмена с
   assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM journal_messages').get().n, 1);
 });
 
-test('Ошибка второй операции пакета откатывает SQL и удаляет только новый объект', async t => {
+test('Failure of the second batch operation rolls back SQL and removes only the new object', async t => {
   const f = fixture(t), first = await f.upload();
   const beforeObjects = clone([...f.objects]), beforeNotes = clone(f.sql.prepare('SELECT * FROM journal_messages').all());
-  f.sql.exec("CREATE TRIGGER fail_actiwatch_note BEFORE INSERT ON journal_messages WHEN NEW.assistant_source='actiwatch' BEGIN SELECT RAISE(ABORT,'Проверка отката'); END;");
+  f.sql.exec("CREATE TRIGGER fail_actiwatch_note BEFORE INSERT ON journal_messages WHEN NEW.assistant_source='actiwatch' BEGIN SELECT RAISE(ABORT,'Rollback check'); END;");
   const changed = f.recording(); changed.rows[0].activity = 700;
   const failed = await f.upload({value: changed});
   assert.equal(failed.status, 503);
@@ -270,7 +270,7 @@ test('Ошибка второй операции пакета откатывае
   assert.equal((await f.run('/api/activity')).body.events.length, 1);
 });
 
-test('Последним считается конец измерений а не дата загрузки', async t => {
+test('Latest means the end of measurement rather than upload time', async t => {
   const f = fixture(t), newer = await f.upload();
   const old = f.recording();
   for (const row of old.rows) row.timestamp = new Date(Date.parse(row.timestamp) - 86400000).toISOString();
@@ -282,17 +282,17 @@ test('Последним считается конец измерений а н�
   assert.deepEqual(list.body.imports.map(item => item.id), [newer.body.import.id, older.body.import.id]);
 });
 
-test('Импорт доступен книге и векторному поиску только личного профиля владельца', async t => {
+test('Import is available to the book and vector search only in the owner’s personal profile', async t => {
   const f = fixture(t), imported = await f.upload(), id = imported.body.import.diaryMessageId;
   const friendId = webcrypto.randomUUID();
-  await f.run('/api/astronauts/jessica-meir/messages', {method: 'POST', body: {id: friendId, content: 'Запись чужого профиля', language: 'ru', mode: 'diary', attachments: []}});
+  await f.run('/api/astronauts/jessica-meir/messages', {method: 'POST', body: {id: friendId, content: 'Recording another profile', language: 'en', mode: 'diary', attachments: []}});
   const personal = await f.run('/api/astronauts/personal/book');
   assert.equal(personal.body.total, 1);
   assert.equal(personal.body.entries[0].id, id);
   const pending = await f.run('/api/astronauts/personal/book-index');
   assert.equal(pending.body.entries.length, 1);
   assert.equal(pending.body.entries[0].id, id);
-  assert.ok(pending.body.entries[0].content.includes('Actiwatch / импорт Actiware'));
+  assert.ok(pending.body.entries[0].content.includes('Actiwatch / import Actiware'));
   assert.equal((await f.run('/api/astronauts/jessica-meir/book-index')).body.entries[0].id, friendId);
   assert.equal((await f.run('/api/astronauts/personal/book-index', {owner: 'owner-b'})).body.entries.length, 0);
   const vector = Array.from({length: 256}, (_, index) => index === 0 ? 1 : 0);
@@ -301,7 +301,7 @@ test('Импорт доступен книге и векторному поис�
   for (const [profile, owner] of [['jessica-meir', 'owner-a'], ['personal', 'owner-b']]) {
     assert.equal((await f.run('/api/astronauts/' + profile + '/book-vectors', {owner, method: 'POST', body: {id, model, vectors: [vector]}})).status, 404);
   }
-  const search = await f.run('/api/astronauts/personal/book-search', {method: 'POST', body: {query: 'Сон и освещенность Actiwatch', model, vector}});
+  const search = await f.run('/api/astronauts/personal/book-search', {method: 'POST', body: {query: 'Sleep and illuminance Actiwatch', model, vector}});
   assert.equal(search.status, 200);
   assert.equal(search.body.method, 'browser-vectors');
   assert.deepEqual(search.body.matches.map(item => item.id), [id]);
@@ -310,13 +310,13 @@ test('Импорт доступен книге и векторному поис�
   assert.equal(f.outgoing.length, 0);
 });
 
-test('Некорректный JSON формат и тип данных отклоняются без побочных эффектов', async t => {
+test('Invalid JSON format and data type are rejected without side effects', async t => {
   const f = fixture(t);
   const invalid = [
     {raw: '{'},
     {body: null},
     {body: {id: webcrypto.randomUUID(), filename: '', recording: f.recording()}},
-    {body: {id: 'неверный ID', filename: 'file.csv', recording: f.recording()}},
+    {body: {id: 'invalid ID', filename: 'file.csv', recording: f.recording()}},
     {body: {id: webcrypto.randomUUID(), filename: 'file.csv', recording: {...f.recording(), epochSeconds: '30'}}},
     {body: {id: webcrypto.randomUUID(), filename: 'file.csv', recording: f.recording()}, headers: {'content-type': 'text/plain'}}
   ];
@@ -326,7 +326,7 @@ test('Некорректный JSON формат и тип данных откл
   assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM journal_messages').get().n, 0);
 });
 
-test('Ограничение размера и отсутствие хранилища не создают метаданные', async t => {
+test('Size limits and missing storage do not create metadata', async t => {
   const f = fixture(t);
   const tooLarge = await f.upload({headers: {'content-length': '10000001'}});
   assert.equal(tooLarge.status, 413);

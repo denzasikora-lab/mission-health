@@ -1,18 +1,18 @@
-/* Локальные признаки изображения. Пороги качества и цвета шкал не являются клиническими нормами. */
+/* Local image features. Quality thresholds and scale colors are not clinical norms. */
 (() => {
   const metrics = [
-    {key:'width', title:'Контур лица', unit:'%', relative:true, floor:.015, description:'Ширина скул относительно расстояния между внешними уголками глаз. Это не объем отека.'},
-    {key:'balance', title:'Симметрия контура', unit:'п.п.', floor:.8, description:'Разница расстояний от носа до левой и правой скулы, в процентных пунктах.'},
-    {key:'underEye', title:'Зона под глазами', unit:'L*', floor:1.2, color:true, description:'Контраст светлоты между зоной под глазами и щеками. Это не оценка усталости или мешков.'},
-    {key:'redness', title:'Оттенок щек', unit:'a*', floor:1, color:true, description:'Красно-зеленая компонента CIELAB щек относительно лба. Это не диагноз воспаления.'},
-    {key:'height', title:'Высота лица', unit:'%', relative:true, floor:.015, description:'Расстояние от верхней точки контура до подбородка относительно расстояния между внешними уголками глаз.'},
-    {key:'jawWidth', title:'Линия челюсти', unit:'%', relative:true, floor:.015, description:'Ширина нижнего контура лица, нормированная по расстоянию между внешними уголками глаз.'},
-    {key:'lowerFace', title:'Нижняя часть лица', unit:'%', relative:true, floor:.012, description:'Расстояние от основания носа до подбородка относительно расстояния между внешними уголками глаз.'},
-    {key:'eyeOpening', title:'Раскрытие глаз', unit:'п.п.', floor:.8, description:'Среднее отношение высоты глазной щели к ее ширине. Моргание и выражение лица меняют этот признак.'},
-    {key:'eyeBalance', title:'Симметрия глаз', unit:'п.п.', floor:.8, description:'Разница относительного раскрытия глаз между двумя сторонами кадра.'},
-    {key:'mouthWidth', title:'Ширина губ', unit:'%', relative:true, floor:.012, description:'Расстояние между уголками губ относительно расстояния между внешними уголками глаз.'},
-    {key:'toneBalance', title:'Разница тона щек', unit:'a*', floor:1, color:true, description:'Разница красно-зеленой компоненты CIELAB между щеками.'},
-    {key:'underEyeBalance', title:'Тон под глазами', unit:'L*', floor:1.2, color:true, description:'Разница контраста светлоты под глазами относительно щек между двумя сторонами кадра.'}
+    {key:'width', title:'Face contour', unit:'%', relative:true, floor:.015, description:'Cheekbone width relative to the distance between outer eye corners. This does not measure swelling volume.'},
+    {key:'balance', title:'Contour symmetry', unit:'pp', floor:.8, description:'Difference between nose-to-cheekbone distances on both sides, in percentage points.'},
+    {key:'underEye', title:'Under-eye area', unit:'L*', floor:1.2, color:true, description:'Lightness contrast between under-eye areas and cheeks. This does not assess fatigue or eye bags.'},
+    {key:'redness', title:'Cheek tone', unit:'a*', floor:1, color:true, description:'Red-green component CIELAB of cheeks relative to the forehead. This does not diagnose inflammation.'},
+    {key:'height', title:'Face height', unit:'%', relative:true, floor:.015, description:'Distance from upper face contour to chin relative to the distance between outer eye corners.'},
+    {key:'jawWidth', title:'Jawline', unit:'%', relative:true, floor:.015, description:'Lower face contour width, normalized by the distance between outer eye corners.'},
+    {key:'lowerFace', title:'Lower face', unit:'%', relative:true, floor:.012, description:'Distance from nose base to chin relative to the distance between outer eye corners.'},
+    {key:'eyeOpening', title:'Eye opening', unit:'pp', floor:.8, description:'Mean ratio of eye opening height to width. Blinking and facial expression affect this feature.'},
+    {key:'eyeBalance', title:'Eye symmetry', unit:'pp', floor:.8, description:'Difference in relative eye opening between both sides of the frame.'},
+    {key:'mouthWidth', title:'Lip width', unit:'%', relative:true, floor:.012, description:'Distance between lip corners relative to the distance between outer eye corners.'},
+    {key:'toneBalance', title:'Cheek tone difference', unit:'a*', floor:1, color:true, description:'Difference in red-green component CIELAB between cheeks.'},
+    {key:'underEyeBalance', title:'Under-eye tone', unit:'L*', floor:1.2, color:true, description:'Difference in under-eye-to-cheek lightness contrast between both sides.'}
   ];
   const median = values => { const a=[...values].sort((x,y)=>x-y), m=Math.floor(a.length/2); return a.length ? a.length%2 ? a[m] : (a[m-1]+a[m])/2 : NaN; };
   const dist = (a,b) => Math.hypot(a.x-b.x,a.y-b.y);
@@ -41,37 +41,37 @@
   function measure(image,result) {
     const faces=result.faceLandmarks||[];
     const reject=(reason)=>({valid:false,reason});
-    if(faces.length!==1)return reject(faces.length?'В кадре должно быть одно лицо':'Расположи лицо по центру');
+    if(faces.length!==1)return reject(faces.length?'The frame must contain one face':'Center your face');
     const p=faces[0].map(v=>({x:v.x*image.width,y:v.y*image.height,z:v.z*image.width}));
-    if(p.length<455||p.some(v=>!Number.isFinite(v.x)||!Number.isFinite(v.y)||!Number.isFinite(v.z)))return reject('Лицо не удалось измерить');
+    if(p.length<455||p.some(v=>!Number.isFinite(v.x)||!Number.isFinite(v.y)||!Number.isFinite(v.z)))return reject('Could not measure the face');
     const d=dist(p[33],p[263]),width=dist(p[234],p[454]);
-    if(d<110||width<200)return reject('Приблизь лицо к камере');
-    if(p.some(v=>v.x<5||v.y<5||v.x>image.width-5||v.y>image.height-5))return reject('Лицо должно полностью помещаться в кадр');
+    if(d<110||width<200)return reject('Move closer to the camera');
+    if(p.some(v=>v.x<5||v.y<5||v.x>image.width-5||v.y>image.height-5))return reject('Your whole face must fit inside the frame');
     const ex={x:(p[263].x-p[33].x)/d,y:(p[263].y-p[33].y)/d},ey={x:-ex.y,y:ex.x};
     const roll=Math.atan2(ex.y,ex.x)*180/Math.PI;
     const m=result.facialTransformationMatrixes?.[0]?.data;
     const yaw=m?Math.atan2(m[8],m[10])*180/Math.PI:Math.atan2(p[234].z-p[454].z,width)*180/Math.PI;
     const pitch=m?Math.atan2(-m[9],Math.hypot(m[8],m[10]))*180/Math.PI:0;
-    if(Math.abs(roll)>7||Math.abs(yaw)>12||Math.abs(pitch)>12)return reject('Смотри прямо, держи голову ровно');
+    if(Math.abs(roll)>7||Math.abs(yaw)>12||Math.abs(pitch)>12)return reject('Look straight ahead, keep your head level');
     const shapes=result.faceBlendshapes?.[0]?.categories||[];
-    if(dist(p[13],p[14])/d>.045||shapes.some(s=>/^(mouthSmile|jawOpen|browInnerUp|browOuterUp)/.test(s.categoryName)&&s.score>.3))return reject('Для сравнения сделай паузу в речи, расслабь лицо');
+    if(dist(p[13],p[14])/d>.045||shapes.some(s=>/^(mouthSmile|jawOpen|browInnerUp|browOuterUp)/.test(s.categoryName)&&s.score>.3))return reject('Pause speaking for comparison, relax your face');
     const eyeL=mix(p[33],p[133]),eyeR=mix(p[362],p[263]);
     const offset=(point,x,y)=>({x:point.x+ex.x*d*x+ey.x*d*y,y:point.y+ex.y*d*x+ey.y*d*y});
     const centers={cheekL:offset(eyeL,-.025,.34),cheekR:offset(eyeR,.025,.34),underL:offset(eyeL,0,.105),underR:offset(eyeR,0,.105),forehead:mix(p[10],p[9],.55)};
     const patches=Object.fromEntries(Object.entries(centers).map(([k,c])=>[k,patch(image,c,ex,ey,d*(k.startsWith('under')?.10:.12),d*(k.startsWith('under')?.045:.075))]));
-    if(Object.values(patches).some(v=>!v))return reject('Кадр обрезает область измерения');
+    if(Object.values(patches).some(v=>!v))return reject('The frame crops the measurement area');
     const cL=patches.cheekL,cR=patches.cheekR,f=patches.forehead;
     const light={l:(cL.l+cR.l)/2,a:f.a,b:f.b,side:cL.l-cR.l};
-    if(Object.values(patches).some(v=>v.clip>.08)||light.l<18||light.l>92)return reject('Нужен мягкий свет без пересвета и глубоких теней');
-    if(Math.abs(light.side)>10)return reject('Освети лицо равномерно с двух сторон');
-    // Резкость измеряется на глазах, поскольку ровная кожа сама по себе может не иметь текстуры.
+    if(Object.values(patches).some(v=>v.clip>.08)||light.l<18||light.l>92)return reject('Use soft light without overexposure or deep shadows');
+    if(Math.abs(light.side)>10)return reject('Light your face evenly from both sides');
+    // Sharpness is measured around the eyes, because smooth skin may have little texture.
     const eyeSharp=[eyeL,eyeR].map(c=>patch(image,c,ex,ey,d*.13,d*.055)?.sharp||0);
-    if(Math.max(...eyeSharp)<12)return reject('Подожди фокус камеры, не двигайся');
+    if(Math.max(...eyeSharp)<12)return reject('Wait for the camera to focus, stay still');
     const a=dist(p[234],p[1]),b=dist(p[454],p[1]),eyeWidthL=dist(p[33],p[133]),eyeWidthR=dist(p[362],p[263]);
-    if(eyeWidthL<1||eyeWidthR<1)return reject('Глаза не удалось измерить');
+    if(eyeWidthL<1||eyeWidthR<1)return reject('Could not measure the eyes');
     const openL=dist(p[159],p[145])/eyeWidthL,openR=dist(p[386],p[374])/eyeWidthR;
     const values={width:width/d,balance:100*(a-b)/(a+b),underEye:light.l-(patches.underL.l+patches.underR.l)/2,redness:(cL.a+cR.a)/2-f.a,height:dist(p[10],p[152])/d,jawWidth:dist(p[172],p[397])/d,lowerFace:dist(p[2],p[152])/d,eyeOpening:50*(openL+openR),eyeBalance:100*(openL-openR),mouthWidth:dist(p[61],p[291])/d,toneBalance:cL.a-cR.a,underEyeBalance:(cL.l-patches.underL.l)-(cR.l-patches.underR.l)};
-    if(metrics.some(metric=>!Number.isFinite(values[metric.key])||metric.relative&&values[metric.key]<=0))return reject('Контур лица не удалось измерить');
+    if(metrics.some(metric=>!Number.isFinite(values[metric.key])||metric.relative&&values[metric.key]<=0))return reject('Could not measure the face contour');
     return {valid:true,metrics:values,light,pose:{yaw,pitch,roll},distance:d/image.width,center:mix(p[33],p[263]),points:p.filter((_,i)=>[10,33,133,263,362,234,454,1,2,152,172,397,61,291,159,145,386,374].includes(i)).map(v=>({x:v.x/image.width,y:v.y/image.height})),regions:Object.values(centers).map(v=>({x:v.x/image.width,y:v.y/image.height}))};
   }
   function summarize(samples) {
@@ -87,9 +87,9 @@
     return value?.version===2&&Number.isFinite(value.distance)&&value.distance>0&&value.distance<1&&Number.isInteger(value.count)&&value.count>=24&&metrics.every(m=>Number.isFinite(value.metrics?.[m.key]?.center)&&Number.isFinite(value.metrics[m.key].noise)&&value.metrics[m.key].noise>=m.floor&&(!m.relative||value.metrics[m.key].center>0))&&['l','a','b','side'].every(k=>Number.isFinite(value.light?.[k]))&&['yaw','pitch','roll'].every(k=>Number.isFinite(value.pose?.[k]));
   }
   function comparison(sample,reference) {
-    if(!sample.valid||!referenceValid(reference)||metrics.some(m=>!Number.isFinite(sample.metrics?.[m.key])||m.relative&&sample.metrics[m.key]<=0))return {valid:false,reason:sample.reason||'Нужен полный кадр и новый эталон'};
-    if(Math.abs(sample.distance/reference.distance-1)>.15)return {valid:false,reason:'Верни расстояние до камеры как в эталоне'};
-    if(['yaw','pitch','roll'].some(k=>Math.abs(sample.pose[k]-reference.pose[k])>5))return {valid:false,reason:'Повтори ракурс эталона'};
+    if(!sample.valid||!referenceValid(reference)||metrics.some(m=>!Number.isFinite(sample.metrics?.[m.key])||m.relative&&sample.metrics[m.key]<=0))return {valid:false,reason:sample.reason||'A complete frame and new baseline are required'};
+    if(Math.abs(sample.distance/reference.distance-1)>.15)return {valid:false,reason:'Match the baseline distance from the camera'};
+    if(['yaw','pitch','roll'].some(k=>Math.abs(sample.pose[k]-reference.pose[k])>5))return {valid:false,reason:'Match the baseline angle'};
     const colorOk=Math.abs(sample.light.l-reference.light.l)<=7&&Math.abs(sample.light.a-reference.light.a)<=4&&Math.abs(sample.light.b-reference.light.b)<=4&&Math.abs(sample.light.side-reference.light.side)<=5;
     const values={};
     for(const m of metrics){const ref=reference.metrics[m.key],delta=sample.metrics[m.key]-ref.center;values[m.key]={valid:!m.color||colorOk,delta:m.relative?100*delta/ref.center:delta,z:Math.abs(delta)/ref.noise};}
@@ -100,7 +100,7 @@
     for(const m of metrics)copy.metrics[m.key]=median(samples.map(v=>v.metrics[m.key]));
     return copy;
   }
-  // Цвет показывает техническое отличие от эталона, а не вероятность заболевания.
+  // Color indicates a technical difference from the baseline, not disease probability.
   function level(z,persistentMs=0){return z>=3&&persistentMs>=3000?'red':z>=2?'amber':'green';}
   globalThis.MissionAppearanceCore={metrics,median,lab,measure,summarize,referenceValid,comparison,smooth,level};
 })();

@@ -32,7 +32,7 @@ function fixture(){
   class FakeDate extends Date{static now(){return now;}}
   class Observer{constructor(callback){this.callback=callback;this.observations=[];observers.push(this);}observe(target,options){this.observations.push({target,options});}disconnect(){this.observations=[];}}
   const sandbox={window,document,Date:FakeDate,Intl,MutationObserver:Observer,setTimeout,clearTimeout,requestAnimationFrame:callback=>setTimeout(callback,16),cancelAnimationFrame:clearTimeout};
-  // Доступ к рассчитанным точкам нужен для проверки общего участка двух соседних окон.
+  // Calculated points are exposed to verify overlap between adjacent windows.
   vm.runInNewContext(source.replace('window.missionHomeTrends={refresh}', 'window.missionHomeTrends={refresh,demoSeries}'),sandbox);
   const panel=home.querySelector('.home-trends'),controls=panel.querySelector('.home-trend-periods'),svg=panel.querySelector('svg');
   function advance(milliseconds){const end=now+milliseconds;while(true){const next=[...timers].filter(([,timer])=>timer.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];if(!next)break;now=next[1].at;timers.delete(next[0]);next[1].callback();}now=end;}
@@ -44,30 +44,30 @@ function fixture(){
   return {window,document,home,cards,panel,svg,timers,period,select,path,advance,mutate,emit,api:window.missionHomeTrends};
 }
 
-test('Минутный график меняется по времени, а общий участок соседних окон сохраняется',()=>{
+test('The minute chart changes over time, shared points in adjacent windows are preserved',()=>{
   const f=fixture();f.period('1m');
   const first=f.path(),points=Array.from(f.api.demoSeries('hr',72,'1m').points);
   f.advance(999);assert.equal(f.path(),first);f.advance(1);assert.notEqual(f.path(),first);
   const moved=Array.from(f.api.demoSeries('hr',72,'1m').points);
   assert.equal(moved.length,61);assert.deepEqual(moved.slice(0,-1),points.slice(1));
   const current=f.path();f.api.refresh();assert.equal(f.path(),current);assert.equal(f.timers.size,1);
-  assert.match(f.panel.querySelector('.home-trend-source').textContent,/Демо.*1 с/);
+  assert.match(f.panel.querySelector('.home-trend-source').textContent,/Demo.*1 s/);
 });
 
-test('Другие периоды остаются статичными и не запускают секундный таймер',()=>{
+test('Other periods stay static and do not start secondstimer',()=>{
   const f=fixture(),initial=f.path();f.advance(10000);assert.equal(f.path(),initial);assert.equal(f.timers.size,0);
   f.period('1m');f.advance(1000);f.period('1h');const hourly=f.path();assert.equal(f.timers.size,0);
   f.advance(10000);f.api.refresh();assert.equal(f.path(),hourly);
 });
 
-test('Скрытие страницы останавливает обновления, возврат продолжает временную шкалу',()=>{
+test('Hiding the page stops updates, returning resumes the timeline',()=>{
   const f=fixture();f.period('1m');const initial=f.path();
   f.document.hidden=true;f.emit(f.document,'visibilitychange');assert.equal(f.timers.size,0);
   f.advance(10000);assert.equal(f.path(),initial);
   f.document.hidden=false;f.emit(f.document,'visibilitychange');f.advance(16);assert.notEqual(f.path(),initial);assert.equal(f.timers.size,1);
 });
 
-test('Уход из раздела здоровья отменяет таймер и ожидающее обновление',()=>{
+test('Leaving Health cancels the timer and pending update',()=>{
   const f=fixture();f.period('1m');const initial=f.path();
   f.mutate(f.cards.get('hr').querySelector('strong'));assert.equal(f.timers.size,2);
   f.home.hidden=true;f.mutate(f.home,'hidden');assert.equal(f.timers.size,0);
@@ -75,11 +75,11 @@ test('Уход из раздела здоровья отменяет тайме�
   f.home.hidden=false;f.mutate(f.home,'hidden');f.advance(16);assert.notEqual(f.path(),initial);assert.equal(f.timers.size,1);
 });
 
-test('Самооценка и импортированные показатели не получают выдуманную минутную историю',()=>{
+test('Self-reports and imported readings do not receive invented minute history',()=>{
   const f=fixture();f.period('1m');
   for(const key of ['wellbeing','activity']){
     f.select(key);assert.equal(f.path(),null);assert.equal(f.timers.size,0);assert.equal(f.panel.dataset.trendMetric,key);
-    assert.match(f.panel.querySelector('.home-trend-empty').textContent,/Нет потока измерений/);
+    assert.match(f.panel.querySelector('.home-trend-empty').textContent,/No measurement stream/);
     const raw=f.cards.get(key).querySelector('strong').textContent;
     f.advance(6000);assert.equal(f.cards.get(key).querySelector('strong').textContent,raw);assert.equal(f.path(),null);
   }
@@ -87,18 +87,18 @@ test('Самооценка и импортированные показател�
   assert.equal(f.path(),null);assert.equal(f.panel.querySelector('.home-trend-reading').textContent,'67200');assert.equal(f.timers.size,0);
 });
 
-test('Переключение метрики сохраняет выбор и оставляет только один таймер',()=>{
+test('Switching metrics preserves the choice and keeps one timer only',()=>{
   const f=fixture();f.period('1m');const pulse=f.path();f.select('spo2');assert.equal(f.panel.dataset.trendMetric,'spo2');assert.notEqual(f.path(),pulse);assert.equal(f.timers.size,1);
   const oxygen=f.path();f.advance(1000);assert.notEqual(f.path(),oxygen);assert.equal(f.panel.dataset.trendMetric,'spo2');assert.equal(f.timers.size,1);
   f.select('hr');assert.equal(f.panel.dataset.trendMetric,'hr');assert.notEqual(f.path(),pulse);assert.equal(f.timers.size,1);
 });
 
-test('Смена источника с демонстрационного на настоящий прекращает синтетический поток',()=>{
+test('Switching from demonstration to real data stops the synthetic stream',()=>{
   const f=fixture();f.period('1m');const card=f.cards.get('hr');card.dataset.source='imported';f.mutate(card,'data-source');f.advance(16);
   assert.equal(f.path(),null);assert.equal(f.timers.size,0);f.advance(5000);assert.equal(f.path(),null);
 });
 
-test('Уход со страницы отменяет таймер, восстановление из кеша возобновляет его',()=>{
+test('Leaving the page cancels the timer, restoring from cache resumes it',()=>{
   const f=fixture();f.period('1m');const initial=f.path();f.emit(f.window,'pagehide',{persisted:true});assert.equal(f.timers.size,0);
   f.advance(4000);assert.equal(f.path(),initial);f.emit(f.window,'pageshow');f.advance(16);assert.notEqual(f.path(),initial);assert.equal(f.timers.size,1);
 });

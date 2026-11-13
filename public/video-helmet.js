@@ -34,7 +34,7 @@
     const shade=c.createRadialGradient(640,305,150,640,345,610);
     shade.addColorStop(0,'#01070b00');shade.addColorStop(.58,'#01070b18');shade.addColorStop(.83,'#01070bd9');shade.addColorStop(1,'#010305');
     c.fillStyle=shade;c.fillRect(0,0,1280,720);
-    // Боковая оптика и дуги повторяют композицию референса, числовых медицинских показателей нет.
+    // Side optics and arcs follow the reference composition, without numeric medical readings.
     for(const side of [-1,1]) {
       c.save();c.translate(side===-1?0:1280,0);c.scale(side===-1?1:-1,1);
       line(c,[[25,36],[260,36],[332,83],[365,151]],'#467688',2);
@@ -63,7 +63,7 @@
     c.fillStyle='#d7faff';c.font='24px monospace';c.fillText(name,402,648,560);
     c.fillStyle=cyan;c.font='13px monospace';c.fillText('EARTH SOURCE: '+location,402,677,560);
     c.fillStyle='#77b6c5';c.font='11px monospace';c.fillText(new Date().toLocaleTimeString('en-GB',{hour12:false}),1090,678);
-    if(!active){c.fillStyle='#70a1b0';c.font='14px monospace';c.textAlign='center';c.fillText('ВКЛЮЧИ КАМЕРУ / ЛИЦО ПО ЦЕНТРУ',640,363);}
+    if(!active){c.fillStyle='#70a1b0';c.font='14px monospace';c.textAlign='center';c.fillText('ENABLE CAMERA / CENTER YOUR FACE',640,363);}
     c.restore();
   }
   window.missionHelmet={backdrop,portrait,hud};

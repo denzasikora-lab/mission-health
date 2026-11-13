@@ -1,4 +1,4 @@
--- Исходные оценки, тексты и события сохраняются. Новое представление требует повторной индексации.
+-- Original scores, texts and events are preserved. The new representation requires reindexing.
 DELETE FROM journal_text_vectors
 WHERE EXISTS (
   SELECT 1 FROM journal_messages AS m

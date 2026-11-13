@@ -22,7 +22,7 @@
       if(!blocks.length&&!speech){pre.push(block);preFrames+=block.length;while(preFrames>sampleRate*.24&&pre.length>1)preFrames-=pre.shift().length;return;}
       if(!blocks.length){blocks=pre;frames=preFrames;pre=[];preFrames=0;}
       blocks.push(block);frames+=block.length;if(speech){voiced+=block.length;silence=0;}else silence+=block.length;
-      // Каждый запрос содержит самостоятельный WAV, без разрывов контейнера MediaRecorder.
+      // Each request contains a complete WAV, without container splits MediaRecorder.
       if(frames>=sampleRate*6||silence>=sampleRate*.65&&frames>=sampleRate*.8)flush();
     }
     return {push,flush,clear};

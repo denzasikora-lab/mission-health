@@ -24,7 +24,7 @@ self.onmessage = async event => {
           maskCanvas.width = mask.width; maskCanvas.height = mask.height;
         }
         const image = maskContext.createImageData(mask.width, mask.height);
-        // Мягкая граница сохраняет волосы и сглаживает край портрета.
+        // A soft boundary preserves hair and smooths the portrait edge.
         let personPixels = 0;
         for (let pixel = 0; pixel < values.length; pixel++) {
           if (values[pixel] >= .5) personPixels++;
@@ -41,7 +41,7 @@ self.onmessage = async event => {
         portraitContext.drawImage(maskCanvas, 0, 0, 640, 360);
         portraitContext.globalCompositeOperation = 'source-over';
         const cutout = portrait.transferToImageBitmap();
-        // Пустая маска не должна скрывать человека за виртуальным фоном.
+        // An empty mask must not hide the person behind the virtual background.
         self.postMessage({ type: 'frame', bitmap: cutout, hasPerson: personPixels / values.length >= .005 }, [cutout]);
       });
     }

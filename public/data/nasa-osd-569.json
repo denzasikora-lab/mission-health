@@ -5,7 +5,7 @@
   "year": 2021,
   "assay": "Complete Blood Count",
   "tissue": "Whole Blood",
-  "description": "Реальные опубликованные показатели общего анализа крови четырех участников Inspiration4. Все значения взяты из публичного файла NASA OSD-569 и сверены со второй таблицей NASA.",
+  "description": "Real published complete blood count measurements from four participants in Inspiration4. All values come from the public file NASA OSD-569 and were verified against the second table NASA.",
   "source": "https://osdr.nasa.gov/bio/repo/data/studies/OSD-569",
   "provenance": [
     {
@@ -95,7 +95,7 @@
   "metrics": [
     {
       "key": "white_blood_cells_thousand_ul",
-      "label": "Лейкоциты",
+      "label": "White blood cells",
       "sourceAnalyte": "WHITE BLOOD CELL COUNT",
       "unit": "10^3/µL",
       "sourceUnit": "Thousand/uL",
@@ -103,7 +103,7 @@
     },
     {
       "key": "red_blood_cells_million_ul",
-      "label": "Эритроциты",
+      "label": "Red blood cells",
       "sourceAnalyte": "RED BLOOD CELL COUNT",
       "unit": "10^6/µL",
       "sourceUnit": "Million/uL",
@@ -111,7 +111,7 @@
     },
     {
       "key": "hemoglobin_g_dl",
-      "label": "Гемоглобин",
+      "label": "Hemoglobin",
       "sourceAnalyte": "HEMOGLOBIN",
       "unit": "g/dL",
       "sourceUnit": "g/dL",
@@ -119,7 +119,7 @@
     },
     {
       "key": "hematocrit_percent",
-      "label": "Гематокрит",
+      "label": "Hematocrit",
       "sourceAnalyte": "HEMATOCRIT",
       "unit": "%",
       "sourceUnit": "%",
@@ -127,7 +127,7 @@
     },
     {
       "key": "neutrophils_percent",
-      "label": "Нейтрофилы",
+      "label": "Neutrophils",
       "sourceAnalyte": "NEUTROPHILS",
       "unit": "%",
       "sourceUnit": "%",
@@ -135,7 +135,7 @@
     },
     {
       "key": "lymphocytes_percent",
-      "label": "Лимфоциты",
+      "label": "Lymphocytes",
       "sourceAnalyte": "LYMPHOCYTES",
       "unit": "%",
       "sourceUnit": "%",
@@ -143,16 +143,16 @@
     }
   ],
   "limitations": [
-    "Маленькая наблюдательная выборка: четыре человека и один трехдневный полет. Значения описывают эту выборку, причинный эффект полета из них не следует.",
-    "CBC измерен только в наземные точки. Измерений CBC в полете нет. L обозначает дни относительно старта, R обозначает дни относительно возвращения; это разные начала отсчета.",
-    "Показаны шесть заранее указанных показателей из 20 исходных типов анализа. Они заполнены во всех 28 образцах; пропуски не заменялись и значения не интерполировались.",
-    "Для гемоглобина используется единица g/dL из оригинального SUBMITTED-файла. Имя столбца hemoglobin_value_percent в TRANSFORMED-файле не соответствует оригинальной единице, хотя все 28 чисел совпадают.",
-    "В исходных файлах есть подозрительные значения в других показателях образца C003/L-92, включая тромбоциты 12.9 Thousand/uL, MPV 330 fL и абсолютные нейтрофилы 10.1 cells/uL. Эти показатели не включены, значения источника не исправлялись догадкой.",
-    "Пол и референсные интервалы из исходной таблицы не используются для клинических выводов. Набор служит учебной визуализации и не задает диагностические пороги."
+    "Small observational cohort: four people and one three-day flight. Values describe this cohort, they do not establish the causal effect of flight.",
+    "CBC was measured at ground visits only. Measurements CBC are unavailable during flight. L indicates days relative to launch, R indicates days relative to return; these are different time origins.",
+    "Six predefined measurements are shown from 20 original assay types. They are available in all 28 samples; missingwere not replaced and values were not interpolated.",
+    "Hemoglobin uses the unit g/dL from the original SUBMITTED-file. Column name hemoglobin_value_percent in TRANSFORMED-in the file does not match the original unit, although all 28 numbers match.",
+    "The source files contain suspicious values in other measurements for sample C003/L-92, including platelets 12.9 Thousand/uL, MPV 330 fL and absolute neutrophils 10.1 cells/uL. These measurements were excluded, source values were not changed by guesswork.",
+    "Sex and reference intervals from the source table are not used for clinical conclusions. The dataset supports educational visualization and does not define diagnostic thresholds."
   ],
   "normalization": [
-    "Три исходных названия с суффиксом (FEMALE) у C003/R+1 сопоставлены тем же показателям эритроцитов, гемоглобина и гематокрита. Числа и единицы сохранены.",
-    "Thousand/uL отображается как 10^3/µL, Million/uL как 10^6/µL. Числовое масштабирование не выполнялось."
+    "Three original names with suffix (FEMALE) for C003/R+1 are mapped to the same red blood cell measurements, hemoglobin and hematocrit. Numbers and units are preserved.",
+    "Thousand/uL is displayed as 10^3/µL, Million/uL as 10^6/µL. No numeric scaling was applied."
   ],
   "rows": [
     {

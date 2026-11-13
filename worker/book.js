@@ -32,8 +32,8 @@ async function bookRoute(request,env,user,profile,action,url){
     if(typeof input?.query!=='string'||!input.query.trim()||input.query.length>1000||!Array.isArray(input.ids)||!input.ids.length||input.ids.length>6||input.ids.some(id=>typeof id!=='string'||!/^[a-f0-9-]{36}$/i.test(id)))fail('invalid_input',400);
     const rows=[];for(const id of [...new Set(input.ids)]){const row=await db.prepare("SELECT * FROM journal_messages WHERE id=? AND owner_id=? AND astronaut_id=? AND role!='assistant'").bind(id,user,profile).first();if(!row)fail('not_found',404);rows.push(row);}
     if(!languageModelConfigured(env))fail('assistant_unavailable',503);
-    const answer=await languageModelAnswer(env,{query:input.query.trim(),language:'ru',history:[],photos:[],references:rows.map(row=>({...serialize(row),content:diaryDocument(row)}))});
-    return json({answer:answer.text.slice(0,16000).replaceAll('\u0451','\u0435').replaceAll('\u0401','\u0415').replace(/[\u2013\u2014]/g,'-'),references:rows.map(serialize)});
+    const answer=await languageModelAnswer(env,{query:input.query.trim(),language:'en',history:[],photos:[],references:rows.map(row=>({...serialize(row),content:diaryDocument(row)}))});
+    return json({answer:answer.text.slice(0,16000).replace(/[\u2013\u2014]/g,'-'),references:rows.map(serialize)});
   }
   if(action==='book-vectors'){
     if(input?.model!==bookVectorModel||typeof input.id!=='string'||!Array.isArray(input.vectors)||!input.vectors.length||input.vectors.length>8)fail('invalid_input',400);
@@ -48,7 +48,7 @@ async function bookRoute(request,env,user,profile,action,url){
     return json({needsVector:true,model:bookVectorModel});
   }
   if(input.model!==bookVectorModel)fail('invalid_vector',400);const query=bookUnitVector(input.vector);
-  // Ограничение защищает память воркера; интерфейс явно показывает фактический охват.
+  // The limit protects worker memory; the interface explicitly shows actual coverage.
   const {results}=await db.prepare("SELECT m.*,v.vectors_json FROM journal_text_vectors v JOIN journal_messages m ON m.id=v.message_id AND m.owner_id=v.owner_id AND m.astronaut_id=v.astronaut_id WHERE m.owner_id=? AND m.astronaut_id=? AND m.role!='assistant' AND v.model=? ORDER BY m.created_at DESC,m.id DESC LIMIT 500").bind(user,profile,bookVectorModel).all();
   const ranked=results.map(row=>({row,score:Math.max(...JSON.parse(row.vectors_json).map(vector=>vector.reduce((sum,n,i)=>sum+n*query[i],0)))})).filter(item=>Number.isFinite(item.score)).sort((a,b)=>b.score-a.score).slice(0,6);
   return json({matches:await Promise.all(ranked.map(async({row,score})=>({...await hydratedMessage(env,user,profile,row),score:Math.max(-1,Math.min(1,score))}))),method:'browser-vectors',model:'EmbeddingGemma 2',searchedCount:results.length,limit:500});

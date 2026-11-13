@@ -2,15 +2,15 @@ function actiwatchView(row){return {id:row.id,filename:row.filename,summary:JSON
 function actiwatchStorage(env){if(!env.PHOTOS)fail('storage_unavailable',503);return env.PHOTOS;}
 function actiwatchNote(summary,filename){
   const window=summary.latest24h,minutes=value=>Math.round(value/60),lines=[
-    'Actiwatch / импорт Actiware',
-    'Источник: '+filename+'. Это данные загруженного файла, без прямого подключения к часам.',
-    'Период записи: '+summary.start+' - '+summary.end+'. Эпоха: '+summary.epochSeconds+' с. Эпох: '+summary.rowCount+'.',
-    'Окно последних 24 часов до '+window.end+'. Покрытие: '+minutes(window.coveredSeconds)+' мин; классифицировано сон/бодрствование: '+minutes(window.sleepScoredSeconds)+' мин.',
-    window.sleepSeconds===null?'Метки сна не предоставлены или непригодны. Сон по неподвижности не вычислялся.':'Сон по готовым меткам Actiware: '+minutes(window.sleepSeconds)+' мин; бодрствование: '+minutes(window.wakeSeconds)+' мин.',
-    window.activityCounts===null?'Пригодных измерений активности нет.':'Активность полных эпох: '+window.activityCounts+' counts. Это относительные отсчеты, не шаги и не калории.',
-    window.meanLightLux===null?'Пригодных измерений белого света нет.':'Белый свет: среднее '+window.meanLightLux.toFixed(1)+' лк, максимум '+window.maxLightLux.toFixed(1)+' лк.',
-    'Снятые часы за запись: '+minutes(summary.offWristSeconds)+' мин; исключенные эпохи: '+minutes(summary.excludedSeconds)+' мин.',
-    'Actiwatch не предоставил в этой записи пульс, SpO2, ЭКГ или температуру. Интерпретация сна зависит от меток исходного ПО.'
+    'Actiwatch / import Actiware',
+    'Source: '+filename+'. These data come from an uploaded file, without direct watch connection.',
+    'Recording period: '+summary.start+' - '+summary.end+'. Epoch: '+summary.epochSeconds+' s. Epochs: '+summary.rowCount+'.',
+    'Last window of 24 hours ending at '+window.end+'. Coverage: '+minutes(window.coveredSeconds)+' min; classified as sleep/wakefulness: '+minutes(window.sleepScoredSeconds)+' min.',
+    window.sleepSeconds===null?'Sleep labels are missing or unusable. Sleep was not inferred from inactivity.':'Sleep from supplied labels Actiware: '+minutes(window.sleepSeconds)+' min; wakefulness: '+minutes(window.wakeSeconds)+' min.',
+    window.activityCounts===null?'No usable activity measurements.':'Complete epoch activity: '+window.activityCounts+' counts. These are relative counts, not steps or calories.',
+    window.meanLightLux===null?'No usable white-light measurements.':'White light: mean '+window.meanLightLux.toFixed(1)+' lx, maximum '+window.maxLightLux.toFixed(1)+' lx.',
+    'Watch removed during recording: '+minutes(summary.offWristSeconds)+' min; excluded epochs: '+minutes(summary.excludedSeconds)+' min.',
+    'Actiwatch did not provide pulse in this recording, SpO2, ECG or temperature. Sleep interpretation depends on source software labels.'
   ];return lines.join('\n');
 }
 async function actiwatchRoute(request,env,user,id){
@@ -38,13 +38,13 @@ async function actiwatchRoute(request,env,user,id){
   try{
     await db.batch([
       db.prepare('INSERT INTO actiwatch_imports (id,owner_id,digest,filename,object_key,summary_json,recorded_end,diary_message_id,created_at) VALUES (?,?,?,?,?,?,?,?,?)').bind(input.id,user,digest,filename,key,JSON.stringify(summary),summary.end,diaryId,date),
-      db.prepare('INSERT INTO journal_messages (id,owner_id,astronaut_id,role,content,language,created_at,vector_status,references_json,attachments_json,assistant_source) VALUES (?,?,?,?,?,?,?,?,?,?,?)').bind(diaryId,user,'personal','note',actiwatchNote(summary,filename),'ru',date,'pending','[]','[]','actiwatch')
+      db.prepare('INSERT INTO journal_messages (id,owner_id,astronaut_id,role,content,language,created_at,vector_status,references_json,attachments_json,assistant_source) VALUES (?,?,?,?,?,?,?,?,?,?,?)').bind(diaryId,user,'personal','note',actiwatchNote(summary,filename),'en',date,'pending','[]','[]','actiwatch')
     ]);
   }catch(error){
     await actiwatchStorage(env).delete(key);
     const raced=await db.prepare('SELECT * FROM actiwatch_imports WHERE owner_id=? AND digest=?').bind(user,digest).first();if(raced)return json({import:actiwatchView(raced),duplicate:true});throw error;
   }
-  if(typeof activityWrite==='function')await activityWrite(env,user,'actiwatch_imported','Добавил данные Actiwatch / '+summary.rowCount+' эпох','actiwatch:'+input.id);
+  if(typeof activityWrite==='function')await activityWrite(env,user,'actiwatch_imported','Imported data Actiwatch / '+summary.rowCount+' epochs','actiwatch:'+input.id);
   const row=await db.prepare('SELECT * FROM actiwatch_imports WHERE id=? AND owner_id=?').bind(input.id,user).first();
   return json({import:actiwatchView(row),duplicate:false},201);
 }

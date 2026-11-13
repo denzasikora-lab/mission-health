@@ -2,7 +2,7 @@ import {AutoConfig,AutoModel,AutoProcessor,RawImage,env} from './vendor/transfor
 import './apparent-age-core.js';
 import './skin-spots-core.js';
 const modelId='onnx-community/embeddinggemma-2-ONNX',revision='daa72c51243991dfcaf9f9137d2c573d8f7790c0';
-// Загрузчик токенизатора читает служебный конфиг без revision; фиксируем путь ко всем файлам модели.
+// The tokenizer loader reads the service configuration without revision; pin paths for all model files.
 env.remotePathTemplate='{model}/resolve/'+revision+'/';
 env.allowLocalModels=false;env.backends.onnx.wasm.numThreads=1;
 const descriptions=[['neutral','A person speaking in a calm, neutral tone.'],['happy','A person speaking with a happy, cheerful tone.'],['sad','A person speaking in a sad, subdued tone.'],['angry','A person speaking with an angry, irritated tone.'],['tense','A person speaking with a tense, anxious tone.']];

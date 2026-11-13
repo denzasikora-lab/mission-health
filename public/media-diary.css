@@ -30,14 +30,14 @@ body[data-display=phone] .media-diary[data-active=true][data-mode]{display:block
 .media-diary #voice-dialog{margin-top:20px;padding-top:20px;border-top:1px solid #27424b;scroll-margin-top:14px}
 
 
-/* Дневник занимает основной раздел и прокручивается вместе со страницей. */
+/* The diary occupies the main section and scrolls with the page. */
 #media-diary-dialog.media-diary{position:static;inset:auto;display:block;width:100%;max-width:100%;max-height:none;margin:0;padding:16px;overflow:visible;box-shadow:none;container:media-diary/inline-size;scroll-margin-top:16px}
 #media-diary-dialog.media-diary[hidden]{display:none!important}
 body[data-diary=true] .mission-content .layout{grid-template-columns:minmax(0,1fr)}
 body[data-diary=true] .mission-content .main-column>:not(#media-diary-dialog),body[data-diary=true] .mission-content .insight-column{display:none!important}
 @container mission (max-width:700px){#media-diary-dialog.media-diary{padding:12px 10px}}
 
-/* Две категории записи и отдельная беседа имеют собственный контур. */
+/* Two capture categories and the separate conversation have their own borders. */
 #media-diary-dialog.media-diary{padding:0;border:0;background:transparent}
 #media-diary-dialog .diary-panel{min-width:0;max-width:100%;margin:0;padding:16px;border:1px solid #315b61;border-radius:16px;background:#081317;overflow:visible}
 #media-diary-dialog .diary-panel+.diary-panel{margin-top:16px}
@@ -68,7 +68,7 @@ body[data-diary=true] .mission-content .main-column>:not(#media-diary-dialog),bo
 #media-diary-dialog #video-log-dialog>.diary-category-heading h3{font-size:.82rem;color:#8eaaa3}
 #media-diary-dialog .log-heading-tools{min-width:0}
 
-/* Запись и каждый результат анализа отделены собственной рамкой и отступом. */
+/* Recording and each analysis result have separate borders and spacing. */
 #media-diary-dialog .diary-visual-analysis>:is(.appearance-panel,.apparent-age-panel,.skin-spots-panel,.media-analysis-result),
 #media-diary-dialog .voice-analysis-panel,#media-diary-dialog #voice-dialog>.media-analysis-result{
   min-width:0;max-width:100%;padding:14px;margin:0;border:1px solid #315b61;border-radius:13px;background:#0c1c20;
@@ -90,12 +90,12 @@ body[data-diary=true] .mission-content .main-column>:not(#media-diary-dialog),bo
 #media-diary-dialog .diary-footer .log-earth{margin:0;min-width:0;flex:1 1 auto}
 #media-diary-dialog .diary-footer .speech-environment{margin-inline-start:auto;flex:none}
 
-/* Внешность, видимый возраст и кожа составляют общую группу результатов. */
+/* Appearance, apparent age and skin form one shared result group. */
 #media-diary-dialog .diary-visual-analysis{padding:14px;border:1px solid #315b61;border-radius:13px;background:#0c1c20}
 #media-diary-dialog .diary-visual-analysis>:is(.appearance-panel,.apparent-age-panel,.skin-spots-panel,.media-analysis-result){padding:0;margin:0;border:0;border-radius:0;background:transparent}
 @container media-diary (max-width:450px){#media-diary-dialog .diary-visual-analysis{padding:10px}}
 
-/* Все визуальные измерения используют одну сетку и общие пояснения. */
+/* All visual measurements use one grid and shared explanations. */
 #media-diary-dialog .appearance-metric-extra{grid-template-rows:auto auto auto;align-content:start}
 #media-diary-dialog .appearance-metric-extra strong{white-space:normal;overflow-wrap:break-word;font-size:.85rem;line-height:1.3;color:#a6bfb0}
 #media-diary-dialog .appearance-metric-extra .appearance-metric-status{margin:0;color:#79998b;font-size:.48rem;line-height:1.4;overflow-wrap:break-word}
@@ -107,7 +107,7 @@ body[data-diary=true] .mission-content .main-column>:not(#media-diary-dialog),bo
 #media-diary-dialog .appearance-extra-methods .skin-spots-items:empty{display:none}
 #media-diary-dialog .appearance-extra-methods .skin-spots-items{margin:8px 0}
 
-/* Светлая тема дневника использует общую палитру интерфейса. */
+/* The light diary theme uses the common interface palette. */
 :root[data-theme=light] #media-diary-dialog{color:var(--text);color-scheme:light}
 :root[data-theme=light] #media-diary-dialog :is(.diary-panel,.diary-visual-analysis,.voice-analysis-panel,.media-analysis-result){background:var(--field);color:var(--text);border-color:var(--border)}
 :root[data-theme=light] #media-diary-dialog :is(.diary-category-heading,.diary-footer,.voice-readings,.appearance-method,.diary-analysis,.media-analysis-job){border-color:var(--border)}

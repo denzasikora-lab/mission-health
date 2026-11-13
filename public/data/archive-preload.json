@@ -3,66 +3,66 @@
   "items": [
     {
       "id": "archive-sample-video",
-      "title": "Технический журнал миссии",
-      "content": "Синтезированный технический образец с русской озвучкой Milena. Слайд-шоу из двух архивных снимков NASA с плавным приближением. Это не запись пользователя и не измерение его состояния. Источники снимков: NASA / iss075e0003980: https://images.nasa.gov/details/iss075e0003980; NASA / iss061e011828: https://images.nasa.gov/details/iss061e011828.",
+      "title": "Technical mission log",
+      "content": "Synthesized English narration using the Samantha system voice. A slideshow uses two NASA archive photographs with a slow zoom. This is not a user recording or a measurement of their condition. Image sources: NASA / iss075e0003980: https://images.nasa.gov/details/iss075e0003980; NASA / iss061e011828: https://images.nasa.gov/details/iss061e011828.",
       "createdAt": "2026-11-06T06:26:55.222Z",
       "archiveSample": true,
       "observation": {
         "kind": "video",
-        "duration": 12,
+        "duration": 12.028,
         "mediaUrl": "/assets/archive/video.mp4",
-        "transcript": "Технический журнал миссии. Это синтезированный образец архивной записи. На экране два снимка НАСА. Проверяем воспроизведение видео и звука. Личные показатели не записывались.",
+        "transcript": "Technical mission log. This synthesized archive sample shows two NASA photographs. This checks video and audio playback. No personal health data was measured.",
         "features": {
           "acoustic": {
-            "level": -18.644169811119117,
-            "quiet": 0.17637271214642264,
-            "clipping": 0,
-            "seconds": 12.0106875
+            "level": -17.192414630270328,
+            "quiet": 0.3338870431893688,
+            "clipping": 0.0,
+            "seconds": 12.0279375
           }
         },
-        "analysis": "Синтезированная речь с паузами. Перегрузок звука не обнаружено. В видеоряде два архивных снимка NASA.",
+        "analysis": "Synthesized speech with pauses. No audio clipping detected. The video contains two archive photographs NASA.",
         "status": "measured",
-        "source": "Синтезированная техническая речь / macOS say / Milena",
+        "source": "Synthetic technical speech / macOS say / Samantha",
         "credits": [
           {
             "id": "iss075e0003980",
-            "title": "Работа снаружи станции",
+            "title": "Working outside the station",
             "credit": "NASA",
             "url": "https://images.nasa.gov/details/iss075e0003980"
           },
           {
             "id": "iss061e011828",
-            "title": "Земля за спиной",
+            "title": "Earth in the background",
             "credit": "NASA",
             "url": "https://images.nasa.gov/details/iss061e011828"
           }
         ],
-        "measurementMethod": "В декодированной звуковой дорожке 16 кГц, один канал: средний уровень RMS -18,64 dBFS; тихие блоки длительностью 20 мс 17,64 % при RMS < 0,01; перегрузка 0,00 % при абсолютном значении сэмпла >= 0,99. Измерена акустика синтезированной речи. Видеоряд собран из снимков NASA iss075e0003980 и iss061e011828. Авторство и ссылки указаны в тексте записи."
+        "measurementMethod": "Decoded audio at 16 kHz, mono. RMS level: -17.19 dBFS. Quiet 20 ms blocks with RMS below 0.01: 33.39%. Clipped samples with absolute amplitude at least 0.99: 0.00%. These acoustics describe synthesized English speech, not the current user."
       }
     },
     {
       "id": "archive-sample-audio",
-      "title": "Техническая проверка звука",
-      "content": "Синтезированная техническая реплика системным голосом Milena в macOS. Образец проверяет воспроизведение и расчет акустических характеристик. Данные пользователя не измерялись.",
+      "title": "Technical audio check",
+      "content": "Synthesized English speech using the Samantha system voice in macOS. This sample tests playback and acoustic calculations. No user data was measured.",
       "createdAt": "2026-11-06T06:26:55.222Z",
       "archiveSample": true,
       "observation": {
         "kind": "audio",
-        "duration": 10,
+        "duration": 12.0,
         "mediaUrl": "/assets/archive/audio.mp3",
-        "transcript": "Техническая проверка архива. Это синтезированная речь для проверки воспроизведения. В записи есть голос и паузы. Данные пользователя не измерялись.",
+        "transcript": "Technical archive check. This is synthesized English speech for a playback check. The recording contains voice and pauses. No personal health data was measured.",
         "features": {
           "acoustic": {
-            "level": -19.16012827509389,
-            "quiet": 0.196,
-            "clipping": 0,
-            "seconds": 10
+            "level": -18.130485721323698,
+            "quiet": 0.38333333333333336,
+            "clipping": 0.0,
+            "seconds": 12.0
           }
         },
-        "analysis": "Синтезированная речь с паузами. Перегрузок звука не обнаружено. Запись содержит несколько коротких фраз для проверки воспроизведения и расшифровки.",
+        "analysis": "Synthesized speech with pauses. No audio clipping detected. Recording contains several short phrases for testing playback and transcription.",
         "status": "measured",
-        "source": "Синтезированная техническая речь / macOS say / Milena",
-        "measurementMethod": "В декодированной звуковой дорожке 16 кГц, один канал: средний уровень RMS -19,16 dBFS; тихие блоки длительностью 20 мс 19,60 % при RMS < 0,01; перегрузка 0,00 % при абсолютном значении сэмпла >= 0,99. Измерена акустика синтезированной речи."
+        "source": "Synthetic technical speech / macOS say / Samantha",
+        "measurementMethod": "Decoded audio at 16 kHz, mono. RMS level: -18.13 dBFS. Quiet 20 ms blocks with RMS below 0.01: 38.33%. Clipped samples with absolute amplitude at least 0.99: 0.00%. These acoustics describe synthesized English speech, not the current user."
       }
     }
   ]

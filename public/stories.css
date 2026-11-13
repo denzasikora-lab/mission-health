@@ -6,7 +6,7 @@
 .stories-row{align-items:flex-start}.stories-row>.story-person{display:grid;align-content:start;align-self:start;justify-items:center;margin:0;padding:0}.stories-row .story-person>button:first-child{height:auto;min-height:0;margin:0;padding:0;grid-template-rows:auto auto;align-content:start;align-items:start;line-height:1}.stories-row .story-person>button:first-child>.story-ring{align-self:start;justify-self:center;margin:0;box-sizing:border-box}.stories-row .story-person>button:first-child>strong{display:block;align-self:start;margin:0;padding:0;line-height:1.3}
 
 .mission-rail>.stories-section{order:-1;border-top:0;margin:0 0 12px;padding:8px 0 12px}.mission-rail>.stories-section .stories-heading{display:none}.mission-rail>.stories-section .stories-row{align-items:start;justify-content:space-between;gap:8px}.mission-rail>.stories-section .story-person{width:calc((100% - 24px)/4);min-width:0}.mission-rail>.stories-section .story-ring{width:min(54px,100%);height:auto;aspect-ratio:1}.mission-rail>.stories-section .story-person>button:first-child{grid-template-rows:auto auto;gap:8px}.mission-rail>.stories-section .story-person strong{width:100%;max-width:100%;font-size:.53rem}.mission-rail>.stories-section .story-add{top:auto;bottom:calc(.73rem + 3px);right:max(0px,calc(50% - 30px));width:20px;height:20px;font-size:16px}
-/* Общие центры четырех колонок в компактном представлении. */
+/* Shared four-column centers in compact layout. */
 @container mission (max-width:700px){
   .topbar{margin-inline:0;padding-inline:10px}
   .toolbar,.mission-nav,.mission-rail>.stories-section .stories-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;justify-items:center}
@@ -22,7 +22,7 @@
 
 .story-ring.story-ring-empty{background:transparent;box-shadow:none}
 
-/* Фото не участвует в расчете окружности и всегда находится в ее центре. */
+/* The photograph does not affect ring geometry and always stays centered. */
 .mission-rail>.stories-section .stories-row .story-ring{position:relative;padding:0;isolation:isolate}
 .mission-rail>.stories-section .stories-row .story-ring>img,
 .mission-rail>.stories-section .stories-row .story-ring>.story-initials{position:absolute;inset:4px;width:calc(100% - 8px);height:calc(100% - 8px);margin:0;border:0;border-radius:50%;box-shadow:0 0 0 2px var(--bg);object-fit:cover;clip-path:circle(50%)}

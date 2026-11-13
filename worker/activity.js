@@ -8,18 +8,18 @@ async function activityRoute(request,env,user){
   }
   if(request.method!=='POST')fail('method_not_allowed',405);
   const input=await personalInput(request);if(!input||typeof input.id!=='string'||!/^[a-f0-9-]{36}$/i.test(input.id))fail('invalid_input',400);
-  const sections={overview:'Домой',observations:'Здоровье',chat:'NasaGPT',diary:'Дневник',archive:'Архив',favorites:'Избранное',sources:'Исследования'};
+  const sections={overview:'Home',observations:'Health',chat:'NasaGPT',diary:'Diary',archive:'Archive',favorites:'Favorites',sources:'Research'};
   const people={'jessica-meir':'Jessica Meir','jack-hathaway':'Jack Hathaway','christina-koch':'Christina Koch'};
-  const areas={team:'общем чате',chat:'NasaGPT',diary:'дневнике',caption:'подписи сториз'};
+  const areas={team:'group chat',chat:'NasaGPT',diary:'diary',caption:'story caption'};
   let summary;
-  if(input.kind==='navigation'&&Object.hasOwn(sections,input.target)&&sections[input.target])summary='Открыл раздел «'+sections[input.target]+'»';
-  if(input.kind==='friend_visit'&&Object.hasOwn(people,input.profile)&&people[input.profile])summary='Зашел в гости / '+people[input.profile];
-  if(input.kind==='media_open'&&['audio','video'].includes(input.mode))summary='Открыл '+(input.mode==='audio'?'аудиодневник':'видеодневник');
-  if(input.kind==='draft'&&Object.hasOwn(areas,input.area)&&Number.isInteger(input.length)&&input.length>=0&&input.length<=6000)summary=(input.length?'Изменил черновик в '+areas[input.area]+' / '+input.length+' символов':'Очистил черновик в '+areas[input.area]);
-  if(input.kind==='wellbeing'){const report=selfReport({score:input.score,wellbeingScale:input.wellbeingScale});summary='Выбрал самочувствие / '+report.score+' из 100';}
-  if(input.kind==='training_review')summary='Открыл подготовку fine-tuning / LoRA';
-  if(input.kind==='camera_click')summary='Нажал переключатель камеры';
-  if(input.kind==='microphone_click')summary='Нажал переключатель микрофона';
+  if(input.kind==='navigation'&&Object.hasOwn(sections,input.target)&&sections[input.target])summary='Opened section «'+sections[input.target]+'»';
+  if(input.kind==='friend_visit'&&Object.hasOwn(people,input.profile)&&people[input.profile])summary='Visited / '+people[input.profile];
+  if(input.kind==='media_open'&&['audio','video'].includes(input.mode))summary='Opened '+(input.mode==='audio'?'audio diary':'video diary');
+  if(input.kind==='draft'&&Object.hasOwn(areas,input.area)&&Number.isInteger(input.length)&&input.length>=0&&input.length<=6000)summary=(input.length?'Edited draft in '+areas[input.area]+' / '+input.length+' characters':'Cleared draft in '+areas[input.area]);
+  if(input.kind==='wellbeing'){const report=selfReport({score:input.score,wellbeingScale:input.wellbeingScale});summary='Selected wellbeing / '+report.score+' from 100';}
+  if(input.kind==='training_review')summary='Opened preparation fine-tuning / LoRA';
+  if(input.kind==='camera_click')summary='Pressed camera toggle';
+  if(input.kind==='microphone_click')summary='Pressed microphone toggle';
   if(!summary)fail('invalid_input',400);
   const id='ui:'+user+':'+input.id;
   if(!await activityWrite(env,user,input.kind,summary,id))fail('storage_unavailable',503);
