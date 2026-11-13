@@ -18,6 +18,8 @@ A teammate's health-analysis agent is an upstream service. Its supplied Azure de
 
 The production API is not a public anonymous REST service. Use the hosted site through its authenticated browser session. A caller-supplied identity header is not a supported production authentication method. Do not spoof it, expose a bypass token, or add `LOCAL_PREVIEW=1` to production.
 
+English is the default interface language, and Urdu (`ur`, `ur-PK`, right-to-left) is supported. `x-mission-language: ur` selects Urdu prose for chat, health analysis, and media analysis; absent or unsupported values fall back to English. Diary entries also accept `language: "ur"` and retain that saved language. API field names, status codes, numerical units, and generated hashtags remain canonical English. Russian is not offered as a locale. Stored Urdu and English entries are preserved; the historical Cyrillic display filter does not translate or remove Urdu.
+
 JSON mutation requests use `Content-Type: application/json`. File and recording uploads use `multipart/form-data`. Non-GET requests with a foreign `Origin` or `Sec-Fetch-Site: cross-site` are rejected. The Worker does not offer a general cross-origin API integration contract. A teammate's external service should be called from a server-side adapter, with its credentials kept on the server.
 
 Personal diary, media, tasks, and favorites are scoped to the signed-in owner. Group-chat messages form a shared channel for site participants; an attachment becomes shared only after it is explicitly posted there. A display name is not an authorization identity.

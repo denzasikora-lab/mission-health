@@ -191,7 +191,7 @@
   $b('book-entry-text').addEventListener('input',()=>{if(!saving)saveId=null});
   $b('book-entry-form').addEventListener('submit',async event=>{
     event.preventDefault();const content=$b('book-entry-text').value.trim();if(!content||saving)return;saving=true;saveId||=crypto.randomUUID();const id=B.profile,version=B.version,button=$b('book-save');button.disabled=true;$b('book-entry-text').disabled=true;
-    try{await journalApi('/api/astronauts/'+id+'/messages',{method:'POST',body:JSON.stringify({id:saveId,content,mode:'diary',language:'en',attachments:[],wellbeing:window.missionCheckin?.current()||null})});if(version!==B.version)return;void window.missionActivity?.refresh();editor.close();saveId=null;$b('book-entry-text').value='';B.demo=false;B.loading=false;await load();B.cover=false;B.index=Math.max(0,B.pages.length-perSpread());draw();void loadJournal();}
+    try{await journalApi('/api/astronauts/'+id+'/messages',{method:'POST',body:JSON.stringify({id:saveId,content,mode:'diary',language:typeof state!=='undefined'&&state.language==='ur'?'ur':'en',attachments:[],wellbeing:window.missionCheckin?.current()||null})});if(version!==B.version)return;void window.missionActivity?.refresh();editor.close();saveId=null;$b('book-entry-text').value='';B.demo=false;B.loading=false;await load();B.cover=false;B.index=Math.max(0,B.pages.length-perSpread());draw();void loadJournal();}
     catch{if(version===B.version)$b('book-save-status').textContent='Could not save. Your text remains here, try again.';}finally{saving=false;button.disabled=false;$b('book-entry-text').disabled=false}
   });
   $b('book-archive-select').addEventListener('change',render);

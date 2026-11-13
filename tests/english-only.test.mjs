@@ -24,16 +24,20 @@ test('Project source, documentation, and sample metadata contain no Cyrillic tex
   assert.deepEqual(failures,[]);
 });
 
-test('The initial page and dictionary use English with one language choice',async()=>{
+test('English defaults and Urdu remain available without a Russian language choice',async()=>{
   const html=await readFile(new URL('public/index.html',root),'utf8');
   assert.match(html,/<html lang="en"/);
-  assert.deepEqual([...html.matchAll(/data-language="([^"]+)"/g)].map(match=>match[1]),['en']);
-  const scope={};vm.runInNewContext(await readFile(new URL('public/translations.js',root),'utf8')+';globalThis.actual=translations;',scope);
-  assert.deepEqual(Object.keys(scope.actual),['en']);
+  assert.deepEqual([...html.matchAll(/data-language="([^"]+)"/g)].map(match=>match[1]),['en','ur']);
+  const scope={};vm.runInNewContext(await readFile(new URL('public/translations.js',root),'utf8')+'\n'+await readFile(new URL('public/locales.js',root),'utf8')+';globalThis.actual=translations;',scope);
+  assert.deepEqual(Object.keys(scope.actual),['en','ur']);assert.equal(scope.actual.ur.locale,'ur-PK');assert.equal(scope.actual.ur.language,'زبان');assert.deepEqual(Object.keys(scope.actual.ur).sort(),Object.keys(scope.actual.en).sort());
   assert.equal(scope.actual.en.locale,'en-GB');assert.ok(scope.actual.en.crewHeadline);assert.ok(scope.actual.en.crewIntro);assert.ok(scope.actual.en.workspaceLabel);
   const app=await readFile(new URL('public/app.js',root),'utf8');
   assert.match(app,/language:"en"/);
-  assert.match(app,/localStorage\.setItem\("mission-health-language","en"\)/);
+  const initialization=app.slice(app.indexOf('const languageInfo='),app.indexOf('const $='));
+  for(const [saved,expected] of [['ur','ur'],['en','en'],['ru','en'],['unknown','en'],[null,'en']]){
+    const preferences=new Map(saved?[['mission-health-language',saved]]:[]),context={document:{documentElement:{dataset:{theme:'dark'}}},localStorage:{getItem:key=>preferences.get(key)||null,setItem:(key,value)=>preferences.set(key,value)}};
+    vm.runInNewContext(initialization+';globalThis.selected=state.language;globalThis.info=languageInfo;',context);assert.equal(context.selected,expected);assert.equal(Object.hasOwn(context.info,'ru'),false);if(saved==='ur')assert.equal(preferences.get('mission-health-language'),'ur');
+  }
 });
 
 test('Preloaded English recordings retain measured non-silent audio and existing media files',async()=>{

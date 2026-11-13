@@ -5,7 +5,7 @@
   const label=value=>value<=20?'Very poor':value<=40?'Below usual':value<=60?'Okay':value<=80?'Good':'Excellent';
   const hue=value=>Math.round((value-1)/99*150);
   const stamp=value=>new Intl.DateTimeFormat('en-GB',{dateStyle:'short',timeStyle:'short'}).format(new Date(value));
-  const create=(tag,className,text)=>{const n=document.createElement(tag);if(className)n.className=className;if(text!==undefined)n.textContent=text;return n;};
+  const create=(tag,className,text)=>{const n=document.createElement(tag);if(tag==='p')n.dir='auto';if(tag==='time')n.dir='ltr';if(className)n.className=className;if(text!==undefined)n.textContent=text;return n;};
   const api=(path,options)=>journalApi(path,options);
   function selection(){return selections.get(profile())||null;}
   function currentReport(){const value=selection();return value?{score:value.score,wellbeingScale:100}:null;}
@@ -121,7 +121,7 @@
     const s=store(kind);if(s.busy||s.dictating||s.files.some(file=>!file.id)||!s.draft.trim()&&!s.files.length)return;s.busy=true;s.notice='';
     s.pending||={id:crypto.randomUUID(),content:s.draft.trim(),attachments:s.files.map(file=>file.id),...(kind==='team'?{}:{wellbeing:currentReport(),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone}),...(kind==='chat'&&window.missionHealth?.snapshot?{healthSnapshot:window.missionHealth.snapshot()}: {})};const input=s.pending;renderViews();
     try{
-      const result=await api(kind==='team'?'/api/team-chat':kind==='chat'?'/api/chat':'/api/astronauts/'+s.profile+'/messages',{method:'POST',body:JSON.stringify({...input,...(kind==='diary'?{mode:'diary',language:'en',attachments:[]}:{} )})});
+      const result=await api(kind==='team'?'/api/team-chat':kind==='chat'?'/api/chat':'/api/astronauts/'+s.profile+'/messages',{method:'POST',body:JSON.stringify({...input,...(kind==='diary'?{mode:'diary',language:typeof state!=='undefined'&&state.language==='ur'?'ur':'en',attachments:[]}:{} )})});
       for(const entry of [result.message,result.reply].filter(Boolean)){const index=s.messages.findIndex(item=>item.id===entry.id);if(index<0)s.messages.push(entry);else s.messages[index]=entry;}
       void window.missionActivity?.refresh();s.draft='';s.files=[];s.pending=null;s.loaded=true;s.notice=kind==='diary'?'Recording saved in the diary.':result.replyError?'NasaGPT could not answer yet. Try the request again.':'';
       if(kind==='chat'&&result.tasks?.length){s.notice=(s.notice?s.notice+' ':'')+'In «Scheduled»: '+result.tasks.length+'.';void window.missionScheduler.refresh();}
@@ -135,7 +135,7 @@
   }
   function panel(host,kind,{favoriteShortcut=false,onKindChange}={}){
     const view={host,kind,favoriteShortcut,onKindChange};host.classList.add('personal-conversation');
-    host.innerHTML='<header class="personal-conversation-heading"><div><span class="personal-section-title"></span><small class="personal-section-caption"></small></div><div><button type="button" data-personal-search>✧ NasaGPT</button><button type="button" data-personal-favorites hidden>Favorites</button><button type="button" data-personal-refresh aria-label="Refresh history">↻</button></div></header><button type="button" class="personal-older" hidden>Earlier entries</button><div class="personal-messages" role="log" aria-live="polite"></div><form class="personal-composer"><label class="sr-only">Message text</label><textarea rows="2" maxlength="6000" aria-label="Message text"></textarea><footer><span class="personal-send-hint"></span><button type="submit"></button></footer></form><p class="personal-status" role="status"></p>';
+    host.innerHTML='<header class="personal-conversation-heading"><div><span class="personal-section-title"></span><small class="personal-section-caption"></small></div><div><button type="button" data-personal-search>✧ NasaGPT</button><button type="button" data-personal-favorites hidden>Favorites</button><button type="button" data-personal-refresh aria-label="Refresh history">↻</button></div></header><button type="button" class="personal-older" hidden>Earlier entries</button><div class="personal-messages" role="log" aria-live="polite"></div><form class="personal-composer"><label class="sr-only">Message text</label><textarea dir="auto" rows="2" maxlength="6000" aria-label="Message text"></textarea><footer><span class="personal-send-hint"></span><button type="submit"></button></footer></form><p class="personal-status" role="status"></p>';
     Object.assign(view,{list:host.querySelector('.personal-messages'),form:host.querySelector('form'),input:host.querySelector('textarea'),send:host.querySelector('button[type=submit]'),status:host.querySelector('.personal-status'),more:host.querySelector('.personal-older'),refresh:host.querySelector('[data-personal-refresh]')});
     view.form.addEventListener('submit',event=>{event.preventDefault();void send(view.kind);});
     view.input.addEventListener('input',()=>{const s=store(view.kind);s.draft=view.input.value;s.pending=null;view.send.disabled=!s.draft.trim()&&!s.files.length||s.files.some(file=>!file.id)||s.busy||s.loading||s.dictating;});

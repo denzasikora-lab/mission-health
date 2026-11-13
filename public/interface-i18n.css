@@ -1,0 +1,11 @@
+html[lang=ur]{font-family:"Noto Nastaliq Urdu","Noto Naskh Arabic",Tahoma,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+html[lang=ur] :is(.mission-nav button,.personal-tabs button,.personal-section-title,.personal-section-caption,.personal-composer button,.home-vital>span,.home-vital>small,.home-body-panel h2,.wellbeing-checkin h3,.wellbeing-readout>span,.wellbeing-endpoints,.wellbeing-time,.wellbeing-reset,.health-analysis,.diary-category-heading,.log-controls,.voice-actions){font-family:"Noto Nastaliq Urdu","Noto Naskh Arabic",Tahoma,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.6;letter-spacing:0}
+html[lang=ur] :is(.mission-nav button>span,.personal-tabs button,.home-vital>span,.wellbeing-readout>span,.health-analysis-header,.diary-category-heading){min-inline-size:0;white-space:normal;overflow-wrap:break-word}
+html[lang=ur] .personal-tabs{grid-template-columns:repeat(4,minmax(0,1fr))}
+html[lang=ur] :is(.personal-tabs button,.mission-nav button){padding-inline:5px}
+html[lang=ur] .wellbeing-readout>span{text-align:start}
+html[lang=ur] :is(.home-vital>strong,.metric-gauge,.metric-value,.home-vital-trend,.voice-readings strong,#voice-clock,#video-log-clock,.home-trend-graph,.home-trend-xaxis,#trend-chart,#chart-axis){direction:ltr;unicode-bidi:isolate}
+html[lang=ur] .health-analysis-alerts{padding-inline-start:18px;padding-inline-end:0}
+html[lang=ur] :is(.health-analysis h2,.health-analysis button){font-family:inherit;line-height:1.6}
+html[lang=ur] .shell .mission-frame .mission-nav>button>span{white-space:normal;overflow-wrap:break-word}
+@container mission (max-width:1000px){html[lang=ur] .shell .mission-frame .mission-nav>button>span{font-size:12px}}

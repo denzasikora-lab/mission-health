@@ -1,6 +1,6 @@
 const metricIcons={hr:'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z',spo2:'M12 3v9m0-3-3-3c-3 1-6 5-6 11 0 3 5 3 7 1V9m2 0 3-3c3 1 6 5 6 11 0 3-5 3-7 1V9',temp:'M9 14V5a3 3 0 0 1 6 0v9a5 5 0 1 1-6 0Zm3-7v10',fatigue:'M8 9h.01M16 9h.01M8 15q4 4 8 0 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0'};
 const metricInfo={hr:{unit:"bpm"},spo2:{unit:"%"},temp:{unit:"°C"},fatigue:{unit:"/ 10"}};
-const languageInfo={en:{flag:"🇬🇧",name:"English"},};
+const languageInfo={en:{flag:"🇬🇧",name:"English"},ur:{flag:"🇵🇰",name:"اردو"}};
 const sourceUrls=["https://www.nasa.gov/hrp/risks/","https://www.nasa.gov/hrp/risks/","https://www.nasa.gov/hrp/"];
 const sourceKeywords=[
   ["health","risk","oxygen","hypoxia","fatigue","temperature","monitoring","baseline","健康","风险","血氧","氧气","疲劳","体温","الصحة","صحة","خطر","مخاطر","أكسجين","الأكسجين","تعب","حرارة","salud","riesgo","oxígeno","fatiga","temperatura"],
@@ -9,7 +9,7 @@ const sourceKeywords=[
 ];
 const personalProfileId='personal';
 const state={visiting:false,crew:0,metric:"hr",period:"24h",view:"health",workspace:"research",language:"en",theme:document.documentElement.dataset.theme,query:""};
-try{localStorage.setItem("mission-health-language","en")}catch{}
+try{const language=localStorage.getItem("mission-health-language");if(Object.hasOwn(languageInfo,language))state.language=language;else if(language)localStorage.setItem("mission-health-language","en")}catch{}
 const $=id=>document.getElementById(id);
 const text=()=>translations[state.language];
 const format=(value,key)=>new Intl.NumberFormat(text().locale,{maximumFractionDigits:key==="temp"?1:0,minimumFractionDigits:key==="temp"?1:0}).format(value);
@@ -87,7 +87,7 @@ document.querySelectorAll("[data-period]").forEach(button=>button.addEventListen
 document.querySelectorAll("[data-theme-choice]").forEach(button=>button.addEventListener("click",()=>{state.theme=button.dataset.themeChoice;savePreference("mission-health-theme",state.theme);render()}));
 $("language-button").addEventListener("click",()=>$("language-menu").hidden?openLanguageMenu():closeLanguageMenu());
 $("language-button").addEventListener("keydown",event=>{if(["ArrowDown","ArrowUp"].includes(event.key)){event.preventDefault();openLanguageMenu(true)}});
-$("language-menu").addEventListener("click",event=>{const button=event.target.closest("[data-language]");if(button){state.language=button.dataset.language;savePreference("mission-health-language",state.language);render();closeLanguageMenu(true)}});
+$("language-menu").addEventListener("click",event=>{const button=event.target.closest("[data-language]");if(button){if(!Object.hasOwn(languageInfo,button.dataset.language))return;state.language=button.dataset.language;savePreference("mission-health-language",state.language);render();window.dispatchEvent(new Event("mission-language-change"));closeLanguageMenu(true)}});
 $("language-menu").addEventListener("keydown",event=>{const buttons=[...document.querySelectorAll("[data-language]")],index=buttons.indexOf(document.activeElement);if(event.key==="ArrowDown"||event.key==="ArrowUp"){event.preventDefault();buttons[(index+(event.key==="ArrowDown"?1:-1)+buttons.length)%buttons.length].focus()}else if(event.key==="Home"||event.key==="End"){event.preventDefault();buttons[event.key==="Home"?0:buttons.length-1].focus()}});
 document.addEventListener("pointerdown",event=>{if(!event.target.closest(".language-control"))closeLanguageMenu()});document.addEventListener("keydown",event=>{if(event.key==="Escape"&&!$("language-menu").hidden){event.preventDefault();closeLanguageMenu(true)}});
 $("lookup-form").addEventListener("submit",event=>{event.preventDefault();state.query=$("lookup-input").value;renderLookup()});

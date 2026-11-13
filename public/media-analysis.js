@@ -58,7 +58,7 @@
       const form=new FormData();if(item.features)form.set('features',JSON.stringify(item.features));for(const key of ['id','kind','duration','transcript','createdAt'])form.set(key,String(item[key]));form.set('file',item.blob,'recording.'+(item.blob.type.includes('mp4')?'mp4':'webm'));for(const frame of item.frames||[])form.append('frame',frame,'frame.jpg');
       if(item.report)form.set('wellbeing',JSON.stringify(item.report));
       job.status.textContent='NasaGPT is analyzing the recording...';
-      const response=await fetch('/api/media-analysis',{method:'POST',body:form,signal:AbortSignal.timeout(150000)}),result=await response.json();
+      const response=await fetch('/api/media-analysis',{method:'POST',headers:{'x-mission-language':typeof state!=='undefined'&&state.language==='ur'?'ur':'en'},body:form,signal:AbortSignal.timeout(150000)}),result=await response.json();
       if(!response.ok||result.status!=='analyzed')throw Object.assign(new Error(result.error||'media_analysis_unavailable'),{saved:result.saved});
       if(item.kind==='video'&&item.features?.skin)window.missionSkinSpots?.matches(result.skinMatches||[],item.features.skin.trackingKey);job.phase='complete';job.status.textContent='Analysis saved in archive';job.answer.textContent=result.analysis;window.missionVoiceAnalysis?.transcript(item.kind,result.transcript||item.transcript);job.payload=null;
       void window.missionBook?.refresh();void window.missionActivity?.refresh();

@@ -32,7 +32,7 @@ async function bookRoute(request,env,user,profile,action,url){
     if(typeof input?.query!=='string'||!input.query.trim()||input.query.length>1000||!Array.isArray(input.ids)||!input.ids.length||input.ids.length>6||input.ids.some(id=>typeof id!=='string'||!/^[a-f0-9-]{36}$/i.test(id)))fail('invalid_input',400);
     const rows=[];for(const id of [...new Set(input.ids)]){const row=await db.prepare("SELECT * FROM journal_messages WHERE id=? AND owner_id=? AND astronaut_id=? AND role!='assistant'").bind(id,user,profile).first();if(!row)fail('not_found',404);rows.push(row);}
     if(!languageModelConfigured(env))fail('assistant_unavailable',503);
-    const answer=await languageModelAnswer(env,{query:input.query.trim(),language:'en',history:[],photos:[],references:rows.map(row=>({...serialize(row),content:diaryDocument(row)}))});
+    const answer=await languageModelAnswer(env,{query:input.query.trim(),language:responseLanguage(request),history:[],photos:[],references:rows.map(row=>({...serialize(row),content:diaryDocument(row)}))});
     return json({answer:answer.text.slice(0,16000).replace(/[\u2013\u2014]/g,'-'),references:rows.map(serialize)});
   }
   if(action==='book-vectors'){
