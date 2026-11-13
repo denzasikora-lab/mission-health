@@ -1,6 +1,6 @@
 import http from 'node:http';
 import {AsyncLocalStorage} from 'node:async_hooks';
-import {readFile,stat} from 'node:fs/promises';
+import {readFile,stat,realpath} from 'node:fs/promises';
 import {dirname,isAbsolute,resolve,sep} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {Readable} from 'node:stream';
@@ -145,7 +145,8 @@ export async function startFromEnv(env=process.env){
     await new Promise((resolveListen,reject)=>{server.once('error',reject);server.listen(port,host,resolveListen);});return server;
   }catch(error){await storage.close();throw error;}
 }
-if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+const entryPath=process.argv[1]?await realpath(resolve(process.argv[1])).catch(()=>null):null;
+if(entryPath&&entryPath===await realpath(fileURLToPath(import.meta.url))){
   const server=await startFromEnv();console.log('Mission Health API is ready on loopback');
   let stopping=false;for(const signal of ['SIGTERM','SIGINT'])process.once(signal,()=>{if(stopping)return;stopping=true;void server.shutdown().then(()=>process.exit(0),()=>process.exit(1));});
 }

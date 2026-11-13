@@ -1,7 +1,8 @@
 import {test,after} from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import {readFile,mkdtemp,writeFile,rm} from 'node:fs/promises';
+import {readFile,mkdtemp,writeFile,rm,mkdir,copyFile,symlink} from 'node:fs/promises';
+import {spawn} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {pathToFileURL,fileURLToPath} from 'node:url';
@@ -114,4 +115,30 @@ test('The legacy speech fallback cannot bypass AI quota through a different util
 });
 test('Standalone startup rejects local-preview identity and private paths inside the release',async()=>{
   await assert.rejects(startFromEnv({LOCAL_PREVIEW:'1'}),/LOCAL_PREVIEW/);await assert.rejects(startFromEnv({DATA_DIR:fileURLToPath(new URL('runtime/',root)),SESSION_SECRET_FILE:'/not-read'}),/outside the release/);
+});
+test('The actual CLI starts through a current-release symlink and shuts down gracefully on SIGTERM',{timeout:15000},async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'mission-cli-test-')),release=join(directory,'releases','synthetic'),current=join(directory,'current'),runtime=join(directory,'runtime');
+  let child,exited;
+  t.after(async()=>{if(child&&child.exitCode===null&&child.signalCode===null){child.kill('SIGKILL');await exited;}await rm(directory,{recursive:true,force:true});});
+  for(const path of [join(release,'server'),join(release,'dist','backend'),join(release,'drizzle'),runtime])await mkdir(path,{recursive:true,mode:0o700});
+  for(const name of ['standalone.mjs','storage.mjs','session.mjs'])await copyFile(new URL('server/'+name,root),join(release,'server',name));
+  await writeFile(join(release,'dist','backend','worker.mjs'),'export default {async fetch(request){return Response.json({owner:request.headers.get("oai-authenticated-user-id")});}};\n');
+  await writeFile(join(release,'drizzle','0000_cli.sql'),'CREATE TABLE cli_probe (id TEXT PRIMARY KEY);\n');
+  const secretFile=join(runtime,'session-secret');await writeFile(secretFile,secret,{mode:0o600});await symlink(release,current,'dir');
+  const reservation=http.createServer();await new Promise((resolveListen,reject)=>{reservation.once('error',reject);reservation.listen(0,'127.0.0.1',resolveListen);});const port=reservation.address().port;await new Promise(resolveClose=>reservation.close(resolveClose));
+  let output='',errors='';
+  child=spawn(process.execPath,[join(current,'server','standalone.mjs')],{cwd:current,env:{PUBLIC_ORIGIN:publicOrigin,SESSION_SECRET_FILE:secretFile,DATA_DIR:join(runtime,'data'),MIGRATIONS_DIR:join(current,'drizzle'),WORKER_MODULE:join(current,'dist','backend','worker.mjs'),API_HOST:'127.0.0.1',API_PORT:String(port),AIR_GAP:'1'},stdio:['ignore','pipe','pipe']});
+  child.stdout.on('data',value=>{output=(output+value).slice(-8192);});child.stderr.on('data',value=>{errors=(errors+value).slice(-8192);});
+  exited=new Promise((resolveExit,reject)=>{child.once('error',reject);child.once('exit',(code,signal)=>resolveExit({code,signal}));});
+  async function request(path,cookie){return new Promise((resolveResult,reject)=>{const call=http.get({hostname:'127.0.0.1',port,path,headers:{host:new URL(publicOrigin).host,...(cookie?{cookie}:{})},timeout:500},response=>{const data=[];response.on('data',value=>data.push(value));response.once('end',()=>resolveResult({status:response.statusCode,headers:response.headers,body:JSON.parse(Buffer.concat(data))}));});call.once('error',reject);call.once('timeout',()=>call.destroy(new Error('CLI probe timed out')));});}
+  async function readiness(){
+    const deadline=Date.now()+8000;
+    while(Date.now()<deadline){if(child.exitCode!==null||child.signalCode!==null)throw new Error('CLI exited before readiness: '+output+' '+errors);try{const response=await request('/_health');if(response.status===200&&response.body.ready)return;}catch(error){if(!['ECONNREFUSED','ECONNRESET'].includes(error.code))throw error;}await new Promise(resolveWait=>setTimeout(resolveWait,25));}
+    throw new Error('CLI never became ready: '+output+' '+errors);
+  }
+  await readiness();assert.match(output,/Mission Health API is ready on loopback/);
+  const session=await request('/api/session');assert.equal(session.status,200);const cookie=session.headers['set-cookie'][0].split(';')[0];const api=await request('/api/probe',cookie);assert.equal(api.status,200);assert.match(api.body.owner,/^guest:/);
+  child.kill('SIGTERM');let timer;
+  try{assert.deepEqual(await Promise.race([exited,new Promise((_resolve,reject)=>{timer=setTimeout(()=>reject(new Error('CLI did not stop gracefully: '+errors)),3000);})]),{code:0,signal:null});}finally{clearTimeout(timer);}
+  const reopened=await openStorage({dataDir:join(runtime,'data'),migrationsDir:join(release,'drizzle')});try{assert.equal((await reopened.DB.prepare('SELECT COUNT(*) AS n FROM cli_probe').first()).n,0);}finally{await reopened.close();}
 });
