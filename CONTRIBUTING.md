@@ -39,6 +39,8 @@ Open a pull request into `main`. Explain the problem, resulting behavior, config
 
 Publishing the GPT site is separate from merging source code. Coordinate releases with the owner and publish the exact verified commit with its matching build archive. Changing repository access does not grant Sites hosting access.
 
+The Vercel frontend uses a separate standalone backend on t4. See [docs/VERCEL_DEPLOYMENT.md](docs/VERCEL_DEPLOYMENT.md) for its build, signed browser sessions, storage, and release checks. Production Git deployments are enabled for that frontend; backend releases and the GPT site are separate operations.
+
 ## Install and run locally
 
 Use Node.js 24 for the built-in `node:test` and `node:sqlite` APIs required by the regression suite. The checkout has been verified with Node.js 24.14.0. The optional Python services use Python 3.12. Docker Desktop is needed only for the optional Qdrant environment.

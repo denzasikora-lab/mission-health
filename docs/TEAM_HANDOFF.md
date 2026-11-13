@@ -89,4 +89,4 @@ node --test tests/*.test.mjs
 
 Run relevant interface checks, build the final source, and open a focused pull request. Include request/response examples with synthetic data and the actual validation results. Coordinate generated `dist/` changes and migrations with the owner. Do not commit `.dev.vars`, keys, uploaded recordings, databases, or model weights.
 
-The current runtime uses a Cloudflare Worker, D1, R2, and Sites authentication. The Git-linked Vercel project is not a compatible replacement without porting those bindings and authentication. Merging code does not itself publish the GPT site; the owner releases the exact verified commit while preserving the existing audience.
+The GPT site uses a Cloudflare Worker, D1, R2, and Sites authentication. The separate Vercel frontend uses a Node.js adapter on t4 with private SQLite/object storage and signed guest browser sessions. See [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md). Its storage is separate; existing GPT-site records are not migrated. Merging code does not itself publish the GPT site or update the VPS backend; the owner releases the exact verified commit while preserving the existing audience.

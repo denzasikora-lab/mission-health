@@ -16,3 +16,6 @@ local/runtime/
 __pycache__/
 *.pyc
 public/vendor/
+.vercel/
+vercel-static/
+dist/backend/

@@ -11,6 +11,8 @@ A teammate's health-analysis agent is an upstream service. Its supplied Azure de
 
 Ready-to-import synthetic requests are in [mission-health.postman_collection.json](mission-health.postman_collection.json). See [TEAM_HANDOFF.md](TEAM_HANDOFF.md) for the shortest team setup and access checklist.
 
+The standalone Vercel/VPS deployment reuses these routes behind a signed browser-session adapter. Its identity, storage, quotas, and HTTPS topology are documented in [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md); do not apply Sites identity headers to that deployment.
+
 ## Environments and authentication
 
 | Environment | Base URL | Identity |

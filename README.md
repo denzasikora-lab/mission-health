@@ -6,6 +6,8 @@ Website: https://mission-health-orbit-2026.crownbobbytron.chatgpt.site/
 
 Repository: https://github.com/denzasikora-lab/mission-health
 
+Vercel frontend and VPS backend: [deployment guide](docs/VERCEL_DEPLOYMENT.md). The standalone deployment has separate browser sessions and storage; it does not expose the GPT site's existing personal records.
+
 Team start: [docs/TEAM_HANDOFF.md](docs/TEAM_HANDOFF.md). Development workflow: [CONTRIBUTING.md](CONTRIBUTING.md). Integration contract: [docs/API.md](docs/API.md). Importable requests: [Postman collection](docs/mission-health.postman_collection.json).
 
 ## Application
