@@ -6,7 +6,7 @@ Website: https://mission-health-orbit-2026.crownbobbytron.chatgpt.site/
 
 Repository: https://github.com/denzasikora-lab/mission-health
 
-Team development: [CONTRIBUTING.md](CONTRIBUTING.md). Integration routes and agent handoff: [docs/API.md](docs/API.md).
+Team start: [docs/TEAM_HANDOFF.md](docs/TEAM_HANDOFF.md). Development workflow: [CONTRIBUTING.md](CONTRIBUTING.md). Integration contract: [docs/API.md](docs/API.md). Importable requests: [Postman collection](docs/mission-health.postman_collection.json).
 
 ## Application
 
@@ -16,7 +16,7 @@ Team development: [CONTRIBUTING.md](CONTRIBUTING.md). Integration routes and age
 - **Archive:** a page-based history containing text, recordings, transcripts, analysis results, and health snapshots. Swipe or tap either side to turn pages.
 - **Research:** separate explorers for NASA OSD-575 serum biomarkers, BIDMC physiological recordings, NASA OSD-569 whole-blood measurements, and a MIT-BIH ECG preview.
 
-The interface uses English, supports light and dark themes, and adapts to narrow windows and mobile screens. Display presets include desktop, tablet, phone, and iPhone Duo. They change layout dimensions; they do not emulate physical devices.
+The interface supports English and Urdu, light and dark themes, and adapts to narrow windows and mobile screens. Display presets include desktop, tablet, phone, and iPhone Duo. They change layout dimensions; they do not emulate physical devices.
 
 NASA portraits and archive stories include source attribution. Jessica Meir, Jack Hathaway, and Christina Koch are real astronauts; the health readings and conversations associated with prototype profiles are simulated, not their personal medical records or statements. The body illustration is not a scan. Sample archive material is kept distinct from user recordings.
 
@@ -57,7 +57,7 @@ Visual observations share one group, including facial geometry, apparent age, an
 
 Uploaded video comparisons use selected frames. Frame similarity helps retrieve earlier material; it does not measure pulse, respiration, or gait. Original recordings and derived results remain separate in the archive. Sample results must not be presented as measurements of the current user.
 
-Older non-English records are displayed through an owner-scoped English translation cache. Original records remain unchanged. Translation uses the configured utility language service; if unavailable, an English status message is shown instead of untranslated text.
+Older Cyrillic records are displayed through an owner-scoped English translation cache. Original records remain unchanged; existing Urdu and English text is preserved. Translation uses the configured utility language service; if unavailable, an English status message is shown instead of untranslated Cyrillic text.
 
 ## Personal memory and assistant
 

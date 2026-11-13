@@ -9,6 +9,8 @@ This document describes the API implemented in `worker/` and the supported serve
 
 A teammate's health-analysis agent is an upstream service. Its supplied Azure deployment was tested successfully and has a Responses adapter; see the external-agent section below. The structured prototype readings workflow is available separately from ordinary diary/chat replies; both use the same primary provider.
 
+Ready-to-import synthetic requests are in [mission-health.postman_collection.json](mission-health.postman_collection.json). See [TEAM_HANDOFF.md](TEAM_HANDOFF.md) for the shortest team setup and access checklist.
+
 ## Environments and authentication
 
 | Environment | Base URL | Identity |
