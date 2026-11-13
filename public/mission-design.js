@@ -40,7 +40,7 @@
   const brandMark=document.querySelector('.brand-mark');brandMark.removeAttribute('aria-hidden');
   brandMark.innerHTML='<img class="nasa-brand-logo" src="assets/nasa-brand/nasa-insignia.png" alt="NASA" width="121" height="102">';
   document.querySelector('.brand>span:last-child').textContent = 'MISSION HEALTH';
-  const subtitle = document.createElement('span'); subtitle.className = 'mission-brand-caption'; subtitle.textContent = 'Bug Busters / NASA Space Apps'; document.querySelector('.brand').append(subtitle);
+  const subtitle = document.createElement('span'); subtitle.className = 'mission-brand-caption'; subtitle.innerHTML = '<span class="mission-team-name">Bug Busters / NASA Space Apps</span><span aria-hidden="true">·</span><span class="mission-system-name">Astronaut Health Monitoring System</span>'; document.querySelector('.brand').append(subtitle);
   const themeGroup = document.querySelector('.theme-control'); themeGroup.hidden=true;
   const themeToggle=document.createElement('button'); themeToggle.type='button';themeToggle.id='mission-theme-toggle';themeToggle.className='mission-tool';
   const sun=themeGroup.querySelector('[data-theme-choice="light"]').innerHTML,moon=themeGroup.querySelector('[data-theme-choice="dark"]').innerHTML;
