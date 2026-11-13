@@ -14,6 +14,8 @@ import uuid
 
 TARGET = Path("/etc/nginx/sites-enabled/app")
 HOST = "app.fereyappfuturewinterworkbookgrace.store"
+TARGET_T213 = Path("/etc/nginx/sites-enabled/users")
+HOST_T213 = "users.fereyuserstopstrongcloudwinter.shop"
 PUBLIC_HOST = "mission-health-bug-busters.vercel.app"
 PREFIX = "/mission-health-api/"
 BACKUPS = Path("/var/backups/mission-health")
@@ -42,7 +44,16 @@ ROUTE = """
 """
 
 
-def candidate(source):
+def deployment_target(server="t4"):
+    if server == "t4":
+        return TARGET, HOST
+    if server == "t213":
+        return TARGET_T213, HOST_T213
+    raise ValueError("Unsupported backend server")
+
+
+def candidate(source, server="t4"):
+    _, host = deployment_target(server)
     if PREFIX.rstrip("/") in source:
         raise ValueError("The backend route already exists; review instead of replacing it")
     masked = re.sub(r"#[^\n]*", lambda match: " " * len(match[0]), source)
@@ -58,7 +69,7 @@ def candidate(source):
             raise ValueError("Unbalanced nginx configuration")
         block = masked[start:end]
         names = re.findall(r"server_name\s+([^;]+);", block)
-        if any(HOST in value.split() for value in names) and re.search(r"listen\s+(?:\[::\]:)?443\s+ssl\b", block):
+        if any(host in value.split() for value in names) and re.search(r"listen\s+(?:\[::\]:)?443\s+ssl\b", block):
             matches.append(end - 1)
     if len(matches) != 1:
         raise ValueError("Expected exactly one existing app HTTPS server")
@@ -89,21 +100,23 @@ def check_backend():
             raise RuntimeError("The standalone API must be ready before HTTPS activation")
 
 
-def apply_locked(original, proposed, backup_dir, resolved_target):
-    if TARGET.resolve(strict=True) != resolved_target or resolved_target.read_bytes() != original:
+def apply_locked(original, proposed, backup_dir, resolved_target, server="t4"):
+    target, _ = deployment_target(server)
+    if target.resolve(strict=True) != resolved_target or resolved_target.read_bytes() != original:
         raise ValueError("Nginx configuration changed during deployment preparation")
     metadata = resolved_target.stat()
-    backup = backup_dir / ("nginx-app-backend-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ") + "-" + uuid.uuid4().hex)
+    backup_name = "nginx-app-backend-" if server == "t4" else "nginx-users-backend-"
+    backup = backup_dir / (backup_name + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ") + "-" + uuid.uuid4().hex)
     shutil.copy2(resolved_target, backup)
     backup.chmod(0o600)
     try:
-        if TARGET.resolve(strict=True) != resolved_target or resolved_target.read_bytes() != original:
+        if target.resolve(strict=True) != resolved_target or resolved_target.read_bytes() != original:
             raise ValueError("Nginx configuration changed before replacement")
         replace_file(resolved_target, proposed, metadata)
         subprocess.run(["/usr/sbin/nginx", "-t"], check=True)
         subprocess.run(["/bin/systemctl", "reload", "nginx"], check=True)
     except BaseException as error:
-        if TARGET.resolve(strict=True) != resolved_target or resolved_target.read_bytes() != proposed:
+        if target.resolve(strict=True) != resolved_target or resolved_target.read_bytes() != proposed:
             raise RuntimeError("Concurrent nginx edit preserved; inspect the saved backup before manual recovery") from error
         replace_file(resolved_target, original, metadata)
         subprocess.run(["/usr/sbin/nginx", "-t"], check=True)
@@ -112,27 +125,30 @@ def apply_locked(original, proposed, backup_dir, resolved_target):
     return backup
 
 
-def apply_change(original, proposed):
+def apply_change(original, proposed, server="t4"):
+    target, _ = deployment_target(server)
     BACKUPS.mkdir(mode=0o700, parents=True, exist_ok=True)
     BACKUPS.chmod(0o700)
     descriptor = os.open(BACKUPS / "activation.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     with os.fdopen(descriptor, "a", encoding="utf-8") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         check_backend()
-        return apply_locked(original, proposed, BACKUPS, TARGET.resolve(strict=True))
+        return apply_locked(original, proposed, BACKUPS, target.resolve(strict=True), server)
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--expected-sha")
+    parser.add_argument("--server", choices=("t4", "t213"), default="t4")
     args = parser.parse_args()
-    original = TARGET.read_bytes()
+    target, host = deployment_target(args.server)
+    original = target.read_bytes()
     before = hashlib.sha256(original).hexdigest()
-    proposed = candidate(original.decode("utf-8")).encode("utf-8")
-    print(json.dumps({"target": str(TARGET), "beforeSha256": before,
+    proposed = candidate(original.decode("utf-8"), args.server).encode("utf-8")
+    print(json.dumps({"server": args.server, "target": str(target), "beforeSha256": before,
                       "afterSha256": hashlib.sha256(proposed).hexdigest(),
-                      "backendUrl": "https://" + HOST + PREFIX.rstrip("/"),
+                      "backendUrl": "https://" + host + PREFIX.rstrip("/"),
                       "publicOrigin": "https://" + PUBLIC_HOST,
                       "change": "Add only the standalone API path; preserve existing applications and TLS",
                       "apply": args.apply}), flush=True)
@@ -143,8 +159,8 @@ def main():
     if args.expected_sha != before:
         raise SystemExit("Nginx configuration changed after review")
     check_backend()
-    backup = apply_change(original, proposed)
-    print(json.dumps({"status": "activated", "backup": str(backup),
+    backup = apply_change(original, proposed, args.server)
+    print(json.dumps({"status": "activated", "server": args.server, "backup": str(backup),
                       "afterSha256": hashlib.sha256(proposed).hexdigest()}), flush=True)
 
 

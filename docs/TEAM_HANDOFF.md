@@ -5,7 +5,8 @@ Mission Health / Bug Busters / NASA Space Apps.
 ## Shared project
 
 - Code: https://github.com/denzasikora-lab/mission-health
-- Hosted application: https://mission-health-orbit-2026.crownbobbytron.chatgpt.site/
+- GPT site with its separate audience: https://mission-health-orbit-2026.crownbobbytron.chatgpt.site/
+- Vercel frontend target: https://mission-health-bug-busters.vercel.app/
 - API contract: [API.md](API.md)
 - Importable requests: [mission-health.postman_collection.json](mission-health.postman_collection.json)
 - Development and pull requests: [CONTRIBUTING.md](../CONTRIBUTING.md)
@@ -30,7 +31,7 @@ These are real application routes, not proposed paths. See API.md for all routes
 
 The browser calls this application's `/api/` endpoints. The Worker then calls Hanzala's Azure **NASA-AI Responses agent** using a server-side secret. Chat, diary replies, recording summaries, and readings analysis use that primary provider. Utility features use their separate configured provider. Hammad can work on frontend/API wiring in the same repository while Hanzala maintains the upstream agent.
 
-Do not put the Azure key in frontend code or send it as an authentication key to this application's routes. The hosted API uses an authenticated Sites browser session; it is not an anonymous API or a separately provisioned bearer-token service. Test external scripts against the local development server. A new server-to-server integration needs an explicit authentication contract rather than forged identity headers, public access, or relaxed CORS checks.
+Do not put the Azure key in frontend code or send it as an authentication key to this application's routes. The GPT-site API uses an authenticated Sites browser session. The separate Vercel deployment uses signed guest browser sessions with private owner scopes; it does not offer a separately provisioned server-to-server bearer token. Test external scripts against the local development server. A new server-to-server integration needs an explicit authentication contract rather than forged identity headers or relaxed CORS checks.
 
 ## Run a checkout
 
@@ -89,4 +90,6 @@ node --test tests/*.test.mjs
 
 Run relevant interface checks, build the final source, and open a focused pull request. Include request/response examples with synthetic data and the actual validation results. Coordinate generated `dist/` changes and migrations with the owner. Do not commit `.dev.vars`, keys, uploaded recordings, databases, or model weights.
 
-The GPT site uses a Cloudflare Worker, D1, R2, and Sites authentication. The separate Vercel frontend uses a Node.js adapter on t4 with private SQLite/object storage and signed guest browser sessions. See [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md). Its storage is separate; existing GPT-site records are not migrated. Merging code does not itself publish the GPT site or update the VPS backend; the owner releases the exact verified commit while preserving the existing audience.
+The GPT site uses a Cloudflare Worker, D1, R2, and Sites authentication. The separate Vercel frontend targets the Node.js API on t213 through `https://users.fereyuserstopstrongcloudwinter.shop/mission-health-api/`, with private SQLite/object storage and signed guest browser sessions. Memory and Qdrant remain on t4 loopback; the API accesses memory through a dedicated SSH tunnel at `127.0.0.1:18091` on t213. This topology uses no public memory endpoint and gives the browser no memory credentials.
+
+See [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md) for release acceptance. The migration preserves the standalone runtime configuration, session-signing secret, and consistent SQLite/object snapshot. `deploy/t4/configure_backend.mjs` remains a legacy t4 bootstrap; do not run it for t213. The migration is complete only after the actual HTTPS route, guest cookies, owner isolation, task CRUD, and a synthetic agent request have been verified. The storage is separate; existing GPT-site records are not migrated. Merging code does not itself publish the GPT site or update the VPS backend; the owner releases the exact verified commit while preserving the existing audience.

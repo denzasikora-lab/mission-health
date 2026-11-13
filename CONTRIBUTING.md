@@ -39,7 +39,7 @@ Open a pull request into `main`. Explain the problem, resulting behavior, config
 
 Publishing the GPT site is separate from merging source code. Coordinate releases with the owner and publish the exact verified commit with its matching build archive. Changing repository access does not grant Sites hosting access.
 
-The Vercel frontend uses a separate standalone backend on t4. See [docs/VERCEL_DEPLOYMENT.md](docs/VERCEL_DEPLOYMENT.md) for its build, signed browser sessions, storage, and release checks. Production Git deployments are enabled for that frontend; backend releases and the GPT site are separate operations.
+The Vercel deployment target uses a separate standalone backend on t213. Text memory, the embedder, and Qdrant remain on t4; a dedicated SSH tunnel exposes memory only on t213 loopback port 18091. The migration preserves standalone data and the session-signing secret. `deploy/t4/configure_backend.mjs` is a legacy t4 bootstrap and must not be run for t213. See [docs/VERCEL_DEPLOYMENT.md](docs/VERCEL_DEPLOYMENT.md) for the build, signed browser sessions, private storage, and release checks. Production Git deployments are enabled for the frontend; backend releases and the GPT site are separate operations. A complete release requires actual HTTPS and browser acceptance, not only a successful frontend build.
 
 ## Install and run locally
 
