@@ -7,7 +7,7 @@ This document describes the API implemented in `worker/`. It is a collaboration 
 1. **Application API:** the browser calls the same-origin `/api/` routes below. These manage identity, chat, diary, recordings, tasks, and research-related imports.
 2. **Language-service adapter:** the Worker calls a configured OpenAI-compatible service using `LLM_BASE_URL`, `LLM_MODEL`, and `LLM_API_KEY`.
 
-A teammate's structured health-analysis agent is a third, currently unspecified service. The supplied project document proposes an input/output JSON format, but provides no deployed URL, HTTP path, authentication scheme, or working endpoint. Do not substitute the existing diary/chat endpoint for that proposed agent API.
+A teammate's structured health-analysis agent is a third service. The supplied project document proposes input/output JSON but does not itself include a deployment address. The separately supplied Azure deployment was tested successfully; see the external-agent section below. Do not substitute the existing diary/chat endpoint for that agent API.
 
 ## Environments and authentication
 
@@ -232,12 +232,50 @@ Optional services use separate settings:
 
 Never put service keys in browser JavaScript, a GitHub issue, or an example request committed to Git.
 
-## External health-agent handoff still required
+## External health-agent: verified endpoint and remaining handoff
 
-Before integration, obtain the following from the agent owner:
+The separately supplied deployment was tested on 2026-11-13 with synthetic inputs only:
 
-- A deployed HTTPS base URL and exact HTTP method/path, or the service source and startup instructions.
-- Authentication header/token requirements, supplied privately.
+```http
+POST https://AstronautHealthAI.services.ai.azure.com/api/projects/AstronautHealthAI/agents/NASA-AI/endpoint/protocols/openai/responses?api-version=v1
+Content-Type: application/json
+api-key: <server-side secret>
+```
+
+The resource root `https://astronauthealthai.services.ai.azure.com/` is not the complete agent invocation URL. Send a Responses request with `input` and `stream: false`; the tested dedicated endpoint did not require a `model` field.
+
+Two requests succeeded with HTTP 200 and protocol `status: completed`: a connectivity message and the document's synthetic example (heart rate 112 bpm, SpO2 94%, temperature 38.1 C, respiratory rate 17, blood pressure unavailable, fatigue High, rule status ATTENTION). The final generated text for the second request was:
+
+```json
+{
+  "status": "ATTENTION",
+  "alerts": [
+    "Heart rate 112 flagged",
+    "SpO2 94% flagged",
+    "Temperature 38.1 flagged",
+    "High fatigue flagged"
+  ],
+  "summary": "Several monitored values are outside expected range for this sample, and the recent trend shows heart rate and temperature rising while SpO2 is falling. Mission control should continue close monitoring."
+}
+```
+
+The tested response reported model `gpt-5.4-mini`; the connectivity response identified agent `NASA-AI`, version `2`. These are observations from this deployment, not guarantees about future routing. This test establishes connectivity and one sample response, not clinical validity or complete contract compatibility.
+
+The response's `output` array can begin with reasoning or tool items. Extract final text from items with `type: "message"`, then content parts with `type: "output_text"`. Do not display encrypted reasoning or treat protocol `completed` as a health classification.
+
+The supplied `api-key` was empirically accepted by this deployment. Microsoft's current general agent-configuration documentation describes Entra/RBAC authorization and says API-key authentication is not supported; confirm the deployment's intended authentication with its owner before permanent integration. No key is stored in this repository, test artifacts, or documentation.
+
+Official protocol references:
+
+- https://learn.microsoft.com/en-us/azure/foundry/quickstarts/get-started-code
+- https://learn.microsoft.com/en-us/azure/foundry/agents/how-to/configure-agent
+- https://learn.microsoft.com/en-us/azure/foundry/agents/how-to/manage-hosted-sessions
+
+The live sample returns `alerts` as strings, while the proposed document describes alert objects. A separate Responses adapter is required: changing `LLM_BASE_URL` alone would still append `/chat/completions`, send the wrong body, and read the wrong response structure. The production diary/chat provider has not been replaced.
+
+Before integration, still confirm the following with the agent owner:
+
+- The intended production authentication and how backend credentials will be provisioned privately.
 - A complete request example and response example from the actual service.
 - Units, optional/missing fields, timestamp and astronaut-ID conventions, and the numeric fatigue/stress scale.
 - Whether the service receives raw readings, a precomputed rule result, recent history, or all three.
@@ -247,7 +285,7 @@ Before integration, obtain the following from the agent owner:
 
 The supplied design document states that an agent may raise, but never lower, the rule-engine severity. If that structured agent is implemented, enforce and test that invariant in application code rather than relying on a prompt alone. The documented thresholds are illustrative and are not validated medical limits.
 
-There is currently no implemented readings-ingestion or structured health-agent endpoint matching that document. Add the adapter and its tests after agreeing on the real service contract. Keep diary/chat integration separate unless the team explicitly chooses to change it.
+The external Azure agent is reachable, but this application does not yet expose a readings-ingestion or structured health-agent route matching the document. Add the adapter and its tests after agreeing on the remaining service contract. Keep diary/chat integration separate unless the team explicitly chooses to change it.
 
 ## Errors and compatibility
 
