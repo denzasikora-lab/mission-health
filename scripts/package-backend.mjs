@@ -20,6 +20,7 @@ const staging=await mkdtemp(join(tmpdir(),'mission-backend-package-')),checksums
 try{
   for(const path of files){await mkdir(dirname(join(staging,path)),{recursive:true});await cp(join(root,path),join(staging,path));checksums[path]=createHash('sha256').update(await readFile(join(staging,path))).digest('hex');}
   await writeFile(join(staging,'deployment-source.json'),JSON.stringify({commitSha,nodeVersion:'24.14.0',files:checksums},null,2)+'\n','utf8');
-  execFileSync('tar',['-czf',archive,'-C',staging,'--',...files,'deployment-source.json']);
+  const program='import gzip,io,sys,tarfile\nfrom pathlib import Path\nroot=Path(sys.argv[1])\nwith gzip.GzipFile(filename=sys.argv[2],mode="wb",mtime=0) as compressed:\n with tarfile.open(fileobj=compressed,mode="w",format=tarfile.USTAR_FORMAT) as output:\n  for name in sys.argv[3:]:\n   data=(root/name).read_bytes();info=tarfile.TarInfo(name);info.size=len(data);info.mode=0o600;info.mtime=0;output.addfile(info,io.BytesIO(data))\n';
+  execFileSync('python3',['-c',program,staging,archive,...files,'deployment-source.json']);
   console.log(JSON.stringify({archive,commitSha,sha256:createHash('sha256').update(await readFile(archive)).digest('hex'),files:files.length}));
 }finally{await rm(staging,{recursive:true,force:true});}
