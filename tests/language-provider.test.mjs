@@ -129,6 +129,20 @@ test('Raw transport JSON stays intact while validated health results become read
   assert.ok(f.scope.readableHealthAnswer(JSON.stringify({...health,alerts:[{parameter:'Heart rate',value:'112 bpm',severity:'moderate',note:'Elevated',trend:'rising'}]})).includes('Heart rate / 112 bpm / moderate / Elevated / rising'));
 });
 
+test('Structured health display preserves numeric zero and missing values without exposing raw JSON',()=>{
+  const f=fixture();
+  for(const [value,display] of [[112,'112'],[0,'0'],[null,'No signal']]){
+    const health={status:'ATTENTION',summary:'Review the supplied observation.',alerts:[{parameter:'Sample value',value,severity:'info',note:'Synthetic observation',trend:'unknown'}]},original=JSON.stringify(health);
+    assert.equal(f.scope.readableHealthAnswer(original),'Review the supplied observation.\n\nStatus: ATTENTION\nAlerts:\n- Sample value / '+display+' / info / Synthetic observation / unknown');
+    assert.equal(JSON.stringify(health),original);
+  }
+  const base={status:'ATTENTION',summary:'Review the supplied observation.',alerts:[{parameter:'Sample value',value:112,severity:'info'}]};
+  for(const edit of [alert=>alert.value=true,alert=>alert.value={unexpected:112},alert=>alert.value=[112],alert=>alert.note=112,alert=>alert.extra='unexpected']){
+    const changed=JSON.parse(JSON.stringify(base));edit(changed.alerts[0]);const original=JSON.stringify(changed);assert.equal(f.scope.readableHealthAnswer(original),original);
+  }
+  const overflow=JSON.stringify(base).replace('"value":112','"value":1e400');assert.equal(f.scope.readableHealthAnswer(overflow),overflow);
+});
+
 test('Provider attribution and cache scope identify the actual selected backend',()=>{
   const f=fixture({LLM_MODEL:'old-utility-model',LLM_BASE_URL:'https://utility.test/v1'});assert.equal(f.scope.languageModelSource(f.env),'azure_responses/NASA-AI');assert.equal(f.scope.languageModelSource(f.env,'utility'),'old-utility-model');const scope=f.scope.languageProviderScope(f.env);assert.ok(scope.includes(endpoint));assert.ok(!scope.includes('synthetic-azure-key'));assert.notEqual(scope,f.scope.languageProviderScope({...f.env,AZURE_AGENT_ENDPOINT:endpoint+'&version=test'}));
 });

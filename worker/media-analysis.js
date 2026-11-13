@@ -103,8 +103,9 @@ async function latestMediaAnalysis(db,user){
   for(const row of rows){
     let reference;try{reference=JSON.parse(row.references_json)[0];}catch{continue;}
     if(!['audio','video'].includes(reference?.kind)||items.some(item=>item.kind===reference.kind))continue;
-    const features=mediaAcousticSnapshot(reference.features);if(!features)continue;
+    const features=mediaAcousticSnapshot(reference.features);if(!features&&reference.kind!=='video')continue;
     const answer=await db.prepare("SELECT content FROM journal_messages WHERE owner_id=? AND astronaut_id='personal' AND reply_to=? AND assistant_source LIKE 'media-analysis:%' ORDER BY created_at DESC LIMIT 1").bind(user,row.id).first();
+    if(!features&&!answer?.content?.trim())continue;
     const legacy=String(row.content||'').match(/Recognized speech: ([\s\S]*?)(?=\n(?:Self-reported wellbeing|Original audio features|Audio not decoded|EmbeddingGemma 2|Apparent age|Skin comparison)|$)/);
     const transcript=typeof reference.transcript==='string'?reference.transcript.slice(0,40000):legacy?.[1]||'';
     items.push({id:row.id,kind:reference.kind,createdAt:row.created_at,features,transcript,analysis:answer?mediaAnalysisText(readableHealthAnswer(answer.content)).slice(0,16000):'',status:answer?'analyzed':'measured'});

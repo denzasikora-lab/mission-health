@@ -268,6 +268,13 @@ test('Opening latest results does not trigger transcription or upload again',asy
   const item={...savedVoice,id:'audio-saved',status:'analyzed',analysis:'Saved response'},f=analysisFixture({saved:[item]}),restored=[];f.window.missionVoiceAnalysis={restore:(...args)=>restored.push(args)};await f.api.restore();assert.equal(f.calls.length,0);assert.equal(restored.length,1);assert.equal(restored[0][1].features.acoustic.level,-25.4);const root=f.node('#voice-dialog').children[0];assert.equal(root.hidden,false);assert.equal(root.children[0].children[1].textContent,'Saved response');
 });
 
+test('A saved visual-only analysis remains visible when no voice measurements can be restored',async()=>{
+  const item={kind:'video',id:'video-saved',createdAt:'2026-11-05T09:30:00Z',status:'analyzed',features:null,transcript:'',analysis:'Saved observation of the selected frames.'},f=analysisFixture({saved:[item]});
+  f.window.missionVoiceAnalysis={restore:()=>false};await f.api.restore();const root=f.node('#video-log-dialog .diary-visual-analysis').children[0];
+  assert.equal(root.hidden,false);assert.equal(root.children.length,1);assert.equal(root.children[0].children[1].textContent,item.analysis);assert.equal(f.calls.length,0);
+  await f.api.restore();assert.equal(root.children.length,1);assert.equal(f.calls.length,0);
+});
+
 
 test('Acoustic values appear after decoding before the embedder responds',async()=>{
   const data=new Float32Array(16000).fill(.1),f=voiceAnalysisFixture({decode:Promise.resolve({length:data.length,sampleRate:16000,numberOfChannels:1,getChannelData:()=>data})});

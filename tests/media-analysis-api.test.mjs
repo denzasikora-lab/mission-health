@@ -25,6 +25,14 @@ function fixture(t){
 }
 test('Audio is transcribed, analyzed and saved with the response in the personal diary',async t=>{const f=fixture(t),r=await f.send();assert.equal(r.status,200);assert.equal(r.body.status,'analyzed');assert.equal(f.outgoing.length,2);assert.equal(f.objects.size,1);assert.equal(f.db.prepare('SELECT COUNT(*) n FROM journal_messages').get().n,2);const body=JSON.parse(f.outgoing[1].options.body);assert.match(body.messages[1].content[0].text,/I felt tired after exercise today/);assert.match(body.messages[0].content,/Do not infer a diagnosis from face or voice/);});
 test('Video sends three image attachments and speech text to the model',async t=>{const f=fixture(t),r=await f.send({kind:'video',transcript:'User message'});assert.equal(r.status,200);assert.equal(r.body.frames,3);const body=JSON.parse(f.outgoing[0].options.body);assert.equal(body.messages[1].content.filter(p=>p.type==='image_url').length,3);assert.match(body.messages[1].content[0].text,/User message/);});
+test('Unknown video formats are rejected before storage or model calls',async t=>{
+  const f=fixture(t),result=await f.send({kind:'video',bytes:new Uint8Array(64),transcript:'Synthetic observation'});
+  assert.equal(result.status,400);assert.equal(result.body.error,'invalid_video');assert.equal(f.outgoing.length,0);assert.equal(f.objects.size,0);assert.equal(f.objectReads.length,0);assert.equal(f.db.prepare('SELECT COUNT(*) n FROM journal_messages').get().n,0);
+});
+test('Recognized MP4 and WebM containers preserve their media type and frames',async t=>{
+  const mp4=new Uint8Array(64);mp4.set(new TextEncoder().encode('ftyp'),4);
+  for(const [bytes,mime] of [[mp4,'video/mp4'],[clip,'video/webm']]){const f=fixture(t),result=await f.send({kind:'video',bytes,transcript:'Synthetic observation'});assert.equal(result.status,200);assert.equal(result.body.frames,3);assert.equal(f.objects.size,1);assert.equal([...f.objects.values()][0].httpMetadata.contentType,mime);const body=JSON.parse(f.outgoing[0].options.body);assert.equal(body.messages[1].content.filter(part=>part.type==='image_url').length,3);}
+});
 test('Azure media analysis preserves selected frames and attributes the stored response to the agent',async t=>{
   const f=fixture(t);Object.assign(f.env,{LLM_PROVIDER:'azure_responses',AZURE_AGENT_ENDPOINT:'https://agent.test/agents/NASA-AI/endpoint/protocols/openai/responses?api-version=v1',AZURE_AGENT_API_KEY:'synthetic-azure-key'});
   const result=await f.send({kind:'video',transcript:'Synthetic speech'});assert.equal(result.status,200);assert.equal(result.body.status,'analyzed');const body=JSON.parse(f.outgoing[0].options.body);assert.equal(body.input[1].content.filter(part=>part.type==='input_image').length,3);assert.match(body.input[0].content,/Do not infer a diagnosis from face or voice/);assert.match(body.input[1].content[0].text,/Synthetic speech/);const row=f.db.prepare("SELECT assistant_source,owner_id,reply_to FROM journal_messages WHERE role='assistant'").get();assert.equal(row.assistant_source,'media-analysis:azure_responses/NASA-AI');assert.equal(row.owner_id,'person-a');assert.equal(row.reply_to,identifier);assert.equal(f.outgoing[0].options.headers.authorization,undefined);
@@ -73,6 +81,31 @@ test('Latest saved measurements return without decoding again or exposing vector
   const f=fixture(t),features={acoustic:{level:-24,quiet:.2,clipping:.001,seconds:5},model:'embeddinggemma-2:daa72c51243991dfcaf9f9137d2c573d8f7790c0:q4:768',audioVector:Array.from({length:768},(_,i)=>i===0?1:0),tone:[{label:'neutral',similarity:.6}]};
   await f.send({transcript:'Audio check',features});const requests=f.outgoing.length,result=await f.get();assert.equal(result.status,200);assert.equal(f.outgoing.length,requests);assert.equal(result.body.items.length,1);
   const item=result.body.items[0];assert.equal(item.kind,'audio');assert.equal(item.id,identifier);assert.equal(item.status,'analyzed');assert.equal(item.features.acoustic.level,-24);assert.equal(item.features.tone[0].similarity,.6);assert.equal(item.transcript,'Audio check');assert.match(item.analysis,/Wellbeing/);assert.equal(item.features.audioVector,undefined);assert.equal(JSON.stringify(item).includes('digest'),false);
+});
+test('Successful videos without acoustic data restore their saved analysis without exposing vectors or calling the model',async t=>{
+  const visual={acoustic:null,model:'embeddinggemma-2:daa72c51243991dfcaf9f9137d2c573d8f7790c0:q4:768',tone:[],videoVector:Array.from({length:768},(_,index)=>index===0?1:0)};
+  for(const features of [undefined,visual]){
+    const f=fixture(t),id=webcrypto.randomUUID();
+    await f.send({kind:'video',features:{acoustic:{level:-24,quiet:.2,clipping:0,seconds:5}},transcript:'Older synthetic video'});
+    f.db.prepare('UPDATE journal_messages SET created_at=? WHERE id=?').run(new Date(Date.now()-60000).toISOString(),identifier);
+    const saved=await f.send({id,kind:'video',features,transcript:'Synthetic selected-frame observation'});assert.equal(saved.status,200);assert.equal(saved.body.status,'analyzed');
+    const calls=f.outgoing.length;f.env.LLM_API_KEY='';f.env.PHOTOS=null;
+    const result=await f.get();assert.equal(result.status,200);assert.equal(result.body.items.length,1);const item=result.body.items[0];
+    assert.equal(item.id,id);assert.equal(item.kind,'video');assert.equal(item.status,'analyzed');assert.equal(item.features,null);assert.equal(item.transcript,'Synthetic selected-frame observation');assert.equal(item.analysis,saved.body.analysis);assert.doesNotMatch(JSON.stringify(item),/videoVector|audioVector|digest/);
+    if(features)assert.equal(JSON.parse(f.db.prepare('SELECT references_json FROM journal_messages WHERE id=?').get(id).references_json)[0].features.videoVector.length,768);
+    assert.deepEqual((await f.get('person-b')).body.items,[]);assert.equal((await f.get(null)).status,401);assert.equal(f.outgoing.length,calls);
+  }
+});
+test('A failed video without usable measurements cannot hide an older analyzed video or borrow another profile answer',async t=>{
+  const f=fixture(t),pendingId=webcrypto.randomUUID();await f.send({kind:'video',transcript:'Saved synthetic frames'});
+  f.db.prepare('UPDATE journal_messages SET created_at=? WHERE id=?').run(new Date(Date.now()-60000).toISOString(),identifier);
+  f.setModelFailure(true);const failed=await f.send({id:pendingId,kind:'video',transcript:'Pending synthetic frames'});assert.equal(failed.status,503);assert.equal(failed.body.saved,true);
+  const insert=f.db.prepare('INSERT INTO journal_messages (id,owner_id,astronaut_id,role,content,language,created_at,reply_to,assistant_source) VALUES (?,?,?,?,?,?,?,?,?)');
+  insert.run(webcrypto.randomUUID(),'person-b','personal','assistant','Foreign owner answer','en',new Date().toISOString(),pendingId,'media-analysis:other');
+  insert.run(webcrypto.randomUUID(),'person-a','jessica-meir','assistant','Foreign profile answer','en',new Date().toISOString(),pendingId,'media-analysis:other');
+  const calls=f.outgoing.length,result=await f.get();assert.equal(result.status,200);assert.equal(result.body.items.length,1);assert.equal(result.body.items[0].id,identifier);assert.equal(result.body.items[0].features,null);assert.doesNotMatch(result.body.items[0].analysis,/Foreign/);
+  insert.run(webcrypto.randomUUID(),'person-a','personal','assistant','   ','en',new Date().toISOString(),pendingId,'media-analysis:empty');
+  assert.equal((await f.get()).body.items[0].id,identifier);assert.deepEqual((await f.get('person-b')).body.items,[]);assert.equal(f.outgoing.length,calls);
 });
 test('Saved measurements are owner-only and need no original-file storage',async t=>{
   const f=fixture(t);await f.send({features:{acoustic:{level:-21,quiet:.1,clipping:0,seconds:5}},transcript:'Own recording'});f.env.PHOTOS=null;
@@ -148,7 +181,7 @@ test('Azure structured media results are readable and saved with the same owner 
 test('Stored health JSON is readable on retry, history, latest analysis and archive without rewriting the original',async t=>{
   const f=fixture(t),features={acoustic:{level:-24,quiet:.2,clipping:0,seconds:5}};
   await f.send({transcript:'Synthetic observation',features});
-  const original=JSON.stringify({status:'ATTENTION',alerts:['Synthetic flag'],summary:'Review the supplied observation.'}),expected='Review the supplied observation.\n\nStatus: ATTENTION\nAlerts:\n- Synthetic flag';
+  const original=JSON.stringify({status:'ATTENTION',alerts:['Synthetic flag',{parameter:'heart_rate',value:112,severity:'moderate',note:'Review pulse',trend:'rising'},{parameter:'clipping',value:0,severity:'info',note:'No clipped samples',trend:'flat'},{parameter:'spo2',value:null,severity:'info',note:'Measurement missing',trend:'unknown'}],summary:'Review the supplied observation.'}),expected='Review the supplied observation.\n\nStatus: ATTENTION\nAlerts:\n- Synthetic flag\n- heart_rate / 112 / moderate / Review pulse / rising\n- clipping / 0 / info / No clipped samples / flat\n- spo2 / No signal / info / Measurement missing / unknown';
   f.db.prepare("UPDATE journal_messages SET content=? WHERE role='assistant'").run(original);
   const requests=f.outgoing.length;
   assert.equal((await f.send({features})).body.analysis,expected);

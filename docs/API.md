@@ -130,6 +130,8 @@ For `/api/chat`, the response includes `message`, `reply`, `replyError`, and ext
 
 Do not fabricate acoustic measurements, vectors, age ranges, or skin results to satisfy a schema. An unavailable measurement stays unavailable. A file extension alone is insufficient; the server checks media bytes. A recording is saved independently of the language service's availability. The current browser capture implementation and `tests/media-analysis-api.test.mjs` are the reference for the complete feature contract.
 
+`GET /api/media-analysis` restores saved results without another upload, transcription, or model call. A successfully analyzed video remains available even when no acoustic or voice-tone measurements were produced; in that case `features` is null. Incomplete recordings without usable measurements or an analysis do not replace an earlier usable result. Access remains owner-scoped.
+
 `POST /api/transcriptions` separately takes multipart `file` and `mode` (`api` or `local`). Its ordinary upload limit is 8 MiB. Successful responses contain `text`, `mode`, and `model`.
 
 ## Additional implemented routes
@@ -227,7 +229,7 @@ The Azure adapter sends `input` with explicit `type: "message"` items preserving
 
 Autocomplete, semantic story tags, and historical English translation explicitly use the existing Chat Completions utility provider even when Azure is the primary provider. This prevents a dedicated health agent's JSON instructions from replacing a text suffix, tag object, or translation array. If the utility provider is absent, those features keep their existing fallback/unavailable behavior; they do not silently send their inputs to the health agent. There is no automatic cross-provider retry. `AIR_GAP=1` blocks Azure even if old local model settings remain; the explicitly supported local utility path is unchanged.
 
-Ordinary chat, diary answers, and recording analyses render only a narrowly validated health object (`NORMAL`/`ATTENTION`/`CRITICAL`, `alerts`, `summary`) as readable summary, status, and alerts. Other JSON stays unchanged, and utility callers always receive raw text for their existing parsers. Saved recording analyses identify Azure as `media-analysis:azure_responses/NASA-AI`, rather than attributing the answer to an unrelated utility model. Owner/profile boundaries, references, attachments, and reply IDs are unchanged.
+Ordinary chat, diary answers, and recording analyses render only a narrowly validated health object (`NORMAL`/`ATTENTION`/`CRITICAL`, `alerts`, `summary`) as readable summary, status, and alerts. Alert values may be strings, finite numbers, or null; zero is preserved and null displays as No signal. Other JSON stays unchanged, and utility callers always receive raw text for their existing parsers. Saved recording analyses identify Azure as `media-analysis:azure_responses/NASA-AI`, rather than attributing the answer to an unrelated utility model. Owner/profile boundaries, references, attachments, and reply IDs are unchanged.
 
 ### Chat Completions
 
@@ -295,6 +297,8 @@ Two requests succeeded with HTTP 200 and protocol `status: completed`: a connect
 ```
 
 The tested response reported model `gpt-5.4-mini`; the connectivity response identified agent `NASA-AI`, version `2`. These are observations from this deployment, not guarantees about future routing. This test establishes connectivity and one sample response, not clinical validity or complete contract compatibility.
+
+`NASA-AI` is the deployment's agent name. Invocation access does not expose its internal instructions, configured tools, attached knowledge, or training history. Those details require a separate configuration handoff from the agent owner. The name alone establishes no official NASA affiliation.
 
 The response's `output` array can begin with reasoning or tool items. Extract final text from items with `type: "message"`, then content parts with `type: "output_text"`. Do not display encrypted reasoning or treat protocol `completed` as a health classification.
 

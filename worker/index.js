@@ -132,8 +132,9 @@ function readableHealthAnswer(text){
   const alerts=[];
   for(const alert of value.alerts){
     if(typeof alert==='string'&&alert.trim()){alerts.push(alert.trim());continue;}
-    if(!alert||Array.isArray(alert)||typeof alert.parameter!=='string'||!alert.parameter.trim()||Object.keys(alert).some(key=>!['parameter','value','severity','note','trend'].includes(key))||Object.values(alert).some(part=>typeof part!=='string'))return text;
-    alerts.push([alert.parameter,alert.value,alert.severity,alert.note,alert.trend].filter(Boolean).join(' / '));
+    if(!alert||Array.isArray(alert)||typeof alert.parameter!=='string'||!alert.parameter.trim()||Object.keys(alert).some(key=>!['parameter','value','severity','note','trend'].includes(key))||Object.entries(alert).some(([key,part])=>typeof part!=='string'&&!(key==='value'&&(part===null||typeof part==='number'&&Number.isFinite(part)))))return text;
+    const displayValue=alert.value===null?'No signal':typeof alert.value==='number'?String(alert.value):alert.value;
+    alerts.push([alert.parameter,displayValue,alert.severity,alert.note,alert.trend].filter(Boolean).join(' / '));
   }
   return value.summary.trim()+'\n\nStatus: '+value.status+(alerts.length?'\nAlerts:\n'+alerts.map(alert=>'- '+alert).join('\n'):'');
 }
