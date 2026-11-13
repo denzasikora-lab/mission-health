@@ -10,12 +10,20 @@
 .metric-gauge-compact{--gauge-size:42px}
 .metric-gauge-compact .metric-gauge-reading>b{font-size:.75rem}
 .metric-gauge-compact .metric-gauge-reading>small{font-size:.35rem}
-.home-vital>strong:has(>.metric-gauge){display:block;margin-block:8px;line-height:1}
-.home-body-panel .home-vital .metric-gauge{--gauge-size:72px}
+.home-vital>strong:has(>.metric-gauge){display:block;margin-block:0;line-height:1}
+.home-body-panel .home-vital .metric-gauge{--gauge-size:52px}
 .metric-value:has(>.metric-gauge){line-height:1}
 .wellbeing-readout>strong:has(>.metric-gauge){display:flex;align-items:center}
 .wellbeing-badge:has(>.metric-gauge){display:inline-flex;align-items:center;gap:8px;padding:5px 9px}
 @container mission (max-width:500px){
-  .home-body-panel .home-vital .metric-gauge{--gauge-size:62px}
+  .home-body-panel .home-vital .metric-gauge{--gauge-size:44px}
   .home-body-panel .home-vital .metric-gauge-reading>b{font-size:1rem}
+}
+
+@container mission (min-width:621px){
+  .home-body-panel .home-vital:has(>strong>.metric-gauge){grid-template-columns:minmax(0,1fr) 52px;column-gap:12px}
+  .home-body-panel .home-vital:has(>strong>.metric-gauge)>span:first-child{grid-column:1;grid-row:1}
+  .home-body-panel .home-vital>strong:has(>.metric-gauge){grid-column:2;grid-row:1/4;align-self:center}
+  .home-body-panel .home-vital:has(>strong>.metric-gauge)>small{grid-column:1;grid-row:2}
+  .home-body-panel .home-vital:has(>strong>.metric-gauge)>.home-vital-trend{grid-column:1;grid-row:3}
 }
