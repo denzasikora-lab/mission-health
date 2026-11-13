@@ -1,0 +1,26 @@
+.health-analysis{padding:12px 14px;border-radius:16px;min-width:0;font:400 13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text)}
+.health-analysis-header,.health-analysis-badges,.health-analysis-footer,.health-analysis-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.health-analysis-header{justify-content:space-between;margin-bottom:8px}
+.health-analysis h2{font:600 14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0}
+.health-analysis-scope,.health-analysis-status{display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:999px;padding:3px 8px;font-size:12px;line-height:1.4}
+.health-analysis-scope{color:var(--muted)}
+.health-analysis-status{font-weight:600;background:var(--field)}
+.health-analysis-status[data-level=normal]{color:var(--green);background:var(--green-bg)}
+.health-analysis-status[data-level=attention]{color:var(--amber);background:var(--amber-bg)}
+.health-analysis-status[data-level=critical]{color:#f3aaa3;background:#a83e3826}
+html[data-theme=light] .health-analysis-status[data-level=critical]{color:#97362d;background:#f5d8d1}
+.health-analysis p{margin:6px 0;overflow-wrap:anywhere}
+.health-analysis-summary{white-space:pre-wrap;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;overflow:hidden}
+.health-analysis-disclosure{border-top:1px solid var(--border);padding-top:7px;margin-top:7px}
+.health-analysis-disclosure>summary{font-size:12px;color:var(--muted);cursor:pointer}
+.health-analysis-full-summary{white-space:pre-wrap}
+.health-analysis-alerts{margin:6px 0;padding-left:18px;overflow-wrap:anywhere}
+.health-analysis-alerts li+li{margin-top:3px}
+.health-analysis-details,.health-analysis-meta,.health-analysis-notice{font-size:12px;color:var(--muted)}
+.health-analysis-footer{justify-content:space-between;margin-top:10px}
+.health-analysis-button,.health-analysis-new{font:600 13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:var(--selected);border:1px solid var(--border);border-radius:9px;padding:7px 12px;min-height:34px;cursor:pointer}
+.health-analysis-new{font-weight:400;background:var(--field)}
+.health-analysis button:disabled{opacity:.55;cursor:default}
+.health-analysis button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.health-analysis [hidden]{display:none!important}
+@container mission (max-width:420px){.health-analysis{padding:11px 12px}.health-analysis-header{align-items:flex-start}.health-analysis-meta{flex-basis:100%}}

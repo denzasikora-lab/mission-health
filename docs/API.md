@@ -7,7 +7,7 @@ This document describes the API implemented in `worker/` and the supported serve
 1. **Application API:** the browser calls the same-origin `/api/` routes below. These manage identity, chat, diary, recordings, tasks, and research-related imports.
 2. **Language-service adapter:** the Worker supports Chat Completions and the Azure agent Responses protocol. The selected primary provider serves chat, diary answers, and recording analysis. Utility generation keeps its separate Chat Completions contract.
 
-A teammate's health-analysis agent is an upstream service. Its supplied Azure deployment was tested successfully and has a Responses adapter; see the external-agent section below. The proposed structured readings workflow is separate from the browser-facing diary/chat routes.
+A teammate's health-analysis agent is an upstream service. Its supplied Azure deployment was tested successfully and has a Responses adapter; see the external-agent section below. The structured prototype readings workflow is available separately from ordinary diary/chat replies; both use the same primary provider.
 
 ## Environments and authentication
 
@@ -31,6 +31,9 @@ The current personal demo persona is **Cdr. Sara Khan**, astronaut label **AST-0
 | Method | Route | Purpose |
 | --- | --- | --- |
 | GET | `/api/status` | Report configured assistant, history, photo, and semantic-memory capabilities |
+| GET | `/api/health-analysis` | Read the owner's latest prototype readings analysis |
+| GET | `/api/health-analysis/{id}` | Read one owned saved analysis |
+| POST | `/api/health-analysis` | Validate a snapshot, calculate prototype rules, and ask the primary agent |
 | GET | `/api/me` | Return `name`, `researcherId`, account-scoped `storageScope`, and the personal demo persona metadata |
 | PUT | `/api/me` | Save a display name using exactly `{"name":"..."}`; optional `x-mission-profile-scope` prevents stale-account writes |
 | GET | `/api/location` | Return the request's available country code or `null` |
@@ -247,7 +250,7 @@ Authorization: Bearer {LLM_API_KEY}
 
 `LLM_BASE_URL` excludes the final `/chat/completions` suffix. The example configuration uses an OpenAI-compatible provider; actual credentials remain in ignored `.dev.vars` or the hosted runtime settings. Different features override output limits, timeouts, retry counts, and redirect handling. Multimedia requests can include OpenAI-compatible `image_url` content parts. Responses must expose `choices[0].message.content` as text or supported text parts. Both transports preserve the existing retry budget: connection failures and HTTP 502/503/504 may retry; other statuses and invalid completed responses do not.
 
-The browser-facing chat/diary result remains text. A custom FastAPI endpoint or native Anthropic Messages endpoint is not automatically compatible with either supported transport. Structured health-result validation and deterministic severity rules require their own application contract.
+The browser-facing chat/diary result remains text. A custom FastAPI endpoint or native Anthropic Messages endpoint is not automatically compatible with either supported transport. The separate `/api/health-analysis` workflow validates structured results and enforces its deterministic prototype severity floor.
 
 Optional services use separate settings:
 
@@ -301,7 +304,7 @@ Official protocol references:
 
 The live sample returns `alerts` as strings, while the proposed document describes alert objects. The Worker now supports this endpoint through `LLM_PROVIDER=azure_responses`. Changing `LLM_BASE_URL` alone is still incorrect: that setting belongs to the separate Chat Completions adapter. Runtime configuration and a hosted smoke test determine whether a specific deployment uses Azure.
 
-Before implementing the document's structured readings workflow, confirm the following with the agent owner:
+Before expanding this prototype into authenticated device ingestion, confirm the remaining production contract with the agent owner:
 
 - The intended production authentication and how backend credentials will be provisioned privately.
 - A complete request example and response example from the actual service.
@@ -311,9 +314,9 @@ Before implementing the document's structured readings workflow, confirm the fol
 - Confirmation of how `NORMAL`, `ATTENTION`, and `CRITICAL` interact with the deterministic rule-engine result.
 - Synthetic test cases and expected output for normal, missing-data, boundary, and failure cases.
 
-The supplied design document states that an agent may raise, but never lower, the rule-engine severity. If that structured agent is implemented, enforce and test that invariant in application code rather than relying on a prompt alone. The documented thresholds are illustrative and are not validated medical limits.
+The supplied design document states that an agent may raise, but never lower, the rule-engine severity. The structured route now enforces and tests that invariant in application code, including malformed and contradictory replies, rather than relying on a prompt alone. The documented thresholds are illustrative and are not validated medical limits.
 
-The external Azure agent is reachable and has a provider adapter, but this application does not yet expose a readings-ingestion or structured health-agent route matching the document. Agree on that remaining contract before adding a rule-engine/agent pipeline. Selecting Azure for diary/chat does not itself implement that pipeline.
+The `/api/health-analysis` route now implements the prototype readings workflow below. It does not add a physical device connection or validate the medical meaning of the project document thresholds.
 
 ### Integration verification on 2026-11-14
 
@@ -331,7 +334,39 @@ All three responses reported `gpt-5.4-mini`. The model is selected by the upstre
 
 Diary context now retains the recorded self-report, normalized 1-100 scale, and entry date. A wellbeing score is not an objective sensor reading or a fatigue measurement. Structured health JSON is formatted for display in new and previously saved replies, including recording retries, recent results, history, and the archive. Read-time formatting does not rewrite historical originals or send another model request.
 
-The current media request sends the transcript, supported browser measurements, and up to three selected video frames. It does not send the entire original audio/video file to Azure. General chat does not automatically include every dashboard card, Actiwatch import, or past recording analysis. Dashboard skin temperature must not be relabeled as body temperature. A separate validated readings contract and deterministic minimum-severity rule pipeline remain to be implemented.
+The current media request sends the transcript, supported browser measurements, and up to three selected video frames. It does not send the entire original audio/video file to Azure. General chat now receives a saved numeric dashboard snapshot with source and time metadata. Canonical Actiwatch summary data is loaded by owner and explicit import ID. Past recording analyses are not automatically attached. Dashboard skin temperature is never relabeled as body temperature. The structured readings route enforces its own deterministic prototype status independently of free-form conversation.
+
+## Prototype readings workflow
+
+`POST /api/health-analysis` accepts exactly `{id, snapshot}`. `id` is a UUID. `snapshot` contains `profileId: "personal"`, an ISO `capturedAt`, optional `actiwatchImportId`, and a `readings` object. Each reading is null or `{value, unit, source, observedAt}`. Allowed sources are `demo`, `manual`, and `import`. Example readings have `observedAt: null`; the snapshot time is not a sensor time. Manual/import observations require valid timestamps. Client source labels do not establish a verified device connection.
+
+| Reading keys | Canonical unit |
+| --- | --- |
+| `heart_rate` | `bpm` |
+| `spo2` | `%` |
+| `body_temperature`, `skin_temperature` | `C` |
+| `bp_systolic`, `bp_diastolic` | `mmHg` |
+| `respiratory_rate` | `/min` |
+| `fatigue_index`, `stress_index`, `wellbeing`, `recovery` | `/100` |
+| `sleep_hours`, `hrv`, `steps`, `activity`, `light` | `h`, `ms`, `steps`, `counts`, `lx`, respectively |
+
+Unknown fields, profiles, wrong units, numeric strings, non-finite values and invalid times are rejected. `import` is restricted to sleep/activity/light and an explicitly selected owned Actiwatch import. The server replaces those values from the stored summary and its recording end time. It never sends raw CSV, vectors, or another owner's records to the agent.
+
+For example, a synthetic manually reported core uses `heart_rate: {value:112,unit:"bpm",source:"manual",observedAt:"<current ISO timestamp>"}` together with SpO2 94 percent and body temperature 38.1 C. Set `capturedAt` to the current time too. An actual missing body temperature stays null; skin temperature cannot fill it. Wellbeing and recovery cannot become fatigue/stress indices.
+
+Version `pdf-prototype-v1` implements the project document's illustrative thresholds: HR normal 50-100, critical below 40 or above 120; SpO2 normal at least 95, critical below 90; body temperature normal 36-37.5, critical below 35 or above 38.5; systolic normal 90 to below 140, critical below 80 or at least 180; diastolic normal 60 to below 90, critical below 50 or at least 110; respiration normal 12-20, critical below 8 or above 25. Intermediate values are ATTENTION. Fatigue/stress at least 70 is ATTENTION with no independent critical level. Continuous comparisons fill decimal gaps without rounding observations.
+
+Blood pressure and fatigue/stress each count as one group using the worse available component. Five abnormal groups out of six escalate to CRITICAL. Several abnormal groups produce an explicit combination note. Core observations older than 15 minutes are excluded as stale. Missing data is No signal, not zero or normal. A complete core assessment requires usable HR, SpO2 and body temperature; otherwise a result with no known abnormality has `status: null` and the UI displays Incomplete. Known ATTENTION/CRITICAL values remain flagged under incomplete coverage. The scope is explicitly an example whenever demo readings are included.
+
+The response has `snapshot`, `rules`, `result`, `createdAt`, `updatedAt`, and `pending`. Rules contain their version, per-group results, missing/stale lists, coverage and combination/escalation metadata. Result contains final status, original agent status, summary, readable alerts, `downgradeBlocked` and `agentAvailable`. Alert values accept bounded strings, finite numbers, and null as returned by the tested deployment; null becomes No signal / info. A blocked downgrade discards contradictory model prose and alerts as well as retaining the rule floor. The final status cannot be lower than the server rule floor. Invalid JSON/schema, unavailable service and `AIR_GAP=1` preserve a saved rules-only result instead of inventing successful AI analysis.
+
+An ID with an unchanged canonical snapshot reuses a successful result. Another owner or a different snapshot conflicts. Failed analyses can be retried with the same ID; a 60-second server lease prevents overlapping model calls. An overlapping POST returns HTTP 202 with `pending: true`. GET `/api/health-analysis` returns `{item: <latest or null>}`; GET `/api/health-analysis/{id}` reads one owned record. Reads never call a model.
+
+Agent input contains `astronaut`, unknown `mission_time: null`, `latest`, `rule_result`, provenance, and `recent_trend`. Trends require ten distinct non-demo observation times from the same source: the mean of the latest five versus the previous five. Insufficient history and generated chart data never become a real trend.
+
+The browser calls Azure analysis only when Analyze is selected. Chat automatically attaches `healthSnapshot` once when creating its pending request. The server saves the canonical snapshot and rules in `message.healthContext`; retries reuse that original context even if the dashboard has changed. Ordinary conversation remains separate from the structured Health analysis and does not gain diary access.
+
+These are the team's documented prototype rules, not validated medical limits or a medical device. Actual device ingestion and validated mission-specific thresholds require a separate deployment contract.
 
 ## Errors and compatibility
 

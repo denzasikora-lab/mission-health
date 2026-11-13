@@ -119,7 +119,7 @@
   }
   async function send(kind){
     const s=store(kind);if(s.busy||s.dictating||s.files.some(file=>!file.id)||!s.draft.trim()&&!s.files.length)return;s.busy=true;s.notice='';
-    s.pending||={id:crypto.randomUUID(),content:s.draft.trim(),attachments:s.files.map(file=>file.id),...(kind==='team'?{}:{wellbeing:currentReport(),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone})};const input=s.pending;renderViews();
+    s.pending||={id:crypto.randomUUID(),content:s.draft.trim(),attachments:s.files.map(file=>file.id),...(kind==='team'?{}:{wellbeing:currentReport(),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone}),...(kind==='chat'&&window.missionHealth?.snapshot?{healthSnapshot:window.missionHealth.snapshot()}: {})};const input=s.pending;renderViews();
     try{
       const result=await api(kind==='team'?'/api/team-chat':kind==='chat'?'/api/chat':'/api/astronauts/'+s.profile+'/messages',{method:'POST',body:JSON.stringify({...input,...(kind==='diary'?{mode:'diary',language:'en',attachments:[]}:{} )})});
       for(const entry of [result.message,result.reply].filter(Boolean)){const index=s.messages.findIndex(item=>item.id===entry.id);if(index<0)s.messages.push(entry);else s.messages[index]=entry;}
@@ -179,7 +179,7 @@
   }
   function onOpen(){void prepare();setKind(modalView,modalKind);if(!favoriteLoaded)void favorites();renderScores();}
   window.addEventListener('mission-diary-open',onOpen);
-  window.missionCheckin={widget:slider,current:currentReport};
+  window.missionCheckin={widget:slider,current:currentReport,selection:()=>{const owner=window.missionProfileName?.identity?.storageScope;if(owner&&owner!==identity?.storageScope)return null;const value=selection();return value?{...value}:null;}};
   window.missionFavorites={button:star,badge,refresh:favorites};window.missionConversations={render,refreshDiary:()=>load('diary')};
   void prepare();void load('chat');render();if(window.missionDiary.active)onOpen();
 })();

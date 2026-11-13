@@ -28,8 +28,18 @@
     if(url){const link=make('a','home-instrument',label);link.href=url;link.target='_blank';link.rel='noopener';link.title='Instrument description: '+label;note.append(link);}
     else note.textContent=label;
   }
-  const demoValues={hr:['72','bpm'],spo2:['98','%'],temp:['36,7','°C'],sleep:['7','h 40 min'],hrv:['46','ms'],respiration:['14','/min'],pressure:['118/76','mmHg. units.'],recovery:['86','/100'],steps:['6240','steps'],activity:['66 218','counts'],light:['187,3','lx']};
-  for(const [key,[value,unit]]of Object.entries(demoValues)){const card=home.querySelector('[data-home-metric='+key+']'),number=card.querySelector('strong');if(['spo2','recovery'].includes(key))number.innerHTML=window.missionGauge.markup({value:Number(value),label:key==='spo2'?'SpO₂':'Recovery',unit:key==='spo2'?'%':undefined});else{number.textContent=value;number.append(make('span','home-vital-unit',unit));}setSource(key,...instruments[key]);card.dataset.source='demo';}
+  const demoValues={hr:[72,'bpm'],spo2:[98,'%'],temp:[36.7,'°C'],sleep:[7+40/60,'h'],hrv:[46,'ms'],respiration:[14,'/min'],pressure:[{systolic:118,diastolic:76},'mmHg'],recovery:[86,'/100'],steps:[6240,'steps'],activity:[66218,'counts'],light:[187.3,'lx']};
+  for(const [key,[value,unit]]of Object.entries(demoValues)){const card=home.querySelector('[data-home-metric='+key+']'),number=card.querySelector('strong');if(['spo2','recovery'].includes(key))number.innerHTML=window.missionGauge.markup({value,label:key==='spo2'?'SpO₂':'Recovery',unit:key==='spo2'?'%':undefined});else{number.textContent=key==='pressure'?value.systolic+'/'+value.diastolic:key==='sleep'?String(Math.floor(value)):new Intl.NumberFormat('en',{maximumFractionDigits:1,useGrouping:false}).format(value);number.append(make('span','home-vital-unit',key==='sleep'?'h '+Math.round(value%1*60)+' min':unit));}setSource(key,...instruments[key]);card.dataset.source='demo';}
+  function snapshot(){
+    const reading=(value,unit)=>Number.isFinite(value)?{value,unit,source:'demo',observedAt:null}:null;
+    const readings={heart_rate:reading(demoValues.hr[0],'bpm'),spo2:reading(demoValues.spo2[0],'%'),body_temperature:null,bp_systolic:reading(demoValues.pressure[0].systolic,'mmHg'),bp_diastolic:reading(demoValues.pressure[0].diastolic,'mmHg'),respiratory_rate:reading(demoValues.respiration[0],'/min'),fatigue_index:null,stress_index:null,skin_temperature:reading(demoValues.temp[0],'C'),wellbeing:null,recovery:reading(demoValues.recovery[0],'/100'),sleep_hours:reading(demoValues.sleep[0],'h'),hrv:reading(demoValues.hrv[0],'ms'),steps:reading(demoValues.steps[0],'steps'),activity:reading(demoValues.activity[0],'counts'),light:reading(demoValues.light[0],'lx')};
+    const report=window.missionCheckin.current(),at=window.missionCheckin.selection?.()?.at;
+    if(report?.wellbeingScale===100&&Number.isInteger(report.score)&&report.score>=1&&report.score<=100&&Number.isFinite(at)&&at<=Date.now()&&Date.now()-at<12*3600000)readings.wellbeing={value:report.score,unit:'/100',source:'manual',observedAt:new Date(at).toISOString()};
+    const watch=window.missionActiwatch?.current(),imported=watch?.source==='actiwatch'&&/^[a-f0-9-]{36}$/i.test(watch.id||'');
+    if(imported){readings.sleep_hours=null;readings.activity=null;readings.light=null;}
+    else if(watch?.source==='demo'&&watch.simulation===true&&watch.summary?.latest24h){const value=watch.summary.latest24h;readings.sleep_hours=reading(value.sleepSeconds===null?null:value.sleepSeconds/3600,'h');readings.activity=reading(value.activityCounts,'counts');readings.light=reading(value.meanLightLux,'lx');}
+    return {profileId:'personal',capturedAt:new Date().toISOString(),actiwatchImportId:imported?watch.id:null,readings};
+  }
   function render(){
     const isHealth=state.workspace==='crew'&&state.view==='health'&&!state.visiting,isOverview=state.workspace==='crew'&&state.view==='overview';
     document.querySelector('.mission-heading').hidden=isHealth||isOverview||state.workspace==='crew'&&state.view==='diary';
@@ -44,5 +54,5 @@
     const report=window.missionCheckin.current(),vital=home.querySelector('[data-home-metric=wellbeing]');vital.querySelector('strong').innerHTML=window.missionGauge.markup({value:report?report.score:80,label:'Wellbeing'});vital.querySelector(':scope > small').textContent=report?'Your self-report':'Wellbeing scale';vital.dataset.source=report?'self_report':'demo';
     if(state.workspace==='crew'&&state.view==='health'&&state.visiting){document.getElementById('mission-heading-title').textContent='Visiting / '+crew[state.crew].name;document.getElementById('mission-heading-description').textContent='Friend profile readings';}
   }
-  window.missionHome={render,setSource};window.addEventListener('mission-profile-change',render);window.addEventListener('mission-wellbeing-change',render);render();
+  window.missionHome={render,setSource,snapshot};window.addEventListener('mission-profile-change',render);window.addEventListener('mission-wellbeing-change',render);render();
 })();

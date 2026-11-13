@@ -79,7 +79,7 @@ export const journalTrainingJobs=sqliteTable('journal_training_jobs',{
 },table=>[index('training_owner_profile_time').on(table.ownerId,table.astronautId,table.createdAt)]);
 
 export const generalChatMessages=sqliteTable('general_chat_messages',{
-  id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),role:text('role').notNull(),content:text('content').notNull(),createdAt:text('created_at').notNull(),replyTo:text('reply_to'),wellbeing:text('wellbeing_json'),attachments:text('attachments_json').notNull().default('[]')
+  id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),role:text('role').notNull(),content:text('content').notNull(),createdAt:text('created_at').notNull(),replyTo:text('reply_to'),wellbeing:text('wellbeing_json'),attachments:text('attachments_json').notNull().default('[]'),healthContext:text('health_context_json')
 },table=>[index('general_chat_owner_time').on(table.ownerId,table.createdAt,table.id),uniqueIndex('general_chat_owner_reply').on(table.ownerId,table.replyTo)]);
 
 export const teamChatMessages=sqliteTable('team_chat_messages',{
@@ -111,3 +111,7 @@ export const personalTasks=sqliteTable('personal_tasks',{
   createdAt:text('created_at').notNull(),
   updatedAt:text('updated_at').notNull()
 },table=>[uniqueIndex('tasks_owner_source_ordinal').on(table.ownerId,table.sourceMessageId,table.ordinal),index('tasks_owner_due').on(table.ownerId,table.status,table.dueDate,table.dueAt)]);
+
+export const healthAnalyses=sqliteTable('health_analyses',{
+  id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),snapshot:text('snapshot_json').notNull(),rules:text('rules_json').notNull(),result:text('result_json').notNull(),createdAt:text('created_at').notNull(),updatedAt:text('updated_at').notNull(),leaseUntil:integer('lease_until').notNull().default(0)
+},table=>[index('health_analyses_owner_time').on(table.ownerId,table.createdAt,table.id)]);

@@ -16,7 +16,7 @@
   document.body.append(dialog);
   const get=id=>document.getElementById(id),previewStatus=get('actiwatch-preview-status'),save=get('actiwatch-save');
   let latest=null,recording=null,draft=null,raw='',filename='',busy=false,loadVersion=0,importId=null;
-  const fmt=value=>value===null?'-':new Intl.NumberFormat('en',{maximumFractionDigits:1}).format(value);
+  const fmt=value=>value===null?'-':new Intl.NumberFormat('en',{maximumFractionDigits:1,useGrouping:false}).format(value);
   const duration=seconds=>{if(seconds===null)return '-';const minutes=Math.round(seconds/60);return Math.floor(minutes/60)+' h '+minutes%60+' min';};
   const date=value=>new Intl.DateTimeFormat('en',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'UTC'}).format(new Date(value))+' UTC';
   for(let offset=-720;offset<=840;offset+=15){const option=make('option','', 'UTC'+(offset>=0?'+':'-')+String(Math.floor(Math.abs(offset)/60)).padStart(2,'0')+':'+String(Math.abs(offset)%60).padStart(2,'0'));option.value=offset;get('actiwatch-zone').append(option);}
