@@ -13,15 +13,15 @@ const wav=new Uint8Array(64);wav.set(new TextEncoder().encode('RIFF'));wav.set(n
 const clip=new Uint8Array(64);clip.set([26,69,223,163]);const jpg=new Uint8Array([255,216,255,224,1,2,3,4]);
 function fixture(t){
   const db=new DatabaseSync(':memory:');for(const sql of migrations)db.exec(sql);t.after(()=>db.close());
-  const objects=new Map(),outgoing=[],objectReads=[];let failSpeech=false,failModel=false;
+  const objects=new Map(),outgoing=[],objectReads=[];let failSpeech=false,failModel=false,modelText='Wellbeing was described by the user. No objective measurements in the entry.';
   const env={DB:{prepare(sql){const s=db.prepare(sql);return{bind(...args){return{first:async()=>s.get(...args)||null,run:async()=>s.run(...args),all:async()=>({results:s.all(...args)})};}}}},PHOTOS:{async put(key,bytes,options){objects.set(key,{bytes,size:bytes.length,customMetadata:options.customMetadata,httpMetadata:options.httpMetadata});},async head(key){objectReads.push({method:'head',key});const item=objects.get(key);return item?{...item}:null;},async get(key,options){objectReads.push({method:'get',key,options});const item=objects.get(key);return item?{...item,body:options?.range?item.bytes.slice(options.range.offset,options.range.offset+options.range.length):item.bytes}:null;},async delete(key){objects.delete(key);}},LLM_API_KEY:'test-key',LLM_BASE_URL:'https://model.invalid/v1',LLM_MODEL:'vision-model',SPEECH_API_URL:'https://speech.invalid/transcribe',SPEECH_API_KEY:'test-key'};
   const wasm=new Uint8Array([0,97,115,109,1,0,0,0]),assets={'/sample.mp4':{type:'video/mp4',data:Buffer.from(clip).toString('base64')},'/sample.mp3':{type:'audio/mpeg',data:Buffer.from(wav).toString('base64')},'/test.wasm':{type:'application/wasm',encoding:'gzip',data:gzipSync(wasm).toString('base64')}};
-  const sandbox={Request,Response,Headers,FormData,Blob,URL,Uint8Array,TextEncoder,TextDecoder,AbortSignal,crypto:webcrypto,btoa,atob,assets,console,fetch:async(url,options)=>{outgoing.push({url,options});if(url.includes('speech.invalid'))return Response.json(failSpeech?{error:'offline'}:{text:'I felt tired after exercise today, no pain.'},{status:failSpeech?503:200});const text='Wellbeing was described by the user. No objective measurements in the entry.',body=JSON.parse(options.body);return Response.json(failModel?{error:'offline'}:body.input?{status:'completed',output:[{type:'message',role:'assistant',content:[{type:'output_text',text}]}]}:{choices:[{message:{content:text}}]},{status:failModel?503:200});}};
+  const sandbox={Request,Response,Headers,FormData,Blob,URL,Uint8Array,TextEncoder,TextDecoder,AbortSignal,crypto:webcrypto,btoa,atob,assets,console,fetch:async(url,options)=>{outgoing.push({url,options});if(url.includes('speech.invalid'))return Response.json(failSpeech?{error:'offline'}:{text:'I felt tired after exercise today, no pain.'},{status:failSpeech?503:200});const text=modelText,body=JSON.parse(options.body);return Response.json(failModel?{error:'offline'}:body.input?{status:'completed',output:[{type:'message',role:'assistant',content:[{type:'output_text',text}]}]}:{choices:[{message:{content:text}}]},{status:failModel?503:200});}};
   vm.runInNewContext(source,sandbox);
   async function send({owner='person-a',kind='audio',id=identifier,bytes,frames,transcript='',features,wellbeing,origin='https://site.invalid'}={}){const form=new FormData();form.set('id',id);form.set('kind',kind);form.set('duration','5');form.set('transcript',transcript);if(features)form.set('features',JSON.stringify(features));if(wellbeing)form.set('wellbeing',JSON.stringify(wellbeing));form.set('file',new Blob([bytes||(kind==='video'?clip:wav)]),'recording');for(const frame of frames||(kind==='video'?[jpg,jpg,jpg]:[]))form.append('frame',new Blob([frame]),'frame.jpg');const headers={origin};if(owner)headers['oai-authenticated-user-id']=owner;const response=await sandbox.app.fetch(new Request('https://site.invalid/api/media-analysis',{method:'POST',headers,body:form}),env,{waitUntil(){}});return{status:response.status,body:await response.json()};}
   async function get(owner='person-a'){const headers=owner?{'oai-authenticated-user-id':owner}:{};const response=await sandbox.app.fetch(new Request('https://site.invalid/api/media-analysis',{headers}),env,{waitUntil(){}});return {status:response.status,body:await response.json()};}
   async function read(path,{owner='person-a',method='GET',range}={}){const headers={};if(owner)headers['oai-authenticated-user-id']=owner;if(range!==undefined)headers.range=range;const response=await sandbox.app.fetch(new Request('https://site.invalid'+path,{method,headers}),env,{waitUntil(){}}),bytes=new Uint8Array(await response.arrayBuffer());return{status:response.status,headers:response.headers,bytes,body:response.headers.get('content-type')?.includes('application/json')&&bytes.length?JSON.parse(new TextDecoder().decode(bytes)):null};}
-  return{env,db,objects,outgoing,objectReads,send,get,read,wasm,setSpeechFailure:value=>failSpeech=value,setModelFailure:value=>failModel=value};
+  return{env,db,objects,outgoing,objectReads,send,get,read,wasm,setSpeechFailure:value=>failSpeech=value,setModelFailure:value=>failModel=value,setModelText:value=>modelText=value};
 }
 test('Audio is transcribed, analyzed and saved with the response in the personal diary',async t=>{const f=fixture(t),r=await f.send();assert.equal(r.status,200);assert.equal(r.body.status,'analyzed');assert.equal(f.outgoing.length,2);assert.equal(f.objects.size,1);assert.equal(f.db.prepare('SELECT COUNT(*) n FROM journal_messages').get().n,2);const body=JSON.parse(f.outgoing[1].options.body);assert.match(body.messages[1].content[0].text,/I felt tired after exercise today/);assert.match(body.messages[0].content,/Do not infer a diagnosis from face or voice/);});
 test('Video sends three image attachments and speech text to the model',async t=>{const f=fixture(t),r=await f.send({kind:'video',transcript:'User message'});assert.equal(r.status,200);assert.equal(r.body.frames,3);const body=JSON.parse(f.outgoing[0].options.body);assert.equal(body.messages[1].content.filter(p=>p.type==='image_url').length,3);assert.match(body.messages[1].content[0].text,/User message/);});
@@ -134,4 +134,27 @@ test('Preloaded audio and video return Range, and gzip WASM preserves the previo
     const head=await f.read(path,{owner:null,method:'HEAD',range:'bytes=-3'});assert.equal(head.status,206);assert.equal(head.bytes.length,0);assert.equal(head.headers.get('content-length'),'3');assert.equal((await f.read(path,{owner:null,range:'bytes=100-'})).status,416);assert.deepEqual((await f.read(path,{owner:null})).bytes,bytes);
   }
   const wasm=await f.read('/test.wasm',{owner:null,range:'bytes=0-1'});assert.equal(wasm.status,200);assert.equal(wasm.headers.get('content-type'),'application/wasm');assert.equal(wasm.headers.get('content-encoding'),'gzip');assert.deepEqual(new Uint8Array(gunzipSync(wasm.bytes)),f.wasm);
+});
+
+test('Azure structured media results are readable and saved with the same owner and recording',async t=>{
+  const f=fixture(t);Object.assign(f.env,{LLM_PROVIDER:'azure_responses',AZURE_AGENT_ENDPOINT:'https://agent.test/agents/NASA-AI/endpoint/protocols/openai/responses?api-version=v1',AZURE_AGENT_API_KEY:'synthetic-key'});
+  f.setModelText(JSON.stringify({status:'ATTENTION',alerts:['Synthetic sample flag'],summary:'Review the supplied synthetic observation.'}));
+  const result=await f.send({transcript:'Synthetic integration observation'});
+  assert.equal(result.status,200);assert.equal(result.body.analysis,'Review the supplied synthetic observation.\n\nStatus: ATTENTION\nAlerts:\n- Synthetic sample flag');
+  const saved=f.db.prepare("SELECT content,owner_id,reply_to FROM journal_messages WHERE role='assistant'").get();assert.equal(saved.content,result.body.analysis);assert.equal(saved.owner_id,'person-a');assert.equal(saved.reply_to,identifier);
+});
+
+
+test('Stored health JSON is readable on retry, history, latest analysis and archive without rewriting the original',async t=>{
+  const f=fixture(t),features={acoustic:{level:-24,quiet:.2,clipping:0,seconds:5}};
+  await f.send({transcript:'Synthetic observation',features});
+  const original=JSON.stringify({status:'ATTENTION',alerts:['Synthetic flag'],summary:'Review the supplied observation.'}),expected='Review the supplied observation.\n\nStatus: ATTENTION\nAlerts:\n- Synthetic flag';
+  f.db.prepare("UPDATE journal_messages SET content=? WHERE role='assistant'").run(original);
+  const requests=f.outgoing.length;
+  assert.equal((await f.send({features})).body.analysis,expected);
+  assert.equal((await f.get()).body.items[0].analysis,expected);
+  const history=await f.read('/api/astronauts/personal/messages');assert.equal(history.status,200);assert.equal(history.body.messages.find(item=>item.role==='assistant').content,expected);
+  const archive=await f.read('/api/astronauts/personal/book');assert.equal(archive.status,200);assert.equal(archive.body.entries[0].observation.analysis,expected);
+  assert.equal((await f.get('person-b')).body.items.length,0);assert.equal(f.outgoing.length,requests);
+  assert.equal(f.db.prepare("SELECT content FROM journal_messages WHERE role='assistant'").get().content,original);
 });

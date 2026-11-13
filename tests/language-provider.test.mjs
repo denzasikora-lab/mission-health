@@ -136,3 +136,10 @@ test('Provider attribution and cache scope identify the actual selected backend'
 test('Unknown providers fail closed without calling either service',async()=>{
   const f=fixture({LLM_PROVIDER:'azure_typo',LLM_BASE_URL:'https://legacy.test/v1',LLM_MODEL:'legacy-model',LLM_API_KEY:'synthetic-legacy-key'});await assert.rejects(f.run(),unavailable);assert.equal(f.calls.length,0);
 });
+
+test('Azure diary context retains normalized self-reports, scales and dates without changing stored observations',async()=>{
+  const f=fixture(),record={score:8,wellbeingScale:10,source:'self_report',recordedAt:'2030-01-01T10:00:00Z'};
+  const query={query:'Recall my self-report',references:[{createdAt:'2030-01-01T10:00:00Z',role:'note',content:'A dated note.',wellbeing:record}],history:[{role:'user',createdAt:'2030-01-02T10:00:00Z',content:'Recall my self-report',wellbeing:{score:70,wellbeingScale:100,source:'self_report'}}],photos:[]},original=JSON.stringify(query);
+  await f.scope.languageModelAnswer(f.env,query);const input=f.calls[0].body.input;
+  assert.match(input[0].content,/"score":80/);assert.match(input[0].content,/"wellbeingScale":100/);assert.match(input[0].content,/2030-01-01T10:00:00Z/);assert.match(input[0].content,/not a sensor reading or fatigue measurement/);assert.match(input[1].content,/Wellbeing: 70\/100/);assert.equal(JSON.stringify(query),original);
+});

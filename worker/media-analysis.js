@@ -79,7 +79,7 @@ async function mediaBookObservation(env,user,row){
   if(row.owner_id!==user)return null;const reference=mediaArchiveReference(row);if(!reference)return null;
   const answer=await database(env).prepare("SELECT content FROM journal_messages WHERE owner_id=? AND astronaut_id='personal' AND role='assistant' AND reply_to=? AND assistant_source LIKE 'media-analysis:%' ORDER BY created_at DESC,id DESC LIMIT 1").bind(user,row.id).first();
   const legacy=String(row.content||'').match(/Recognized speech: ([\s\S]*?)(?=\n(?:Self-reported wellbeing|Original audio features|Audio not decoded|EmbeddingGemma 2|Apparent age|Skin comparison)|$)/),features=mediaPresentationFeatures(reference.features,reference.kind),stored=await mediaAnalysisObjectHead(env,user,row,reference);
-  return {kind:reference.kind,duration:reference.duration,transcript:mediaAnalysisText(typeof reference.transcript==='string'?reference.transcript.slice(0,40000):legacy?.[1]||''),features,analysis:answer?mediaAnalysisText(answer.content).slice(0,16000):'',status:answer?'analyzed':features?'measured':'pending',mediaUrl:stored?'/api/media-analysis/'+row.id+'/media':null};
+  return {kind:reference.kind,duration:reference.duration,transcript:mediaAnalysisText(typeof reference.transcript==='string'?reference.transcript.slice(0,40000):legacy?.[1]||''),features,analysis:answer?mediaAnalysisText(readableHealthAnswer(answer.content)).slice(0,16000):'',status:answer?'analyzed':features?'measured':'pending',mediaUrl:stored?'/api/media-analysis/'+row.id+'/media':null};
 }
 function mediaByteRange(value,size){
   if(!value)return null;if(!Number.isSafeInteger(size)||size<=0)return false;const match=value.match(/^bytes=(\d*)-(\d*)$/);if(!match||!match[1]&&!match[2])return false;
@@ -107,7 +107,7 @@ async function latestMediaAnalysis(db,user){
     const answer=await db.prepare("SELECT content FROM journal_messages WHERE owner_id=? AND astronaut_id='personal' AND reply_to=? AND assistant_source LIKE 'media-analysis:%' ORDER BY created_at DESC LIMIT 1").bind(user,row.id).first();
     const legacy=String(row.content||'').match(/Recognized speech: ([\s\S]*?)(?=\n(?:Self-reported wellbeing|Original audio features|Audio not decoded|EmbeddingGemma 2|Apparent age|Skin comparison)|$)/);
     const transcript=typeof reference.transcript==='string'?reference.transcript.slice(0,40000):legacy?.[1]||'';
-    items.push({id:row.id,kind:reference.kind,createdAt:row.created_at,features,transcript,analysis:answer?.content||'',status:answer?'analyzed':'measured'});
+    items.push({id:row.id,kind:reference.kind,createdAt:row.created_at,features,transcript,analysis:answer?mediaAnalysisText(readableHealthAnswer(answer.content)).slice(0,16000):'',status:answer?'analyzed':'measured'});
     if(items.length===2)break;
   }
   return json({items});
@@ -147,7 +147,7 @@ async function mediaAnalysisRoute(request,env,user){
   }
   if(!stored)await env.PHOTOS.put(key,bytes,{httpMetadata:{contentType:media[0]},customMetadata:{digest,kind,owner:user}});
   const completed=await db.prepare('SELECT * FROM journal_messages WHERE owner_id=? AND reply_to=? AND assistant_source LIKE ?').bind(user,id,'media-analysis:%').first();
-  if(completed){let matches=[];try{matches=JSON.parse(completed.references_json)[0]?.skinMatches||[];}catch{}return json({id,status:'analyzed',analysis:completed.content,saved:true,duplicate:true,skinMatches:matches});}
+  if(completed){let matches=[];try{matches=JSON.parse(completed.references_json)[0]?.skinMatches||[];}catch{}return json({id,status:'analyzed',analysis:mediaAnalysisText(readableHealthAnswer(completed.content)).slice(0,16000),saved:true,duplicate:true,skinMatches:matches});}
   const skinMatches=await mediaSkinMatches(db,user,id,features?.skin);
   if(transcript)reference.transcript=mediaAnalysisText(transcript);
   if(features){reference.features=features;if(features.skin)reference.skinMatches=skinMatches;}
@@ -168,7 +168,7 @@ async function mediaAnalysisRoute(request,env,user){
     const parts=[{type:'text',text:content}];
     const skinInstruction=' Data skin describe local image changes. Do not label a candidate as a new mole, melanoma or another disease. Do not invent millimeters. With status unavailable or conditions_changed do not conclude there are no changes. Even with zero counters, only the specified regions were examined. Suggest dermatology assessment for a new or changing spot; similarity to a previous recording does not establish benignity.';
     for(let index=0;index<frames.length;index++){let binary='';for(let offset=0;offset<frames[index].length;offset+=8192)binary+=String.fromCharCode(...frames[index].subarray(offset,offset+8192));parts.push({type:'text',text:'Frame '+(index+1)+' from '+frames.length+' selected recording frames.'},{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+btoa(binary),detail:'high'}});}
-    const answer=await completeLanguageMessages(env,[{role:'system',content:instruction+skinInstruction},{role:'user',content:parts}],{attempts:1,timeoutMs:45000,maxCompletionTokens:1800,redirect:'manual'}),analysis=mediaAnalysisText(answer.text).slice(0,16000);
+    const answer=await completeLanguageMessages(env,[{role:'system',content:instruction+skinInstruction},{role:'user',content:parts}],{attempts:1,timeoutMs:45000,maxCompletionTokens:1800,redirect:'manual'}),analysis=mediaAnalysisText(readableHealthAnswer(answer.text)).slice(0,16000);
     await db.prepare('INSERT INTO journal_messages (id,owner_id,astronaut_id,role,content,language,created_at,vector_status,reply_to,references_json,attachments_json,assistant_source) SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM journal_messages WHERE owner_id=? AND reply_to=? AND assistant_source LIKE ?)').bind(crypto.randomUUID(),user,'personal','assistant',analysis,'en',new Date().toISOString(),'indexed',id,JSON.stringify([reference]),'[]','media-analysis:'+languageModelSource(env),user,id,'media-analysis:%').run();
     await activityWrite(env,user,'media_analyzed','NasaGPT analyzed '+(kind==='video'?'speech and video frames':'audio observation'),'media-analysis:'+id);
     return json({id,status:'analyzed',analysis,transcript,saved:true,frames:frames.length,skinMatches});

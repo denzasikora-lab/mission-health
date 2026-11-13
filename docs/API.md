@@ -220,7 +220,7 @@ The Azure adapter sends `input` with explicit `type: "message"` items preserving
 
 Autocomplete, semantic story tags, and historical English translation explicitly use the existing Chat Completions utility provider even when Azure is the primary provider. This prevents a dedicated health agent's JSON instructions from replacing a text suffix, tag object, or translation array. If the utility provider is absent, those features keep their existing fallback/unavailable behavior; they do not silently send their inputs to the health agent. There is no automatic cross-provider retry. `AIR_GAP=1` blocks Azure even if old local model settings remain; the explicitly supported local utility path is unchanged.
 
-Ordinary chat and diary answers render only a narrowly validated health object (`NORMAL`/`ATTENTION`/`CRITICAL`, `alerts`, `summary`) as readable summary, status, and alerts. Other JSON stays unchanged, and utility callers always receive raw text for their existing parsers. Saved recording analyses identify Azure as `media-analysis:azure_responses/NASA-AI`, rather than attributing the answer to an unrelated utility model. Owner/profile boundaries, references, attachments, and reply IDs are unchanged.
+Ordinary chat, diary answers, and recording analyses render only a narrowly validated health object (`NORMAL`/`ATTENTION`/`CRITICAL`, `alerts`, `summary`) as readable summary, status, and alerts. Other JSON stays unchanged, and utility callers always receive raw text for their existing parsers. Saved recording analyses identify Azure as `media-analysis:azure_responses/NASA-AI`, rather than attributing the answer to an unrelated utility model. Owner/profile boundaries, references, attachments, and reply IDs are unchanged.
 
 ### Chat Completions
 
@@ -314,6 +314,24 @@ Before implementing the document's structured readings workflow, confirm the fol
 The supplied design document states that an agent may raise, but never lower, the rule-engine severity. If that structured agent is implemented, enforce and test that invariant in application code rather than relying on a prompt alone. The documented thresholds are illustrative and are not validated medical limits.
 
 The external Azure agent is reachable and has a provider adapter, but this application does not yet expose a readings-ingestion or structured health-agent route matching the document. Agree on that remaining contract before adding a rule-engine/agent pipeline. Selecting Azure for diary/chat does not itself implement that pipeline.
+
+### Integration verification on 2026-11-14
+
+The published configuration selects `azure_responses` for primary chat, diary answers, and recording analysis. The API key is a hosted runtime secret. Utility tasks retain the separately configured Chat Completions provider.
+
+Live requests through the actual Worker adapter verified the following with synthetic data only:
+
+| Check | Result |
+| --- | --- |
+| Document payload with astronaut, latest readings, rule result, and recent trend | HTTP 200, completed, `ATTENTION`, four string alerts |
+| Ordered user/assistant history followed by a recall question | HTTP 200, correct recall of the supplied earlier entry |
+| JPEG frame supplied as an image content part | HTTP 200, correct description of the solid-color synthetic image; no person invented |
+
+All three responses reported `gpt-5.4-mini`. The model is selected by the upstream agent and may change. These are transport and response checks, not validation of medical accuracy or a complete implementation of the proposed readings workflow.
+
+Diary context now retains the recorded self-report, normalized 1-100 scale, and entry date. A wellbeing score is not an objective sensor reading or a fatigue measurement. Structured health JSON is formatted for display in new and previously saved replies, including recording retries, recent results, history, and the archive. Read-time formatting does not rewrite historical originals or send another model request.
+
+The current media request sends the transcript, supported browser measurements, and up to three selected video frames. It does not send the entire original audio/video file to Azure. General chat does not automatically include every dashboard card, Actiwatch import, or past recording analysis. Dashboard skin temperature must not be relabeled as body temperature. A separate validated readings contract and deterministic minimum-severity rule pipeline remain to be implemented.
 
 ## Errors and compatibility
 
