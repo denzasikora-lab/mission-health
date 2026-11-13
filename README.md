@@ -4,6 +4,10 @@ Astronaut health research prototype by **Bug Busters / NASA Space Apps**. Missio
 
 Website: https://mission-health-orbit-2026.crownbobbytron.chatgpt.site/
 
+Repository: https://github.com/denzasikora-lab/mission-health
+
+Team development: [CONTRIBUTING.md](CONTRIBUTING.md). Integration routes and agent handoff: [docs/API.md](docs/API.md).
+
 ## Application
 
 - **Home:** NasaGPT, saved messages, scheduled tasks, and an astronaut group conversation.
