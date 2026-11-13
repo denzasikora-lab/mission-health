@@ -27,15 +27,30 @@ function fixture(options={}){
   const note=async(score=70,profile='jessica-meir',owner='owner-a',content='Fatigue decreased after exercise.')=>run('/api/astronauts/'+profile+'/messages',{owner,method:'POST',body:{id:webcrypto.randomUUID(),content,language:'en',mode:'diary',attachments:[],wellbeing:score===null?null:{score,wellbeingScale:100}}});
   return {sql,out,objects,run,note,migrateHundred:()=>{for(const migration of migrations.slice(10))sql.exec(migration);},validateHealth:scope.validatedStoryHealth,provider:(code,text)=>{status=code;if(text)answer=text;}};
 }
-test('New visitors receive Astronaut without account name or email',async()=>{
+test('New visitors receive the Sara Khan demo persona without account name or email',async()=>{
   const f=fixture();
   for(const headers of [{},{name:'crown-bobby'},{email:'crown-bobby@example.test'},{name:'%D0%95%D0%B3%D0%BE%D1%80',nameEncoding:'percent-encoded-utf-8',email:'private@example.test'}]){
-    const result=await f.run('/api/me',headers);assert.equal(result.status,200);assert.equal(result.body.name,'Astronaut');assert.match(result.body.storageScope,/^[a-f0-9]{64}$/);assert.match(result.body.researcherId,/^\d{3} \d{3} \d{3}$/);
+    const result=await f.run('/api/me',headers);assert.equal(result.status,200);assert.equal(result.body.name,'Cdr. Sara Khan');assert.match(result.body.storageScope,/^[a-f0-9]{64}$/);assert.match(result.body.researcherId,/^\d{3} \d{3} \d{3}$/);
   }
   assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM personal_profiles').get().n,0);
 });
+test('Demo persona metadata preserves account identity and does not create a Sara crew profile',async()=>{
+  const f=fixture(),first=(await f.run('/api/me')).body,other=(await f.run('/api/me',{owner:'owner-b'})).body;
+  for(const identity of [first,other]){
+    assert.equal(identity.name,'Cdr. Sara Khan');assert.equal(identity.astronautId,'AST-014');assert.equal(identity.station,'Orion Station');assert.equal(identity.expedition,'Expedition 7');assert.equal(identity.isDemo,true);
+    assert.match(identity.researcherId,/^\d{3} \d{3} \d{3}$/);assert.notEqual(identity.researcherId,identity.astronautId);
+  }
+  assert.notEqual(first.storageScope,other.storageScope);assert.notEqual(first.researcherId,other.researcherId);
+  const renamed=(await f.run('/api/me',{method:'PUT',body:{name:'Custom user'}})).body;
+  assert.equal(renamed.name,'Custom user');assert.equal(renamed.storageScope,first.storageScope);assert.equal(renamed.researcherId,first.researcherId);assert.equal(renamed.astronautId,'AST-014');
+  assert.equal((await f.run('/api/me',{owner:'owner-b'})).body.name,'Cdr. Sara Khan');
+  const saved=await f.note(null,'personal','owner-a','Personal demo observation.');assert.equal(saved.status,201);
+  assert.equal((await f.run('/api/astronauts/personal/book')).body.total,1);assert.equal((await f.run('/api/astronauts/personal/book',{owner:'owner-b'})).body.total,0);
+  for(const profile of ['jessica-meir','jack-hathaway','christina-koch'])assert.equal((await f.run('/api/astronauts/'+profile+'/book')).status,200);
+  for(const resource of ['messages','book','book-index','photos'])assert.equal((await f.run('/api/astronauts/sara-khan/'+resource)).status,404);
+});
 test('First name NasaGPT stored separately, normalized and repeated writes are idempotent',async()=>{
-  const f=fixture(),initial=await f.run('/api/me',{name:'Account Name'});assert.equal(initial.body.name,'Astronaut');
+  const f=fixture(),initial=await f.run('/api/me',{name:'Account Name'});assert.equal(initial.body.name,'Cdr. Sara Khan');
   const saved=await f.run('/api/me',{method:'PUT',name:'Account Name',body:{name:'  Egor   Fedosov  '}});assert.equal(saved.status,200);assert.equal(saved.body.name,'Egor Fedosov');assert.equal(saved.body.storageScope,initial.body.storageScope);assert.equal(saved.body.researcherId,initial.body.researcherId);
   assert.equal((await f.run('/api/me',{name:'Old Account Name'})).body.name,'Egor Fedosov');
   f.sql.prepare('UPDATE personal_profiles SET updated_at=? WHERE owner_id=?').run('2000-01-01T00:00:00.000Z','owner-a');
@@ -43,7 +58,7 @@ test('First name NasaGPT stored separately, normalized and repeated writes are i
   const normalized=await f.run('/api/me',{method:'PUT',body:{name:'Theodore eE \u2013 \u2014'}});assert.equal(normalized.body.name,'Theodore eE - -');assert.equal(f.out.length,0);
 });
 test('Name changes are account-isolated and protected by authentication and origin',async()=>{
-  const f=fixture();await f.run('/api/me',{method:'PUT',body:{name:'First user'}});assert.equal((await f.run('/api/me',{owner:'owner-b',name:'Second User'})).body.name,'Astronaut');
+  const f=fixture();await f.run('/api/me',{method:'PUT',body:{name:'First user'}});assert.equal((await f.run('/api/me',{owner:'owner-b',name:'Second User'})).body.name,'Cdr. Sara Khan');
   await f.run('/api/me',{owner:'owner-b',method:'PUT',body:{name:'Second user'}});assert.equal((await f.run('/api/me')).body.name,'First user');assert.equal((await f.run('/api/me',{owner:'owner-b'})).body.name,'Second user');
   for(const method of ['GET','PUT'])assert.equal((await f.run('/api/me',{owner:null,method,...(method==='PUT'?{body:{name:'Spoofing'}}:{})})).status,401);
   assert.equal((await f.run('/api/me',{method:'PUT',origin:'https://other.test',body:{name:'Spoofing'}})).status,403);assert.equal((await f.run('/api/me',{method:'PUT',body:{name:'Spoofing',owner_id:'owner-b'}})).status,400);assert.equal((await f.run('/api/me')).body.name,'First user');
@@ -51,7 +66,7 @@ test('Name changes are account-isolated and protected by authentication and orig
 test('An old tab from another account cannot save an old name after authentication changes',async()=>{
   const f=fixture(),first=(await f.run('/api/me')).body,second=(await f.run('/api/me',{owner:'owner-b',name:'Second Account'})).body;
   assert.equal((await f.run('/api/me',{method:'PUT',expectedScope:first.storageScope,body:{name:'First account name'}})).status,200);
-  const stale=await f.run('/api/me',{owner:'owner-b',method:'PUT',expectedScope:first.storageScope,body:{name:'Old draft'}});assert.equal(stale.status,409);assert.equal(stale.body.error,'profile_changed');assert.equal((await f.run('/api/me',{owner:'owner-b',name:'Second Account'})).body.name,'Astronaut');
+  const stale=await f.run('/api/me',{owner:'owner-b',method:'PUT',expectedScope:first.storageScope,body:{name:'Old draft'}});assert.equal(stale.status,409);assert.equal(stale.body.error,'profile_changed');assert.equal((await f.run('/api/me',{owner:'owner-b',name:'Second Account'})).body.name,'Cdr. Sara Khan');
   assert.equal((await f.run('/api/me',{method:'PUT',expectedScope:second.storageScope,body:{name:'Spoofing'}})).status,409);assert.equal((await f.run('/api/me')).body.name,'First account name');assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM personal_profiles').get().n,1);
 });
 test('Empty, long, control-containing and invalid names do not change the profile',async()=>{
@@ -65,20 +80,20 @@ test('First name NasaGPT does not change group-chat authors or rewrite history',
   const insert=f.sql.prepare('INSERT INTO team_chat_messages (id,owner_id,author_name,content,attachments_json,created_at) VALUES (?,?,?,?,?,?)');
   insert.run(id,'owner-a','Original Author',body.content,'[]','2026-11-05T10:00:00Z');insert.run(other,'owner-b','Jessica Meir','Astronaut message','[]','2026-11-05T10:01:00Z');
   await f.run('/api/me',{method:'PUT',body:{name:'New name NasaGPT'}});await f.run('/api/me',{owner:'owner-b',method:'PUT',body:{name:'Another name NasaGPT'}});
-  const visible=(await f.run('/api/team-chat')).body.messages;assert.equal(visible.find(item=>item.id===id).authorName,'Astronaut');assert.equal(visible.find(item=>item.id===other).authorName,'Jessica Meir');
-  const foreign=(await f.run('/api/team-chat',{owner:'owner-b'})).body.messages;assert.equal(foreign.find(item=>item.id===id).authorName,'Original Author');assert.equal(foreign.find(item=>item.id===other).authorName,'Astronaut');
+  const visible=(await f.run('/api/team-chat')).body.messages;assert.equal(visible.find(item=>item.id===id).authorName,'Cdr. Sara Khan');assert.equal(visible.find(item=>item.id===other).authorName,'Jessica Meir');
+  const foreign=(await f.run('/api/team-chat',{owner:'owner-b'})).body.messages;assert.equal(foreign.find(item=>item.id===id).authorName,'Original Author');assert.equal(foreign.find(item=>item.id===other).authorName,'Cdr. Sara Khan');
   const original=f.sql.prepare('SELECT author_name,content FROM team_chat_messages WHERE id=?').get(id);assert.equal(original.author_name,'Original Author');assert.equal(original.content,body.content);
-  const retry=await f.run('/api/team-chat',{method:'POST',body});assert.equal(retry.status,200);assert.equal(retry.body.message.authorName,'Astronaut');
-  const fresh=await f.run('/api/team-chat',{method:'POST',name:'Stale Header Name',body:{id:webcrypto.randomUUID(),content:'New message'}});assert.equal(fresh.body.message.authorName,'Astronaut');assert.equal(f.sql.prepare('SELECT author_name FROM team_chat_messages WHERE id=?').get(fresh.body.message.id).author_name,'Astronaut');assert.equal(f.out.length,0);
+  const retry=await f.run('/api/team-chat',{method:'POST',body});assert.equal(retry.status,200);assert.equal(retry.body.message.authorName,'Cdr. Sara Khan');
+  const fresh=await f.run('/api/team-chat',{method:'POST',name:'Stale Header Name',body:{id:webcrypto.randomUUID(),content:'New message'}});assert.equal(fresh.body.message.authorName,'Cdr. Sara Khan');assert.equal(f.sql.prepare('SELECT author_name FROM team_chat_messages WHERE id=?').get(fresh.body.message.id).author_name,'Cdr. Sara Khan');assert.equal(f.out.length,0);
 });
-test('Personal stories use Astronaut, name NasaGPT does not change captions or saved authors',async()=>{
+test('Personal stories use Sara Khan, name NasaGPT does not change captions or saved authors',async()=>{
   const f=fixture(),id=webcrypto.randomUUID(),other=webcrypto.randomUUID(),insert=f.sql.prepare('INSERT INTO personal_stories (id,owner_id,author_name,caption,media_kind,object_key,mime,bytes,width,height,digest,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)');
   insert.run(id,'owner-a','Original Author','Original caption Original Author','photo','old-story','image/jpeg',128,32,32,'old-digest','2026-11-05T10:00:00Z');insert.run(other,'owner-b','Other Author','Another caption','photo','other-story','image/jpeg',128,32,32,'other-digest','2026-11-05T10:00:00Z');
-  await f.run('/api/me',{method:'PUT',body:{name:'New name NasaGPT'}});const story=(await f.run('/api/stories')).body.stories[0];assert.equal(story.author,'Astronaut');assert.equal(story.caption,'Original caption Original Author');
-  const stored=f.sql.prepare('SELECT author_name,caption FROM personal_stories WHERE id=?').get(id);assert.equal(stored.author_name,'Original Author');assert.equal(stored.caption,story.caption);const foreign=(await f.run('/api/stories',{owner:'owner-b'})).body.stories;assert.equal(foreign.length,1);assert.equal(foreign[0].author,'Astronaut');assert.equal(foreign[0].caption,'Another caption');assert.equal(foreign[0].id,other);assert.equal(f.sql.prepare('SELECT author_name FROM personal_stories WHERE id=?').get(other).author_name,'Other Author');
+  await f.run('/api/me',{method:'PUT',body:{name:'New name NasaGPT'}});const story=(await f.run('/api/stories')).body.stories[0];assert.equal(story.author,'Cdr. Sara Khan');assert.equal(story.caption,'Original caption Original Author');
+  const stored=f.sql.prepare('SELECT author_name,caption FROM personal_stories WHERE id=?').get(id);assert.equal(stored.author_name,'Original Author');assert.equal(stored.caption,story.caption);const foreign=(await f.run('/api/stories',{owner:'owner-b'})).body.stories;assert.equal(foreign.length,1);assert.equal(foreign[0].author,'Cdr. Sara Khan');assert.equal(foreign[0].caption,'Another caption');assert.equal(foreign[0].id,other);assert.equal(f.sql.prepare('SELECT author_name FROM personal_stories WHERE id=?').get(other).author_name,'Other Author');
   const form=new FormData(),bytes=new Uint8Array(128);bytes.set([255,216,255]);for(const [key,value]of Object.entries({id:webcrypto.randomUUID(),author:'Spoofed author caption',caption:'New caption',kind:'photo',width:32,height:32}))form.set(key,String(value));form.set('file',new Blob([bytes],{type:'image/jpeg'}),'story.jpg');
-  const fresh=await f.run('/api/stories',{method:'POST',body:form});assert.equal(fresh.status,201);assert.equal(fresh.body.story.author,'Astronaut');assert.equal(f.sql.prepare('SELECT author_name FROM personal_stories WHERE id=?').get(fresh.body.story.id).author_name,'Astronaut');
-  const retry=await f.run('/api/stories',{method:'POST',body:form});assert.equal(retry.status,200);assert.equal(retry.body.story.author,'Astronaut');assert.equal((await f.run('/api/me')).body.name,'New name NasaGPT');
+  const fresh=await f.run('/api/stories',{method:'POST',body:form});assert.equal(fresh.status,201);assert.equal(fresh.body.story.author,'Cdr. Sara Khan');assert.equal(f.sql.prepare('SELECT author_name FROM personal_stories WHERE id=?').get(fresh.body.story.id).author_name,'Cdr. Sara Khan');
+  const retry=await f.run('/api/stories',{method:'POST',body:form});assert.equal(retry.status,200);assert.equal(retry.body.story.author,'Cdr. Sara Khan');assert.equal((await f.run('/api/me')).body.name,'New name NasaGPT');
 });
 test('Self-reports are saved with the note, returned in the book with server label and timestamp',async()=>{const f=fixture(),saved=await f.note();assert.equal(saved.status,201);const report=saved.body.message.wellbeing;assert.equal(report.score,70);assert.equal(report.wellbeingScale,100);assert.equal(report.label,'Good');assert.equal(report.source,'self_report');assert.ok(Number.isFinite(Date.parse(report.recordedAt)));const book=await f.run('/api/astronauts/jessica-meir/book');assert.deepEqual(book.body.entries[0].wellbeing,report);assert.equal(f.out.length,0);});
 test('Out-of-range and fractional scores are not saved, missing scores are not invented',async()=>{const f=fixture();for(const score of [0,101,3.5,'80',null]){if(score===null){const saved=await f.note(null);assert.equal(saved.status,201);assert.equal(saved.body.message.wellbeing,undefined);}else assert.equal((await f.note(score)).status,400);}assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM journal_messages').get().n,1);});
@@ -208,7 +223,7 @@ test('Training receives normalized self-reports without changing originals',asyn
 test('Crew chat is visible to site participants, does not call models or copy private data',async()=>{
   const f=fixture();await f.note(30,'personal','owner-a','Personal entry');await f.run('/api/chat',{method:'POST',body:{id:webcrypto.randomUUID(),content:'Personal NasaGPT'}});const calls=f.out.length;
   const saved=await f.run('/api/team-chat',{method:'POST',name:'Egor',body:{id:webcrypto.randomUUID(),content:'Let’s discuss the project',wellbeing:{score:10},authorName:'Spoofing'}});
-  assert.equal(saved.status,201);assert.equal(saved.body.message.authorName,'Astronaut');assert.equal(saved.body.message.isOwn,true);assert.equal(saved.body.message.wellbeing,undefined);
+  assert.equal(saved.status,201);assert.equal(saved.body.message.authorName,'Cdr. Sara Khan');assert.equal(saved.body.message.isOwn,true);assert.equal(saved.body.message.wellbeing,undefined);
   const team=await f.run('/api/team-chat',{owner:'owner-b'});assert.equal(team.body.messages.length,1);assert.equal(team.body.messages[0].isOwn,false);assert.equal(team.body.messages[0].content,'Let’s discuss the project');assert.equal(team.body.messages[0].ownerId,undefined);assert.equal(f.out.length,calls);
   assert.equal((await f.run('/api/chat',{owner:'owner-b'})).body.messages.length,0);
 });

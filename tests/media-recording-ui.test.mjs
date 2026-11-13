@@ -53,19 +53,20 @@ function fixture({background='room',permission,profile,profileFetch,unsupported=
   return{node,incoming,captured,recorders,workers,requests,locks,submissions,engine,bitmaps,drawing,profileRequests,appearanceIdentities,hud,profileChanged(identity){window.missionProfileName={identity};windowEvents.get('mission-profile-change')?.();},start:async()=>{node('video-log-camera').emit('click');await settle();},draw(time=100){animation(time);},advance(ms){clock+=ms;for(const callback of [...intervals.values()])callback();for(const [id,t] of [...timeouts])if(t.at<=clock){timeouts.delete(id);t.callback();}}};
 }
 
-test('Renaming NasaGPT preserves a neutral diary, HUD and camera analysis scope',async()=>{
+test('Renaming NasaGPT preserves the Sara demo diary, HUD and camera analysis scope',async()=>{
   const identity={researcherId:'local-test',storageScope:'a'.repeat(64),name:'crown-bobby'},f=fixture({background:'helmet',profileFetch:async()=>({ok:true,json:async()=>identity})});
   await f.start();f.draw();const updates=f.appearanceIdentities.length;
-  assert.equal(f.node('video-log-title').textContent,'Diary');assert.equal(f.node('video-log-researcher').value,'Astronaut');assert.equal(f.hud.at(-1).name,'Astronaut');assert.equal(f.appearanceIdentities.at(-1).storageScope,identity.storageScope);assert.equal(f.appearanceIdentities.at(-1).name,'Astronaut');
+  assert.equal(f.node('video-log-first-name').value,'Sara');assert.equal(f.node('video-log-last-name').value,'Khan');
+  assert.equal(f.node('video-log-title').textContent,'Diary');assert.equal(f.node('video-log-researcher').value,'Cdr. Sara Khan');assert.equal(f.hud.at(-1).name,'Cdr. Sara Khan');assert.equal(f.appearanceIdentities.at(-1).storageScope,identity.storageScope);assert.equal(f.appearanceIdentities.at(-1).name,'Cdr. Sara Khan');
   f.profileChanged({...identity,name:'Another name for NasaGPT'});await settle();f.draw(200);
-  assert.equal(f.profileRequests.length,1);assert.equal(f.appearanceIdentities.length,updates);assert.equal(f.node('video-log-title').textContent,'Diary');assert.equal(f.hud.at(-1).name,'Astronaut');assert.equal(f.recorders[0].state,'recording');assert.ok(f.incoming.getTracks().every(item=>!item.stopped));
+  assert.equal(f.profileRequests.length,1);assert.equal(f.appearanceIdentities.length,updates);assert.equal(f.node('video-log-title').textContent,'Diary');assert.equal(f.hud.at(-1).name,'Cdr. Sara Khan');assert.equal(f.recorders[0].state,'recording');assert.ok(f.incoming.getTracks().every(item=>!item.stopped));
 });
 test('Account switching releases the camera and rejects late profiles from the previous owner',async()=>{
   const first={researcherId:'first',storageScope:'a'.repeat(64),name:'First'},second={researcherId:'second',storageScope:'b'.repeat(64),name:'Second'},latest={researcherId:'latest',storageScope:'c'.repeat(64),name:'Third'},pendingSecond=deferred(),pendingLatest=deferred();let calls=0;
   const f=fixture({profileFetch:()=>++calls===1?Promise.resolve({ok:true,json:async()=>first}):calls===2?pendingSecond.promise:pendingLatest.promise});
   await f.start();f.profileChanged(second);assert.equal(f.recorders[0].state,'inactive');assert.ok(f.incoming.getTracks().every(item=>item.stopped));assert.equal(f.appearanceIdentities.at(-1),null);await settle();
   f.profileChanged(latest);assert.equal(f.profileRequests.length,3);pendingLatest.resolve({ok:true,json:async()=>latest});await settle();
-  assert.equal(f.appearanceIdentities.at(-1).storageScope,latest.storageScope);assert.equal(f.appearanceIdentities.at(-1).name,'Astronaut');const updates=f.appearanceIdentities.length;
+  assert.equal(f.appearanceIdentities.at(-1).storageScope,latest.storageScope);assert.equal(f.appearanceIdentities.at(-1).name,'Cdr. Sara Khan');const updates=f.appearanceIdentities.length;
   pendingSecond.resolve({ok:true,json:async()=>second});await settle();
   assert.equal(f.appearanceIdentities.length,updates);assert.equal(f.appearanceIdentities.at(-1).storageScope,latest.storageScope);assert.equal(f.node('video-log-title').textContent,'Diary');assert.equal(f.node('video-log-camera').attributes['aria-pressed'],'false');assert.equal(f.recorders.length,1);
 });

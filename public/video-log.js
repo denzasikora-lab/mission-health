@@ -39,15 +39,15 @@
       if (ticket !== identityEpoch) return;
       identity = incoming;
       try { entry = Math.max(1, Number(localStorage.getItem(storageKey('entry'))) || 1); } catch {}
-      firstName.value = 'Astronaut'; lastName.value = '';
+      firstName.value = 'Sara'; lastName.value = 'Khan';
       updateSignature(); renderControls();
     } catch { if (ticket === identityEpoch) message('Could not read the profile. Refresh the page after signing in.', true); }
   }
 
   function updateSignature() {
-    researcher.value = 'Astronaut';
+    researcher.value = 'Cdr. Sara Khan';
     document.getElementById('video-log-title').textContent = 'Diary';
-    window.missionAppearance?.setIdentity({storageScope:identity?.storageScope,name:'Astronaut'});
+    window.missionAppearance?.setIdentity({storageScope:identity?.storageScope,name:'Cdr. Sara Khan'});
   }
 
   function message(value, error = false) { notice.textContent = value; notice.dataset.error = String(error); }

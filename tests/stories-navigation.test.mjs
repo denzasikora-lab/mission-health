@@ -68,7 +68,7 @@ async function fixture({mine=[],items=archive}={}){
 }
 
 test('The selected profile opens at its first story, moving forward reaches the next person',async()=>{
-  const f=await fixture();f.open(2);assert.equal(f.author(),'Jack Hathaway');assert.equal(f.title(),'jack-1');f.next();assert.equal(f.author(),'Christina Koch');assert.equal(f.title(),'christina-1');assert.equal(f.viewer.open,true);
+  const f=await fixture();assert.equal(f.row.children.length,4);assert.equal(f.row.children[0].querySelector('.story-initials').textContent,'SK');assert.equal(f.row.children[0].querySelector('strong').textContent,'Sara');f.open(2);assert.equal(f.author(),'Jack Hathaway');assert.equal(f.title(),'jack-1');f.next();assert.equal(f.author(),'Christina Koch');assert.equal(f.title(),'christina-1');assert.equal(f.viewer.open,true);
 });
 
 test('Without personal stories, the feed cycles through three profiles and returns to the first',async()=>{
@@ -81,7 +81,7 @@ test('Moving back from the feed start opens the previous profile’s final story
 });
 
 test('Personal stories join the forward and backward cycle without gaps',async()=>{
-  const f=await fixture({mine:[personal('mine-1'),personal('mine-2')]});f.open(0);assert.equal(f.current().src,'/mine-1.jpg');f.next();assert.equal(f.current().src,'/mine-2.jpg');f.next();assert.equal(f.title(),'jessica-1');f.prev();assert.equal(f.current().src,'/mine-2.jpg');f.prev();f.prev();assert.equal(f.title(),'christina-2');f.next();assert.equal(f.current().src,'/mine-1.jpg');assert.equal(f.author(),'Astronaut');assert.equal(f.row.children[0].children[0].title,'My story');
+  const f=await fixture({mine:[personal('mine-1'),personal('mine-2')]});f.open(0);assert.equal(f.current().src,'/mine-1.jpg');f.next();assert.equal(f.current().src,'/mine-2.jpg');f.next();assert.equal(f.title(),'jessica-1');f.prev();assert.equal(f.current().src,'/mine-2.jpg');f.prev();f.prev();assert.equal(f.title(),'christina-2');f.next();assert.equal(f.current().src,'/mine-1.jpg');assert.equal(f.author(),'Cdr. Sara Khan');assert.equal(f.row.children[0].children[0].title,'Cdr. Sara Khan / AST-014 / Orion Station / Expedition 7 (demo)');
 });
 
 test('Progress stays within the current author and resets for the next one',async()=>{

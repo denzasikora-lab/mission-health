@@ -26,10 +26,12 @@ Personal diary, media, tasks, and favorites are scoped to the signed-in owner. G
 
 `{profile}` is one of `personal`, `jessica-meir`, `jack-hathaway`, or `christina-koch`. Profile IDs select separate prototype histories; they do not identify real astronauts' medical records.
 
+The current personal demo persona is **Cdr. Sara Khan**, astronaut label **AST-014**, **Orion Station**, **Expedition 7**. This remains the `personal` profile, not an additional crew member or a `sara-khan` API profile. `GET /api/me` returns this default name unless the owner has saved a custom name. Its additive `astronautId`, `station`, `expedition`, and `isDemo: true` fields describe the demo persona; they do not change authentication, account-scoped `storageScope`, or the generated `researcherId`, and do not imply verified telemetry.
+
 | Method | Route | Purpose |
 | --- | --- | --- |
 | GET | `/api/status` | Report configured assistant, history, photo, and semantic-memory capabilities |
-| GET | `/api/me` | Return `name`, `researcherId`, and account-scoped `storageScope` |
+| GET | `/api/me` | Return `name`, `researcherId`, account-scoped `storageScope`, and the personal demo persona metadata |
 | PUT | `/api/me` | Save a display name using exactly `{"name":"..."}`; optional `x-mission-profile-scope` prevents stale-account writes |
 | GET | `/api/location` | Return the request's available country code or `null` |
 | GET | `/api/chat` | Read the owner's NasaGPT conversation |

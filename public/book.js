@@ -109,7 +109,7 @@
   async function personalExtras(entries){
     const helper=window.missionArchiveContent;if(!helper||B.profile!==personalProfileId)return {samples:[],snapshot:null};
     const [samples,identity,wearable]=await Promise.all([preload(),journalApi('/api/me').catch(()=>null),journalApi('/api/actiwatch').catch(()=>null)]);
-    const identified=/^[a-f0-9]{64}$/i.test(identity?.storageScope||'');if(identified)window.missionAppearance?.setIdentity({storageScope:identity.storageScope,name:'Astronaut'});
+    const identified=/^[a-f0-9]{64}$/i.test(identity?.storageScope||'');if(identified)window.missionAppearance?.setIdentity({storageScope:identity.storageScope,name:'Cdr. Sara Khan'});
     const visual=helper.captureVisual(identified?document:{querySelectorAll:()=>[]},entries),wellbeing=identified?window.missionCheckin?.current()||null:null;
     return {samples,snapshot:helper.currentEntry(entries,{visual,wellbeing,wearable:identified?wearable:null})};
   }

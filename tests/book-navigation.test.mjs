@@ -83,7 +83,7 @@ test('Wide screens do not increase page capacity beyond the maximum spread width
 });
 
 test('An empty personal archive includes preloaded video and audio, current results do not present them as personal measurements',async()=>{
-  const f=await fixture({entries:[],withArchive:true});f.open();assert.ok(f.text().trim().length>0);assert.ok(f.spread.querySelector('video'));assert.equal(f.identities[0].name,'Astronaut');
+  const f=await fixture({entries:[],withArchive:true});f.open();assert.ok(f.text().trim().length>0);assert.ok(f.spread.querySelector('video'));assert.equal(f.identities[0].name,'Cdr. Sara Khan');
   const kinds=new Set(),contents=[],positions=new Set();for(let i=0;i<100;i++){const position=f.node('book-position').textContent;if(positions.has(position))break;positions.add(position);contents.push(f.text());for(const media of f.spread.querySelectorAll('audio,video'))kinds.add(media.tagName);f.tap(350);}
   assert.deepEqual([...kinds].sort(),['AUDIO','VIDEO']);assert.ok(positions.size>=2);assert.ok(contents.some(text=>text.includes('No comparison')));assert.ok(contents.some(text=>text.includes('No personal recording saved yet')));assert.ok(!contents.join('\n').includes('"acoustic"'));assert.equal(f.favoriteIds.length,0);assert.match(f.node('book-position').textContent,/entries: 0/);
 });

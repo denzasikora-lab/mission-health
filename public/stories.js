@@ -19,11 +19,11 @@
   const live=document.getElementById('story-camera'),photoPreview=document.getElementById('story-photo-preview'),videoPreview=document.getElementById('story-video-preview');
   const kindChoice=document.getElementById('story-capture-kind'),cameraButton=document.getElementById('story-camera-toggle'),snapButton=document.getElementById('story-snap'),publishButton=document.getElementById('story-publish'),captureNotice=document.getElementById('story-capture-notice');
   const seenArchiveStories=new Map();
-  let archive=[],personal=[],author='Astronaut',group=[],storyIndex=0,viewProgressIndex=0,viewVersion=0,viewFrame=0,viewElapsed=0,viewLast=0,paused=false,viewReady=false;
+  let archive=[],personal=[],author='Cdr. Sara Khan',group=[],storyIndex=0,viewProgressIndex=0,viewVersion=0,viewFrame=0,viewElapsed=0,viewLast=0,paused=false,viewReady=false;
   let cameraStream,cameraVersion=0,cameraPending=false,cameraReady=false,recorder,recordTimer,recordStart,cameraTimer,draft,previewUrl,busy=false;
   const date=value=>new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(value));
-  const initials=name=>name.trim().split(/\s+/).map(part=>part[0]).slice(0,2).join('').toUpperCase()||'I';
-  const ownName=()=> 'Astronaut';
+  const initials=name=>name.replace(/^Cdr\.\s*/i,'').trim().split(/\s+/).map(part=>part[0]).slice(0,2).join('').toUpperCase()||'SK';
+  const ownName=()=> 'Cdr. Sara Khan';
   function notice(value,error=false){captureNotice.textContent=value;captureNotice.dataset.error=String(error)}
   async function api(path,options){const response=await fetch(path,options);let body;try{body=await response.json()}catch{throw new Error('unavailable')}if(!response.ok)throw new Error(body.error||'unavailable');return body}
   function loadAuthor(){document.getElementById('story-author').value=author;renderRow()}
@@ -31,8 +31,8 @@
   function renderRow(){
     row.replaceChildren();
     const mine=make('div','story-person'),mineButton=make('button');mineButton.type='button';mineButton.setAttribute('aria-label',personal.length?'View my stories':'Capture my story');
-    const mineRing=make('span',personal.length?'story-ring':'story-ring story-ring-empty');if(personal.length){const thumbnail=make('img');thumbnail.src=personal[0].poster;thumbnail.alt='';mineRing.append(thumbnail)}else mineRing.append(make('span','story-initials','I'));
-    mineButton.title='My story';mineButton.append(mineRing,make('strong','','My story'));mineButton.addEventListener('click',()=>{if(personal.length)openGroup(personal.map(item=>({...item,own:true})));else{void loadPersonal();openCapture()}});
+    const mineRing=make('span',personal.length?'story-ring':'story-ring story-ring-empty');if(personal.length){const thumbnail=make('img');thumbnail.src=personal[0].poster;thumbnail.alt='';mineRing.append(thumbnail)}else mineRing.append(make('span','story-initials','SK'));
+    mineButton.title='Cdr. Sara Khan / AST-014 / Orion Station / Expedition 7 (demo)';mineButton.append(mineRing,make('strong','','Sara'));mineButton.addEventListener('click',()=>{if(personal.length)openGroup(personal.map(item=>({...item,own:true})));else{void loadPersonal();openCapture()}});
     const add=make('button','story-add','+');add.type='button';add.setAttribute('aria-label','Add story');add.addEventListener('click',openCapture);mine.append(mineButton,add,make('small','','Only me'));row.append(mine);
     for(const person of crew){const items=archive.filter(item=>item.profile===person.id);const node=make('div','story-person'),button=make('button');button.type='button';button.setAttribute('aria-label','Stories NASA / '+person.name);button.disabled=!items.length;const ring=make('span','story-ring');if(items.length&&seenArchiveStories.get(person.id)===items.at(-1).id)ring.classList.add('seen');const image=make('img');image.src=person.photo;image.alt='';ring.append(image);button.append(ring,make('strong','',person.name.split(' ')[0]));button.addEventListener('click',()=>{if(!items.length)return;openGroup(items.map(item=>({...item,url:item.image,kind:'photo',author:person.name,avatar:person.photo,archive:true})))});node.append(button,make('small','','Archive NASA'));row.append(node)}
   }
@@ -40,7 +40,7 @@
   function pauseView(value){paused=value;const video=mediaNode.querySelector('video');if(video){if(value)video.pause();else void video.play().catch(()=>{})}pauseButton.textContent=value?'▶':'Ⅱ';pauseButton.setAttribute('aria-label',value?'Continue story':'Pause story')}
   function showStory(index){
     if(!viewer.open||!group.length)return;index=((index%group.length)+group.length)%group.length;storyIndex=index;viewVersion++;const version=viewVersion;viewElapsed=0;viewLast=performance.now();clearMedia();
-    const item=group[index];if(item.own)item.author='Astronaut';document.getElementById('story-view-author').textContent=item.author;document.getElementById('story-view-kind').textContent=(item.archive?'ARCHIVE NASA / ':'MY STORY / ')+date(item.createdAt);
+    const item=group[index];if(item.own)item.author=ownName();document.getElementById('story-view-author').textContent=item.author;document.getElementById('story-view-kind').textContent=(item.archive?'ARCHIVE NASA / ':'MY STORY / ')+date(item.createdAt);
     const avatar=viewer.querySelector('.story-view-avatar');avatar.replaceChildren();if(item.avatar){const image=make('img','story-view-avatar');image.src=item.avatar;image.alt='';avatar.append(image)}else avatar.textContent=initials(item.author);
     document.getElementById('story-view-title').textContent=item.title||'Personal story';document.getElementById('story-view-caption').textContent=item.description||item.caption||'';document.getElementById('story-view-credit').textContent=item.archive?(item.credit+' / '+item.id+' / '+date(item.createdAt)):'Published in your personal archive';
     document.getElementById('story-profile').hidden=!item.archive||!crew.some(person=>person.id===item.profile);

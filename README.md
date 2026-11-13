@@ -20,6 +20,8 @@ The interface uses English, supports light and dark themes, and adapts to narrow
 
 NASA portraits and archive stories include source attribution. Jessica Meir, Jack Hathaway, and Christina Koch are real astronauts; the health readings and conversations associated with prototype profiles are simulated, not their personal medical records or statements. The body illustration is not a scan. Sample archive material is kept distinct from user recordings.
 
+The current personal demo persona is **Cdr. Sara Khan (AST-014), Orion Station, Expedition 7**. Sara represents the existing personal workspace, not an added crew profile. A custom name saved by the signed-in owner takes precedence in NasaGPT; demo labels do not change account identity or imply live medical telemetry.
+
 ## Research data
 
 Each study retains its own participants, units, and time axis. Records are never joined across people or studies.

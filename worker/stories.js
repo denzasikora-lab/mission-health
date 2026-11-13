@@ -13,14 +13,14 @@ function validatedStoryHealth(raw){
   return {version:1,source:'demo_dashboard',profileId:value.profileId,profileName:profiles[value.profileId],capturedAt:new Date(value.capturedAt).toISOString(),metrics};
 }
 function savedStoryHealth(row){try{const value=row.health_json?JSON.parse(row.health_json):null;return value?.version===2&&value.source==='self_report'?{...value,wellbeing:storedSelfReport(value.wellbeing)}:value}catch{return null}}
-function storyView(row){return {id:row.id,author:'Astronaut',caption:row.caption,health:savedStoryHealth(row),kind:row.media_kind,createdAt:row.created_at,duration:row.duration_ms?row.duration_ms/1000:null,url:'/api/stories/'+row.id+'/media',poster:row.poster_key?'/api/stories/'+row.id+'/media?poster=1':'/api/stories/'+row.id+'/media'}}
+function storyView(row){return {id:row.id,author:'Cdr. Sara Khan',caption:row.caption,health:savedStoryHealth(row),kind:row.media_kind,createdAt:row.created_at,duration:row.duration_ms?row.duration_ms/1000:null,url:'/api/stories/'+row.id+'/media',poster:row.poster_key?'/api/stories/'+row.id+'/media?poster=1':'/api/stories/'+row.id+'/media'}}
 async function storyRow(env,user,id){return database(env).prepare('SELECT * FROM personal_stories WHERE id=? AND owner_id=?').bind(id,user).first()}
 async function storiesRoute(request,env,user,id,media,url){
   if(!id){
     if(request.method==='GET'){const {results}=await database(env).prepare('SELECT * FROM personal_stories WHERE owner_id=? ORDER BY created_at DESC,id DESC LIMIT 40').bind(user).all();return json({stories:results.map(storyView)})}
     if(request.method!=='POST')fail('method_not_allowed',405);
     const bytes=await boundedBytes(request,22000000);let form;try{form=await new Response(bytes,{headers:{'content-type':request.headers.get('content-type')||''}}).formData()}catch{fail('invalid_story',400)}
-    const storyId=String(form.get('id')||''),file=form.get('file'),kind=form.get('kind'),author='Astronaut',caption=String(form.get('caption')||'').trim(),width=Number(form.get('width')),height=Number(form.get('height')),duration=kind==='video'?Number(form.get('duration')):null;
+    const storyId=String(form.get('id')||''),file=form.get('file'),kind=form.get('kind'),author='Cdr. Sara Khan',caption=String(form.get('caption')||'').trim(),width=Number(form.get('width')),height=Number(form.get('height')),duration=kind==='video'?Number(form.get('duration')):null;
     if(!/^[a-f0-9-]{36}$/i.test(storyId)||!['photo','video'].includes(kind)||!file||typeof file.arrayBuffer!=='function'||caption.length>300||!Number.isInteger(width)||!Number.isInteger(height)||width<32||height<32||width>7680||height>7680)fail('invalid_story',400);
     const health=validatedStoryHealth(form.get('health'));
     const content=new Uint8Array(await file.arrayBuffer());if(content.length<64||content.length>(kind==='video'?20000000:3000000))fail('story_too_large',413);

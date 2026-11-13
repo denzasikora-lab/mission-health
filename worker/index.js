@@ -38,11 +38,11 @@ async function profileIdentityRoute(request,env,user){
   return json(await videoLogIdentity(request,user,env));
 }
 async function videoLogIdentity(request,user,env){
-  const name=(await savedProfileName(env,user))?.display_name||'Astronaut';
+  const name=(await savedProfileName(env,user))?.display_name||'Cdr. Sara Khan';
   // The display identifier is linked to the account, the original identifier is not sent to the client.
   const digest=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(user)));
   const digits=String(new DataView(digest.buffer).getUint32(0)%1000000000).padStart(9,'0');
-  return {name:name.trim().slice(0,100),researcherId:digits.match(/.{3}/g).join(' '),storageScope:Array.from(digest,value=>value.toString(16).padStart(2,'0')).join('')};
+  return {name:name.trim().slice(0,100),researcherId:digits.match(/.{3}/g).join(' '),storageScope:Array.from(digest,value=>value.toString(16).padStart(2,'0')).join(''),astronautId:'AST-014',station:'Orion Station',expedition:'Expedition 7',isDemo:true};
 }
 function memoryConfigured(env){return Boolean(env.MEMORY_URL&&(env.MEMORY_API_KEY||env.LOCAL_PREVIEW==='1'))}
 function languageModelConfigured(env){return env.AIR_GAP!=='1'&&Boolean(env.LLM_API_KEY&&env.LLM_BASE_URL&&env.LLM_MODEL)}

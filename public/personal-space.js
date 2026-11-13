@@ -91,7 +91,7 @@
   }
   function messageNode(entry,kind,id){
     const item=create('article','personal-message '+(kind==='team'&&!entry.isOwn||entry.role==='assistant'?'assistant':'user'));
-    const header=create('header'),name=create('span','',kind==='team'?((entry.isOwn?'Astronaut':entry.authorName)+(entry.isOwn?' / you':'')):kind==='diary'?'Your entry':entry.role==='assistant'?'NasaGPT':(window.missionProfileName?.name||'You'));header.append(name,create('time','',stamp(entry.createdAt)));if(kind!=='team')header.append(star(entry,kind,id));
+    const header=create('header'),name=create('span','',kind==='team'?((entry.isOwn?'Cdr. Sara Khan':entry.authorName)+(entry.isOwn?' / you':'')):kind==='diary'?'Your entry':entry.role==='assistant'?'NasaGPT':(window.missionProfileName?.name||'Cdr. Sara Khan'));header.append(name,create('time','',stamp(entry.createdAt)));if(kind!=='team')header.append(star(entry,kind,id));
     item.append(header);if(entry.content)item.append(create('p','',entry.content));if(kind!=='team'&&entry.wellbeing)item.append(badge(entry.wellbeing));for(const file of entry.attachments||[]){const link=create('a','chat-file-link',file.name+' / '+Math.max(1,Math.ceil(file.bytes/1024))+' KB');link.href=file.url;link.download=file.name;item.append(link);}
     if(entry.pending&&kind==='chat'){const retry=create('button','personal-retry','Retry request answer');retry.type='button';retry.disabled=store('chat').busy;retry.addEventListener('click',()=>void retryChat(entry));item.append(retry);}
     return item;
@@ -102,7 +102,7 @@
       const kind=view.kind;
       if(kind==='scheduler'){view.form.hidden=true;view.more.hidden=true;window.missionScheduler.render(view.list);view.refresh.disabled=window.missionScheduler.loading;continue;}
       const s=kind==='favorites'?null:store(kind),scrollTop=view.list.scrollTop,atBottom=view.list.scrollHeight-view.list.scrollTop-view.list.clientHeight<40;view.list.replaceChildren();
-      const items=kind==='favorites'?favoriteItems:kind==='team'?s.messages.map(entry=>entry.isOwn?{...entry,authorName:'Astronaut'}:entry):s.messages;
+      const items=kind==='favorites'?favoriteItems:kind==='team'?s.messages.map(entry=>entry.isOwn?{...entry,authorName:'Cdr. Sara Khan'}:entry):s.messages;
       if(!items.length)view.list.append(create('div','personal-empty',(kind==='favorites'?favoriteLoading:s.loading)?'Loading...':kind==='favorites'?'Save important entries and answers using the star.':kind==='diary'?'Tell me, how your day went. Recording and selected wellbeing will be added to the diary.':kind==='team'?'Astronaut shared channel. Start a conversation with the crew.':'Hello! I NasaGPT. What shall we talk about?'));
       if(kind==='team'&&window.missionAstronautChat)window.missionAstronautChat.render(view.list,items,entry=>messageNode(entry,'team',s.profile));
       else for(const entry of items){

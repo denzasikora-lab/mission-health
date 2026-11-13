@@ -6,7 +6,7 @@
     'christina-koch':'I will prepare the observation materials. Let’s compare notes after lunch.'
   };
   const create=(tag,cls,text)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;};
-  const initials=name=>String(name||'Participant').trim().split(/\s+/).slice(0,2).map(part=>Array.from(part)[0]||'').join('').toUpperCase();
+  const initials=name=>String(name||'Participant').replace(/^Cdr\.\s*/i,'').trim().split(/\s+/).slice(0,2).map(part=>Array.from(part)[0]||'').join('').toUpperCase();
   function portrait(person){const image=create('img','astronaut-chat-avatar');image.src=person.photo;image.alt='';image.loading='lazy';image.width=32;image.height=32;return image;}
   function decorateHost(host,active){
     host.classList.toggle('astronaut-chat',Boolean(active));
