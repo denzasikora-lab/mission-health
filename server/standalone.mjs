@@ -122,7 +122,8 @@ export async function createServer({worker,storage,publicOrigin,sessionSecret,se
     });
   });
   server.headersTimeout=15000;server.requestTimeout=180000;server.keepAliveTimeout=5000;
-  server.shutdown=async()=>{draining=true;await new Promise((resolveClose,reject)=>server.close(error=>error?reject(error):resolveClose()));await Promise.allSettled([...background]);await storage.close();};
+  let ticking=false;const taskClock=typeof worker.scheduled==='function'?setInterval(()=>{if(draining||ticking)return;ticking=true;waitUntil(Promise.resolve().then(()=>worker.scheduled({},environment)).finally(()=>{ticking=false;}));},1000):null;taskClock?.unref();
+  server.shutdown=async()=>{draining=true;if(taskClock)clearInterval(taskClock);await new Promise((resolveClose,reject)=>server.close(error=>error?reject(error):resolveClose()));await Promise.allSettled([...background]);await storage.close();};
   return server;
 }
 function outsideRelease(path,name){

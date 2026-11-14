@@ -61,9 +61,9 @@ function languageModelSource(env,purpose='primary'){
   return 'azure_responses/'+(name?decodeURIComponent(name):'agent');
 }
 function languageProviderScope(env,purpose='primary'){const provider=languageProvider(env,purpose);return provider+'\n'+(provider==='azure_responses'?azureAgentEndpoint(env):env.LLM_BASE_URL)+'\n'+languageModelSource(env,purpose);}
-async function memoryRequest(env,path,body){
+async function memoryRequest(env,path,body,timeoutMs=90000){
   if(!memoryConfigured(env))fail('memory_unavailable',503);
-  const response=await fetch(env.MEMORY_URL.replace(/\/$/,'')+path,{method:body?'POST':'GET',headers:{'content-type':'application/json','authorization':'Bearer '+(env.MEMORY_API_KEY||'')},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(90000)});
+  const response=await fetch(env.MEMORY_URL.replace(/\/$/,'')+path,{method:body?'POST':'GET',headers:{'content-type':'application/json','authorization':'Bearer '+(env.MEMORY_API_KEY||'')},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(timeoutMs)});
   if(!response.ok)fail('memory_unavailable',503);
   return response.json();
 }
@@ -163,7 +163,7 @@ async function completeLanguageMessages(env,messages,options={}){
   if(!azure&&(!env.LLM_BASE_URL||!env.LLM_MODEL||env.AIR_GAP==='1'&&!(typeof localSpeechUrl==='function'&&localSpeechUrl(env.LLM_BASE_URL))))fail('assistant_unavailable',503);
   const endpoint=azure?azureAgentEndpoint(env):env.LLM_BASE_URL.replace(/\/$/,'')+'/chat/completions';
   const headers={'content-type':'application/json',...(azure?{'api-key':env.AZURE_AGENT_API_KEY}:env.LLM_API_KEY?{'authorization':'Bearer '+env.LLM_API_KEY}:{})};
-  const body=azure?{input:responsesInput(messages),max_output_tokens:options.maxCompletionTokens??1536,stream:false,store:false}:{model:env.LLM_MODEL,messages,max_completion_tokens:options.maxCompletionTokens??1536,reasoning_effort:'low',store:false};
+  const body=azure?{input:responsesInput(messages),max_output_tokens:options.maxCompletionTokens??1536,stream:false,store:false}:{model:env.LLM_MODEL,messages,max_completion_tokens:options.maxCompletionTokens??1536,reasoning_effort:options.reasoningEffort??'low',store:false};
   let response;
   const attempts=options.attempts??2;
   for(let attempt=0;attempt<attempts;attempt++){
@@ -220,6 +220,10 @@ async function addMessage(request,env,user,astronaut){
   return json({message:await hydratedMessage(env,user,astronaut,{...row,answered:Boolean(reply)}),reply,replyError,assistantError,assistantState:input.mode==='ask'?(replyError?'unavailable':'ready'):features.assistantState},201);
 }
 const missionHandler={
+  async scheduled(_controller,env){
+    const {results}=await database(env).prepare("SELECT DISTINCT t.owner_id FROM personal_tasks t WHERE t.status='planned' AND (t.due_at<=? OR t.due_at IS NULL) AND NOT EXISTS(SELECT 1 FROM task_deliveries d JOIN general_chat_messages m ON m.id=d.message_id AND m.owner_id=d.owner_id WHERE d.owner_id=t.owner_id AND d.task_id=t.id AND d.due_key=COALESCE(t.due_at,t.due_date)) LIMIT 200").bind(new Date().toISOString()).all();
+    for(const row of results)await deliverTaskMessages(env,row.owner_id);
+  },
   async fetch(request,env,ctx){
     const url=new URL(request.url);
     if(!url.pathname.startsWith('/api/')){

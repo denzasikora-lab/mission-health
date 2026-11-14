@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index, uniqueIndex, primaryKey } from 'drizzle-orm/sqlite-core';
 export const personalProfiles=sqliteTable('personal_profiles',{
   ownerId:text('owner_id').primaryKey(),
   displayName:text('display_name').notNull(),
@@ -79,8 +79,12 @@ export const journalTrainingJobs=sqliteTable('journal_training_jobs',{
 },table=>[index('training_owner_profile_time').on(table.ownerId,table.astronautId,table.createdAt)]);
 
 export const generalChatMessages=sqliteTable('general_chat_messages',{
-  id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),role:text('role').notNull(),content:text('content').notNull(),createdAt:text('created_at').notNull(),replyTo:text('reply_to'),wellbeing:text('wellbeing_json'),attachments:text('attachments_json').notNull().default('[]'),healthContext:text('health_context_json')
-},table=>[index('general_chat_owner_time').on(table.ownerId,table.createdAt,table.id),uniqueIndex('general_chat_owner_reply').on(table.ownerId,table.replyTo)]);
+  id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),role:text('role').notNull(),content:text('content').notNull(),createdAt:text('created_at').notNull(),replyTo:text('reply_to'),wellbeing:text('wellbeing_json'),attachments:text('attachments_json').notNull().default('[]'),healthContext:text('health_context_json'),vectorStatus:text('vector_status').notNull().default('pending'),language:text('language').notNull().default('en'),timeZone:text('time_zone'),references:text('references_json').notNull().default('[]')
+},table=>[index('general_chat_owner_time').on(table.ownerId,table.createdAt,table.id),index('general_chat_pending').on(table.ownerId,table.role,table.vectorStatus,table.createdAt),uniqueIndex('general_chat_owner_reply').on(table.ownerId,table.replyTo)]);
+
+export const chatScheduleIntents=sqliteTable('chat_schedule_intents',{
+  ownerId:text('owner_id').notNull(),messageId:text('message_id').notNull(),intent:text('intent_json').notNull()
+},table=>[primaryKey({columns:[table.ownerId,table.messageId]})]);
 
 export const teamChatMessages=sqliteTable('team_chat_messages',{
   id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),authorName:text('author_name').notNull(),content:text('content').notNull(),attachments:text('attachments_json').notNull().default('[]'),createdAt:text('created_at').notNull()
@@ -115,3 +119,7 @@ export const personalTasks=sqliteTable('personal_tasks',{
 export const healthAnalyses=sqliteTable('health_analyses',{
   id:text('id').primaryKey(),ownerId:text('owner_id').notNull(),snapshot:text('snapshot_json').notNull(),rules:text('rules_json').notNull(),result:text('result_json').notNull(),createdAt:text('created_at').notNull(),updatedAt:text('updated_at').notNull(),leaseUntil:integer('lease_until').notNull().default(0)
 },table=>[index('health_analyses_owner_time').on(table.ownerId,table.createdAt,table.id)]);
+
+export const taskDeliveries=sqliteTable('task_deliveries',{
+  ownerId:text('owner_id').notNull(),taskId:text('task_id').notNull(),dueKey:text('due_key').notNull(),messageId:text('message_id').notNull().unique()
+},table=>[primaryKey({columns:[table.ownerId,table.taskId,table.dueKey]})]);

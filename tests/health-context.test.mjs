@@ -109,8 +109,8 @@ test('Repeated generation changes the sample while unchanged polling and layout 
   f.home.querySelector('.home-sample-button').emit('click');f.scope.missionProfileName.identity={storageScope:'owner-b'};assert.equal(f.api.sampleActive(),false);f.scope.dispatchEvent(new Event('mission-profile-change'));assert.equal(f.home.querySelector('.home-sample-clear').hidden,true);
 });
 
-test('A committed check-in or newly imported watch data restores actual values after a sample',()=>{
-  const f=homeFixture();f.home.querySelector('.home-sample-button').emit('click');f.report({score:81,wellbeingScale:100});f.scope.dispatchEvent(new Event('mission-wellbeing-change'));assert.equal(f.api.sampleActive(),false);assert.equal(f.api.snapshot().readings.wellbeing.value,81);assert.equal(f.api.snapshot().readings.wellbeing.source,'manual');
+test('A check-in preserves the generated layout and actual watch imports restore measured values',()=>{
+  const f=homeFixture();f.home.querySelector('.home-sample-button').emit('click');f.report({score:81,wellbeingScale:100});const before=clone(f.api.snapshot());f.scope.dispatchEvent(new Event('mission-wellbeing-change'));assert.equal(f.api.sampleActive(),true);assert.deepEqual(clone(f.api.snapshot()),before);f.home.querySelector('.home-sample-clear').emit('click');assert.equal(f.api.snapshot().readings.wellbeing.value,81);assert.equal(f.api.snapshot().readings.wellbeing.source,'manual');
   f.home.querySelector('.home-sample-button').emit('click');f.watch({id:importId,source:'actiwatch',summary:{end:new Clock().toISOString(),latest24h:{sleepSeconds:28800,activityCounts:99999,meanLightLux:1000}}});f.scope.dispatchEvent(new Event('mission-actiwatch-change'));assert.equal(f.api.sampleActive(),false);assert.equal(f.api.snapshot().actiwatchImportId,importId);assert.equal(f.api.model().readings.activity.value,99999);
 });
 

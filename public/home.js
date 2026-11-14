@@ -12,7 +12,7 @@
   const sampleActions=make('div','home-sample-actions'),sampleButton=make('button','home-sample-button','FILL SAMPLE'),sampleClear=make('button','home-sample-clear','×');sampleButton.type=sampleClear.type='button';sampleButton.title='Generate fictional sample readings';sampleClear.setAttribute('aria-label','Clear generated sample');sampleClear.title='Clear generated sample';sampleClear.hidden=true;sampleActions.append(sampleButton,sampleClear);home.querySelector('.home-body-panel > header').append(sampleActions);
   let generated=null,generatedOwner=null,generatedBaseline='';
   const owner=()=>window.missionProfileName?.identity?.storageScope||null;
-  const actualSignature=()=>JSON.stringify({readings:window.missionReadings?.current?.()?.readings||{},watch:window.missionActiwatch?.current?.()?.id||null,checkin:window.missionCheckin.selection?.()||null});
+  const actualSignature=()=>JSON.stringify({readings:window.missionReadings?.current?.()?.readings||{},watch:window.missionActiwatch?.current?.()?.id||null});
   function sampleActive(){return generated!==null&&generatedOwner===owner();}
   function clearSample(){if(!generated)return;generated=null;generatedOwner=null;generatedBaseline='';sampleClear.hidden=true;renderValues();window.dispatchEvent(new Event('mission-sample-change'));}
   function fillSample(){
@@ -60,5 +60,5 @@
     const chat=document.getElementById('nasagpt-sidebar');if(!isOverview&&!chat.hidden)window.missionChatComposer.stopWithin(chat);chat.hidden=!isOverview;if(chat.parentElement!==home.parentElement)home.before(chat);friendProfile.classList.toggle('friend-profile',true);renderValues();
     if(state.workspace==='crew'&&state.view==='health'&&state.visiting){document.getElementById('mission-heading-title').textContent='Visiting / '+crew[state.crew].name;document.getElementById('mission-heading-description').textContent='Friend profile readings';}
   }
-  window.missionHome={render,renderValues,setSource,model,snapshot,sampleActive,sampleBase};window.addEventListener('mission-profile-change',()=>{if(generatedOwner!==owner())clearSample();render();});for(const event of ['mission-wellbeing-change','mission-readings-change','mission-actiwatch-change'])window.addEventListener(event,()=>{if(generated&&generatedBaseline!==actualSignature())clearSample();else renderValues();});render();window.dispatchEvent(new Event('mission-home-ready'));
+  window.missionHome={render,renderValues,setSource,model,snapshot,sampleActive,sampleBase};window.addEventListener('mission-profile-change',()=>{if(generatedOwner!==owner())clearSample();render();});for(const event of ['mission-wellbeing-change','mission-readings-change','mission-actiwatch-change'])window.addEventListener(event,()=>{if(event==='mission-wellbeing-change'&&sampleActive())return;if(generated&&generatedBaseline!==actualSignature())clearSample();else renderValues();});render();window.dispatchEvent(new Event('mission-home-ready'));
 })();

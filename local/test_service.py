@@ -164,6 +164,20 @@ class ApiTests(unittest.TestCase):
                                    json={"ownerId": "owner-a", "astronautId": "unknown", "query": "Alpha"})
         self.assertEqual(invalid.status_code, 422)
 
+    def test_urdu_text_is_indexed_without_being_translated_or_enabling_generation(self):
+        text = "یہ ایک محفوظ مشاہدہ ہے۔"
+        response = self.client.post("/upsert", headers=self.headers, json={
+            "id": str(uuid.uuid4()), "ownerId": "nasagpt:owner-a", "astronautId": "personal",
+            "text": text, "language": "ur", "createdAt": "2026-11-13T10:00:00Z"})
+        self.assertEqual(response.status_code, 200)
+        point = next(iter(self.qdrant.points.values()))
+        self.assertEqual(point.payload["text"], text)
+        self.assertEqual(point.payload["language"], "ur")
+        self.assertIn(text, self.embedder.calls[0][0][0])
+        self.assertEqual(self.client.post("/answer", headers=self.headers, json={
+            "ownerId": "nasagpt:owner-a", "astronautId": "personal", "query": text,
+            "language": "ur"}).status_code, 503)
+
 
 class ExportTests(unittest.TestCase):
     def test_export_preserves_text_tensors_and_removes_other_encoders(self):

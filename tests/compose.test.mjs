@@ -75,7 +75,7 @@ test('The provider receives only the prefix and an instruction to continue the a
   const {body,options}=f.calls[0];assert.equal(body.messages.length,2);assert.equal(body.messages[1].content,prefix);assert.equal(body.messages[1].role,'user');
   assert.ok(body.messages[0].content.includes('in the author’s own voice'));assert.ok(body.messages[0].content.includes('Do not reply to the message'));assert.ok(body.messages[0].content.includes('Do not repeat the prefix'));
   assert.ok(!JSON.stringify(body).includes('Private history'));assert.ok(!JSON.stringify(body).includes('jessica-meir'));assert.ok(!JSON.stringify(body).includes('owner-b'));
-  assert.equal(body.store,false);assert.equal(body.max_completion_tokens,256);assert.equal(options.redirect,'manual');assert.equal(options.headers.authorization,'Bearer test-key');
+  assert.equal(body.store,false);assert.equal(body.max_completion_tokens,256);assert.equal(body.reasoning_effort,'minimal');assert.equal(options.redirect,'manual');assert.equal(options.headers.authorization,'Bearer test-key');
   assert.equal(result.headers.get('cache-control'),'private, no-store');
 });
 

@@ -18,11 +18,11 @@
     else window.missionNotifications?.hide();
     if(dueTimer)clearTimeout(dueTimer);dueTimer=0;
     const next=tasks.filter(task=>task.status==='planned'&&task.dueAt&&Date.parse(task.dueAt)>Date.now()).map(task=>Date.parse(task.dueAt)).sort((a,b)=>a-b)[0];
-    if(next)dueTimer=setTimeout(()=>{dueTimer=0;announce();},Math.min(2147483000,Math.max(1,next-Date.now()+10)));
+    if(next)dueTimer=setTimeout(()=>{dueTimer=0;announce();void refresh();window.dispatchEvent(new Event('mission-reminder-messages'));},Math.min(2147483000,Math.max(1,next-Date.now()+10)));
   }
   async function refresh(){
     if(loading||changing.size)return;const snapshot=version;loading=true;error='';announce();
-    try{const result=await journalApi('/api/tasks');if(snapshot===version){tasks=result.tasks;loaded=true;}}catch{error='Could not load tasks. Press «Refresh».';}
+    try{const result=await journalApi('/api/tasks');if(snapshot===version){tasks=result.tasks;loaded=true;if(result.delivered)window.dispatchEvent(new Event('mission-reminder-messages'));}}catch{error='Could not load tasks. Press «Refresh».';}
     finally{loading=false;announce();}
   }
   async function change(task,payload,{method='PATCH',remember=false,restore=false}={}){

@@ -18,7 +18,7 @@ function render(){
 }
 window.missionNotifications={
   show(items,onClose){
-    if(!host){host=document.createElement('div');host.id='mission-reminders';const shadow=host.attachShadow({mode:'open'}),style=document.createElement('link'),content=document.createElement('div');style.rel='stylesheet';style.href='/vendor/mission-notifications.css?v=20261114-konsta1';shadow.append(style,content);document.body.append(host);root=createRoot(content);new MutationObserver(render).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});}
+    if(!host){host=document.createElement('div');host.id='mission-reminders';const shadow=host.attachShadow({mode:'open'}),style=document.createElement('link'),content=document.createElement('div');style.rel='stylesheet';style.href='/vendor/mission-notifications.css?v=20261114-konsta2';shadow.append(style,content);document.body.append(host);root=createRoot(content);new MutationObserver(render).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});}
     current={items,onClose};render();
   },
   hide(){current=null;render();}

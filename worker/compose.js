@@ -43,7 +43,7 @@ async function composeRoute(request,env){
     {role:'user',content:prefix}
   ];
   try{
-    const answer=await completeLanguageMessages(env,messages,{purpose:'utility',maxCompletionTokens:256,timeoutMs:8000,attempts:1,redirect:'manual'});
+    const answer=await completeLanguageMessages(env,messages,{purpose:'utility',maxCompletionTokens:256,reasoningEffort:'minimal',timeoutMs:10000,attempts:1,redirect:'manual'});
     return json({completion:composeCompletion(answer.text,prefix)});
   }catch{fail('assistant_unavailable',503);}
 }

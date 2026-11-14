@@ -130,9 +130,9 @@
     if(entry.pending&&kind==='chat'){const retry=create('button','personal-retry','Retry request answer');retry.type='button';retry.disabled=store('chat').busy;retry.addEventListener('click',()=>void retryChat(entry));item.append(retry);}
     return item;
   }
-  function renderViews(){
+  function renderViews(onlyKind){
     for(const view of views){
-      if(view.host.hidden)continue;
+      if(view.host.hidden||view.host.closest?.('[hidden]')||typeof onlyKind==='string'&&view.kind!==onlyKind)continue;
       const kind=view.kind;
       if(kind==='scheduler'){view.form.hidden=true;view.more.hidden=true;window.missionScheduler.render(view.list);view.refresh.disabled=window.missionScheduler.loading;continue;}
       const s=kind==='favorites'?null:store(kind),scrollTop=view.list.scrollTop,atBottom=view.list.scrollHeight-view.list.scrollTop-view.list.clientHeight<40;view.list.replaceChildren();
@@ -202,7 +202,8 @@
   sidebar.prepend(sidebarTabs);sidebarView.list.setAttribute('aria-labelledby','sidebar-tab-chat');sidebar.querySelector('[data-personal-favorites]').hidden=true;sidebarView.favoriteShortcut=false;
   window.missionProfileName?.attach(sidebar.querySelector('.personal-conversation-heading'));
   window.addEventListener('mission-profile-change',profileChanged);
-  window.addEventListener('mission-tasks-change',renderViews);
+  window.addEventListener('mission-tasks-change',()=>renderViews('scheduler'));
+  window.addEventListener('mission-reminder-messages',()=>void load('chat',false,true));
   window.addEventListener('mission-tasks-open',()=>{window.missionDesign.navigate('overview');sidebarTabs.querySelector('[data-sidebar-tab=scheduler]').click();sidebar.scrollIntoView({behavior:'smooth',block:'start'});});
   setInterval(()=>{if(!document.hidden&&views.some(view=>view.kind==='team'&&view.host.getClientRects().length))void load('team',false,true);},5000);
   window.addEventListener('mission-diary-close',()=>window.missionChatComposer.stopWithin(modal));

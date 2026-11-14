@@ -12,12 +12,12 @@ const model='embeddinggemma-2:daa72c51243991dfcaf9f9137d2c573d8f7790c0:q4:text:2
 function fixture(options={}){
   const sql=new DatabaseSync(':memory:');for(const migration of options.beforeHundred?migrations.slice(0,10):migrations)sql.exec(migration);
   const objects=new Map(),PHOTOS={put:async(key,bytes)=>{objects.set(key,bytes);},get:async key=>objects.has(key)?{body:objects.get(key)}:null,delete:async key=>objects.delete(key)};
-  const out=[],intentCalls=[],DB={prepare(query){
+  const out=[],intentCalls=[],memoryCalls=[],DB={prepare(query){
     const statement=sql.prepare(query);
     return {bind(...values){return {first:async()=>statement.get(...values)||null,all:async()=>({results:statement.all(...values)}),run:async()=>statement.run(...values)};}};
   }};
-  let status=200,answer='Test response based on supplied context.',intentStatus=200,intentAnswer=JSON.stringify({isScheduler:false,tasks:[]});
-  const scope={URL,Request,Response,FormData,Blob,Uint8Array,TextEncoder,DataView,AbortSignal,crypto:webcrypto,atob,console:{warn(){},error(){}},fetch:async(url,options)=>{const body=JSON.parse(options.body);if(body.messages?.[0]?.content?.startsWith('Mission Health scheduler intent.')){intentCalls.push({url,body});return intentStatus===200?Response.json({choices:[{message:{content:intentAnswer}}]}):new Response('unavailable',{status:intentStatus});}out.push({url,body});if(String(url).startsWith('http://trainer.internal/'))return Response.json({id:body.id});return status===200?Response.json(body.input?{status:'completed',output:[{type:'message',role:'assistant',content:[{type:'output_text',text:answer}]}]}:{choices:[{message:{content:answer}}]}):new Response('unavailable',{status});}};
+  let memoryHandler=async()=>({matches:[],indexed:true}),status=200,answer='Test response based on supplied context.',intentStatus=200,intentAnswer=JSON.stringify({isScheduler:false,tasks:[]});
+  const scope={URL,Request,Response,FormData,Blob,Uint8Array,TextEncoder,DataView,AbortSignal,crypto:webcrypto,atob,console:{warn(){},error(){}},fetch:async(url,options)=>{const body=JSON.parse(options.body);if(body.messages?.[0]?.content?.startsWith('Mission Health scheduler intent.')){intentCalls.push({url,body});return intentStatus===200?Response.json({choices:[{message:{content:intentAnswer}}]}):new Response('unavailable',{status:intentStatus});}if(String(url).startsWith('http://memory.internal/')){memoryCalls.push({url,body});return Response.json(await memoryHandler(url,body));}out.push({url,body});if(String(url).startsWith('http://trainer.internal/'))return Response.json({id:body.id});return status===200?Response.json(body.input?{status:'completed',output:[{type:'message',role:'assistant',content:[{type:'output_text',text:answer}]}]}:{choices:[{message:{content:answer}}]}):new Response('unavailable',{status});}};
   vm.runInNewContext(source,scope);
   const env={DB,PHOTOS,LLM_API_KEY:'test-key',LLM_BASE_URL:'https://model.test/v1',LLM_MODEL:'test-model'};
   const run=async(path,{owner='owner-a',method='GET',body,environment={},origin,name,email,nameEncoding,expectedScope}={})=>{
@@ -26,7 +26,7 @@ function fixture(options={}){
     return {status:response.status,headers:response.headers,body:response.headers.get('content-type')?.includes('application/json')?await response.json():await response.text()};
   };
   const note=async(score=70,profile='jessica-meir',owner='owner-a',content='Fatigue decreased after exercise.')=>run('/api/astronauts/'+profile+'/messages',{owner,method:'POST',body:{id:webcrypto.randomUUID(),content,language:'en',mode:'diary',attachments:[],wellbeing:score===null?null:{score,wellbeingScale:100}}});
-  return {sql,out,intentCalls,intentProvider:(code,value)=>{intentStatus=code;intentAnswer=value;},objects,run,note,migrateHundred:()=>{for(const migration of migrations.slice(10).filter(value=>value!==hostedMemoryMigration))sql.exec(migration);},validateHealth:scope.validatedStoryHealth,provider:(code,text)=>{status=code;if(text)answer=text;}};
+  return {sql,out,intentCalls,memoryCalls,memoryProvider:handler=>{memoryHandler=handler;},intentProvider:(code,value)=>{intentStatus=code;intentAnswer=value;},objects,run,note,migrateHundred:()=>{for(const migration of migrations.slice(10).filter(value=>value!==hostedMemoryMigration))sql.exec(migration);},validateHealth:scope.validatedStoryHealth,provider:(code,text)=>{status=code;if(text)answer=text;}};
 }
 test('Azure chat saves readable health output with the same owner and reply identity',async()=>{
   const f=fixture(),environment={LLM_PROVIDER:'azure_responses',AZURE_AGENT_ENDPOINT:'https://agent.test/agents/NASA-AI/endpoint/protocols/openai/responses?api-version=v1',AZURE_AGENT_API_KEY:'synthetic-key'},id=webcrypto.randomUUID();
@@ -48,6 +48,40 @@ test('ProxyAPI mini detects a natural scheduler request and freezes its result a
 test('Negative intent does not schedule quoted text and invalid output falls back only to literal supported requests',async()=>{
   const f=fixture();const quote=await f.run('/api/chat',{method:'POST',body:{id:webcrypto.randomUUID(),content:'The manual says "Remind me in 1 minute to test temperature".'}});assert.equal(quote.body.tasks.length,0);assert.equal(f.out.length,1);assert.equal(f.intentCalls.length,1);
   f.intentProvider(200,JSON.stringify({isScheduler:true,tasks:[{title:'Untrusted output',dueDate:'2026-02-30',url:'https://example.test'}]}));const result=await f.run('/api/chat',{method:'POST',body:{id:webcrypto.randomUUID(),content:'Remind me in 1 minute to test temperature.',timeZone:'UTC'}});assert.equal(result.body.tasks[0].title,'Test temperature');assert.match(result.body.reply.content,/Reminder saved/);assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM personal_tasks').get().n,1);f.sql.close();
+});
+
+test('A minute reminder with via and min still works when the classifier is unavailable',async()=>{
+  const f=fixture();f.intentProvider(503,'unavailable');f.provider(503,'unavailable');
+  const result=await f.run('/api/chat',{method:'POST',body:{id:webcrypto.randomUUID(),content:'remind me via 1 min to check health',timeZone:'Europe/Istanbul'}});
+  assert.equal(result.status,201);assert.equal(result.body.tasks.length,1);assert.equal(result.body.tasks[0].title,'Check health');assert.equal(Date.parse(result.body.tasks[0].dueAt)-Date.parse(result.body.message.createdAt),60000);assert.match(result.body.reply.content,/Reminder saved: Check health/);assert.equal(f.out.length,0);f.sql.close();
+});
+test('Opening Scheduled recovers an interrupted saved reminder with edit and delete support',async()=>{
+  const f=fixture(),id=webcrypto.randomUUID(),at=new Date().toISOString();f.intentProvider(503,'unavailable');
+  f.sql.prepare("INSERT INTO general_chat_messages (id,owner_id,role,content,created_at,time_zone) VALUES (?,'owner-a','user','remind me tomorrow to check my pulse',?,'Europe/Istanbul')").run(id,at);
+  const first=await f.run('/api/tasks'),task=first.body.tasks[0];assert.equal(first.status,200);assert.equal(task.sourceMessageId,id);assert.equal(task.title,'Check my pulse');assert.equal(task.timeZone,'Europe/Istanbul');assert.equal(task.dueAt,null);assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM general_chat_messages WHERE reply_to=?').get(id).n,1);
+  const second=await f.run('/api/tasks');assert.equal(second.body.tasks[0].id,task.id);assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM personal_tasks').get().n,1);
+  assert.equal((await f.run('/api/tasks/'+task.id,{method:'PATCH',body:{title:'Check pulse after breakfast'}})).body.task.title,'Check pulse after breakfast');assert.equal((await f.run('/api/tasks/'+task.id,{method:'DELETE'})).body.task.status,'cancelled');assert.equal((await f.run('/api/tasks')).body.tasks.length,0);f.sql.close();
+});
+
+test('NasaGPT retrieves older user statements and personal diary records with ownership and role checks',async()=>{
+  const f=fixture(),environment={MEMORY_URL:'http://memory.internal',MEMORY_API_KEY:'test-memory-key'},insert=f.sql.prepare('INSERT INTO general_chat_messages (id,owner_id,role,content,created_at) VALUES (?,?,?,?,?)');
+  const old=webcrypto.randomUUID(),foreign=webcrypto.randomUUID(),hallucination=webcrypto.randomUUID(),diary=webcrypto.randomUUID(),otherProfile=webcrypto.randomUUID();
+  insert.run(old,'owner-a','user','I cycled for eleven minutes before the lunar compass check.','2026-01-01T10:00:00.000Z');insert.run(foreign,'owner-b','user','FOREIGN PRIVATE STATEMENT','2026-01-01T10:00:00.000Z');insert.run(hallucination,'owner-a','assistant','INVENTED ASSISTANT OBSERVATION','2026-01-01T10:00:00.000Z');
+  for(let index=0;index<20;index++)insert.run(webcrypto.randomUUID(),'owner-a','user','Recent message '+index,'2026-02-01T10:'+String(index).padStart(2,'0')+':00.000Z');
+  const note=f.sql.prepare("INSERT INTO journal_messages (id,owner_id,astronaut_id,role,content,language,created_at,vector_status) VALUES (?,?,?,'note',?,'en','2026-01-02T10:00:00.000Z','indexed')");note.run(diary,'owner-a','personal','The lunar compass check followed my exercise.');note.run(otherProfile,'owner-a','jessica-meir','OTHER PROFILE OBSERVATION');
+  f.memoryProvider(async(url,body)=>url.endsWith('/upsert')?{indexed:true}:{matches:body.ownerId.startsWith('nasagpt:')?[old,foreign,hallucination].map(id=>({id,score:.9})):[diary,otherProfile].map(id=>({id,score:.8}))});
+  const body={id:webcrypto.randomUUID(),content:'What exercise did I report before the lunar compass check?'},result=await f.run('/api/chat',{method:'POST',body,environment});
+  assert.equal(result.status,201);assert.equal(result.body.reply.references.length,2);const prompt=JSON.stringify(f.out.at(-1).body);assert.match(prompt,/cycled for eleven minutes/);assert.match(prompt,/2026-01-01/);assert.match(prompt,/lunar compass check followed my exercise/);assert.doesNotMatch(prompt,/FOREIGN PRIVATE|INVENTED ASSISTANT|OTHER PROFILE/);assert.match(prompt,/quoted data/);
+  const stored=JSON.parse(f.sql.prepare('SELECT references_json FROM general_chat_messages WHERE reply_to=?').get(body.id).references_json);assert.deepEqual(stored.map(item=>item.id).sort(),[old,diary].sort());
+  const upserts=f.memoryCalls.filter(call=>call.url.endsWith('/upsert'));assert.ok(upserts.some(call=>call.body.id===body.id));assert.ok(upserts.every(call=>/^nasagpt:[a-f0-9]{64}$/.test(call.body.ownerId)&&call.body.astronautId==='personal'));assert.ok(upserts.every(call=>![foreign,hallucination,diary,otherProfile].includes(call.body.id)));assert.equal(f.sql.prepare('SELECT vector_status FROM general_chat_messages WHERE id=?').get(body.id).vector_status,'indexed');
+  const count=f.memoryCalls.length,retry=await f.run('/api/chat',{method:'POST',body,environment});assert.equal(retry.body.reply.id,result.body.reply.id);assert.equal(f.memoryCalls.length,count);f.sql.close();
+});
+
+test('Embedding failure preserves the message and keyword recall, and retry indexes it without duplicating the reply',async()=>{
+  const f=fixture(),environment={MEMORY_URL:'http://memory.internal',MEMORY_API_KEY:'test-memory-key'},old=webcrypto.randomUUID();
+  f.sql.prepare("INSERT INTO journal_messages (id,owner_id,astronaut_id,role,content,language,created_at,vector_status) VALUES (?,'owner-a','personal','note','The lunar compass is in locker seven.','en','2026-01-02T10:00:00.000Z','pending')").run(old);f.memoryProvider(async()=>{throw new Error('unavailable');});
+  const body={id:webcrypto.randomUUID(),content:'Where is the lunar compass?'},result=await f.run('/api/chat',{method:'POST',body,environment});assert.equal(result.status,201);assert.equal(result.body.reply.references[0].id,old);assert.match(JSON.stringify(f.out.at(-1).body),/locker seven/);assert.equal(f.sql.prepare('SELECT vector_status FROM general_chat_messages WHERE id=?').get(body.id).vector_status,'pending');
+  f.memoryProvider(async()=>({indexed:true,matches:[]}));const retry=await f.run('/api/chat',{method:'POST',body,environment});assert.equal(retry.body.reply.id,result.body.reply.id);assert.equal(f.sql.prepare('SELECT vector_status FROM general_chat_messages WHERE id=?').get(body.id).vector_status,'indexed');assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM general_chat_messages WHERE reply_to=?').get(body.id).n,1);f.sql.close();
 });
 
 test('New visitors receive the Sara Khan demo persona without account name or email',async()=>{
