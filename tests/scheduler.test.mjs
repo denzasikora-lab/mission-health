@@ -30,6 +30,12 @@ test('An all-day reminder follows its local date and cancelled reminders are not
   assert.equal(await f.deliver('a','2026-10-30T20:59:59Z'),0);assert.equal(await f.deliver('a','2026-10-30T21:00:00Z'),1);
   await f.route('a',task.id,{dueDate:'2026-11-01'});await f.route('a',task.id,null,'DELETE');assert.equal(await f.deliver('a','2026-11-02T00:00:00Z'),0);assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM general_chat_messages').get().n,1);f.sql.close();
 });
+test('Saving the minute-resolution edit form preserves the exact deadline and does not redeliver a renamed task',async()=>{
+  const f=fixture(),task=(await f.plan('a',{id:webcrypto.randomUUID(),content:'Remind me in 1 minute to check health',created_at:'2026-10-30T18:00:35.858Z'},'Europe/Istanbul'))[0];
+  assert.equal(await f.deliver('a','2026-10-30T18:01:36Z'),1);
+  const edited=(await(await f.route('a',task.id,{title:'Updated check',dueDate:'2026-10-30',dueTime:'21:01'})).json()).task;
+  assert.equal(edited.dueAt,task.dueAt);assert.equal(await f.deliver('a','2026-10-30T18:01:37Z'),0);assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM general_chat_messages').get().n,1);f.sql.close();
+});
 
 const sampleTask=async(f,owner='a',zone='Europe/Istanbul',content='Tomorrow at 10:00 I need to measure pulse')=>JSON.parse(JSON.stringify((await f.plan(owner,{id:webcrypto.randomUUID(),content,created_at:'2026-10-30T18:00:00Z'},zone))[0]));
 test('Title and local date/time edits preserve status and source',async()=>{

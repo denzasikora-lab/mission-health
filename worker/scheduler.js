@@ -104,7 +104,8 @@ function editedTaskRow(previous,input){
     let hour=null,minute=0;
     if(Object.hasOwn(input,'dueTime')){if(input.dueTime!==null&&input.dueTime!==''){if(typeof input.dueTime!=='string'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(input.dueTime))fail('invalid_input',400);[hour,minute]=input.dueTime.split(':').map(Number);}}
     else if(previous.due_at){const parts=taskDateParts(new Date(previous.due_at),previous.time_zone);hour=parts.hour;minute=parts.minute;}
-    next.due_at=hour===null?null:taskZonedInstant(next.due_date,hour,minute,next.time_zone);if(hour!==null&&!next.due_at)fail('invalid_input',400);
+    const old=previous.due_at?taskDateParts(new Date(previous.due_at),previous.time_zone):null,unchanged=old&&next.due_date===previous.due_date&&next.time_zone===previous.time_zone&&hour===old.hour&&minute===old.minute;
+    next.due_at=unchanged?previous.due_at:hour===null?null:taskZonedInstant(next.due_date,hour,minute,next.time_zone);if(hour!==null&&!next.due_at)fail('invalid_input',400);
   }
   return next;
 }
