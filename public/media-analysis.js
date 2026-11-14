@@ -11,9 +11,7 @@
         for(const item of result.items){
           const state=states.get(item.kind);if(!state)continue;
           window.missionVoiceAnalysis?.restore?.(item.kind,item);
-          if(state.jobs.length||!item.analysis||state.savedId===item.id)continue;
-          state.saved?.remove();const root=document.createElement('article'),heading=document.createElement('header'),answer=document.createElement('div');root.className='media-analysis-job';answer.className='media-analysis-answer';
-          heading.textContent='Latest saved analysis / '+new Date(item.createdAt).toLocaleString('en-GB',{dateStyle:'short',timeStyle:'short'});answer.textContent=item.analysis;root.append(heading,answer);state.root.append(root);state.root.hidden=false;state.saved=root;state.savedId=item.id;
+
         }
       }catch{}
     })();
@@ -42,11 +40,11 @@
   }
   async function submit(kind,blob,duration,ageInput=null){
     if(kind==='video')window.missionSkinSpots?.pending(ageInput?.skin?.report);
-    const state=states.get(kind),root=document.createElement('article'),heading=document.createElement('header'),status=document.createElement('p'),answer=document.createElement('div'),retry=document.createElement('button');root.className='media-analysis-job';
-    const createdAt=new Date().toISOString();heading.textContent=(kind==='audio'?'Audio':'Video')+' / '+new Date(createdAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});status.setAttribute('role','status');answer.className='media-analysis-answer';retry.type='button';retry.textContent='Retry analysis';retry.hidden=true;root.append(heading,status,answer,retry);state.root.append(root);state.root.hidden=false;
+    const state=states.get(kind),root=document.createElement('article'),heading=document.createElement('header'),status=document.createElement('p'),retry=document.createElement('button');root.className='media-analysis-job';
+    const createdAt=new Date().toISOString();heading.textContent=(kind==='audio'?'Audio':'Video')+' / '+new Date(createdAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});status.setAttribute('role','status');retry.type='button';retry.textContent='Retry analysis';retry.hidden=true;root.append(heading,status,retry);state.root.append(root);state.root.hidden=false;
     // Speech and wellbeing belong to the stopped recording, independently of later recordings.
     const transcriptTask=Promise.resolve(window.missionSpeech?.finish?.(kind==='audio'?'voice':'video')).catch(()=>'');
-    const job={kind,root,status,answer,retry,phase:'new',payload:{id:crypto.randomUUID(),kind,blob,duration,createdAt,frames:null,features:undefined,ageInput,transcript:'',transcriptTask,report:window.missionCheckin?.current()||null}};state.jobs.push(job);retry.addEventListener('click',()=>void enqueue(job));return enqueue(job);
+    const job={kind,root,status,retry,phase:'new',payload:{id:crypto.randomUUID(),kind,blob,duration,createdAt,frames:null,features:undefined,ageInput,transcript:'',transcriptTask,report:window.missionCheckin?.current()||null}};state.jobs.push(job);retry.addEventListener('click',()=>void enqueue(job));return enqueue(job);
   }
   async function send(job){
     try{
@@ -60,7 +58,7 @@
       job.status.textContent='NasaGPT is analyzing the recording...';
       const response=await fetch('/api/media-analysis',{method:'POST',headers:{'x-mission-language':typeof state!=='undefined'&&state.language==='ur'?'ur':'en'},body:form,signal:AbortSignal.timeout(150000)}),result=await response.json();
       if(!response.ok||result.status!=='analyzed')throw Object.assign(new Error(result.error||'media_analysis_unavailable'),{saved:result.saved});
-      if(item.kind==='video'&&item.features?.skin)window.missionSkinSpots?.matches(result.skinMatches||[],item.features.skin.trackingKey);job.phase='complete';job.status.textContent='Analysis saved in archive';job.answer.textContent=result.analysis;window.missionVoiceAnalysis?.transcript(item.kind,result.transcript||item.transcript);job.payload=null;
+      if(item.kind==='video'&&item.features?.skin)window.missionSkinSpots?.matches(result.skinMatches||[],item.features.skin.trackingKey);job.phase='complete';job.root.remove();const panel=states.get(item.kind).root;panel.hidden=!panel.children.length;window.missionVoiceAnalysis?.transcript(item.kind,result.transcript||item.transcript);job.payload=null;
       void window.missionBook?.refresh();void window.missionActivity?.refresh();
     }catch(error){job.phase='failed';job.status.textContent=error.saved?'Recording saved. Analysis currently unavailable.':'Could not send recording for analysis.';job.retry.hidden=false;}
   }

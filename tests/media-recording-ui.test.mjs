@@ -8,7 +8,8 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
 const deferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;});return{promise,resolve};};
 class Element{
   constructor(){this.dataset={};this.attributes={};this.children=[];this.style={};this.events=new Map();this.value='';this.hidden=false;this.disabled=false;this.textContent='';this.classList={add(){}};}
-  append(...children){this.children.push(...children);}
+  append(...children){for(const child of children)if(child&&typeof child==='object')child.parentNode=this;this.children.push(...children);}
+  remove(){if(this.parentNode){this.parentNode.children=this.parentNode.children.filter(child=>child!==this);this.parentNode=null;}}
   setAttribute(key,value){this.attributes[key]=String(value);}
   removeAttribute(key){delete this.attributes[key];}
   addEventListener(key,callback){this.events.set(key,callback);}
@@ -175,7 +176,7 @@ function analysisFixture({failFirst=false,analysis,request,saved=[]}={}){
 }
 const identifierForClient='ad511184-9b59-4529-9ffa-69cfe258c81e';
 test('Completed audio is automatically sent with speech and wellbeing',async()=>{const f=analysisFixture();await f.api.submit('audio',new Blob(['audio']),2);assert.equal(f.calls.length,1);assert.equal(f.calls[0].get('kind'),'audio');assert.equal(f.calls[0].get('transcript'),'Recognized speech');assert.equal(JSON.parse(f.calls[0].get('wellbeing')).score,74);assert.equal(f.api.busy('audio'),false);});
-test('Analysis failures preserve retry with the same identifier',async()=>{const f=analysisFixture({failFirst:true});await f.api.submit('audio',new Blob(['audio']),2);const root=f.node('#voice-dialog').children[0].children[0];assert.match(root.children[1].textContent,/Recording saved/);assert.equal(root.children[3].hidden,false);root.children[3].emit('click');await settle();assert.equal(f.calls.length,2);assert.equal(f.calls[0].get('id'),f.calls[1].get('id'));assert.equal(root.children[2].textContent,'Model response');});
+test('Analysis failures preserve retry with the same identifier',async()=>{const f=analysisFixture({failFirst:true});await f.api.submit('audio',new Blob(['audio']),2);const root=f.node('#voice-dialog').children[0].children[0];assert.match(root.children[1].textContent,/Recording saved/);assert.equal(root.children[2].hidden,false);root.children[2].emit('click');await settle();assert.equal(f.calls.length,2);assert.equal(f.calls[0].get('id'),f.calls[1].get('id'));assert.equal(root.parentNode,null);assert.equal(f.node('#voice-dialog').children[0].children.length,0);assert.equal(f.node('#voice-dialog').children[0].hidden,true);});
 test('The video indicator calculates signal level and resets after disconnecting',()=>{const f=analysisFixture(),meter=f.api.meter('video-log');meter.prepare();meter.attach(media());[...f.frames.values()][0](200);assert.equal(f.node('video-log-level').textContent,'-20 dBFS');assert.ok(parseFloat(f.node('video-log-level-fill').style.width)>0);meter.stop();assert.equal(f.node('video-log-level').textContent,'-');assert.equal(f.node('video-log-level-fill').style.width,'0%');assert.equal(f.engines[0].state,'closed');});
 
 
@@ -265,14 +266,14 @@ test('Waiting and decode failure preserve the previous measurements with a times
   const wait=deferred(),f=voiceAnalysisFixture({decode:wait.promise});f.api.restore('audio',savedVoice);const pending=f.api.analyze('audio',new Blob(['sound']),[],null,'2026-11-05T09:00:00Z');await settle();assert.equal(f.feature('audio','level').textContent,'-25 dBFS');assert.equal(f.api.restore('audio',{...savedVoice,createdAt:'2026-11-05T08:30:00Z'}),false);wait.resolve(null);await pending;assert.equal(f.feature('audio','level').textContent,'-25 dBFS');assert.match(f.panel('audio').children[0].children[1].textContent,/showing recording from/);
 });
 test('Opening latest results does not trigger transcription or upload again',async()=>{
-  const item={...savedVoice,id:'audio-saved',status:'analyzed',analysis:'Saved response'},f=analysisFixture({saved:[item]}),restored=[];f.window.missionVoiceAnalysis={restore:(...args)=>restored.push(args)};await f.api.restore();assert.equal(f.calls.length,0);assert.equal(restored.length,1);assert.equal(restored[0][1].features.acoustic.level,-25.4);const root=f.node('#voice-dialog').children[0];assert.equal(root.hidden,false);assert.equal(root.children[0].children[1].textContent,'Saved response');
+  const item={...savedVoice,id:'audio-saved',status:'analyzed',analysis:'Saved response'},f=analysisFixture({saved:[item]}),restored=[];f.window.missionVoiceAnalysis={restore:(...args)=>restored.push(args)};await f.api.restore();assert.equal(f.calls.length,0);assert.equal(restored.length,1);assert.equal(restored[0][1].features.acoustic.level,-25.4);const root=f.node('#voice-dialog').children[0];assert.equal(root.hidden,true);assert.equal(root.children.length,0);await f.api.restore();assert.equal(root.children.length,0);assert.equal(f.calls.length,0);
 });
 
-test('A saved visual-only analysis remains visible when no voice measurements can be restored',async()=>{
+test('Saved visual-only analysis creates no narrative block in the diary',async()=>{
   const item={kind:'video',id:'video-saved',createdAt:'2026-11-05T09:30:00Z',status:'analyzed',features:null,transcript:'',analysis:'Saved observation of the selected frames.'},f=analysisFixture({saved:[item]});
   f.window.missionVoiceAnalysis={restore:()=>false};await f.api.restore();const root=f.node('#video-log-dialog .diary-visual-analysis').children[0];
-  assert.equal(root.hidden,false);assert.equal(root.children.length,1);assert.equal(root.children[0].children[1].textContent,item.analysis);assert.equal(f.calls.length,0);
-  await f.api.restore();assert.equal(root.children.length,1);assert.equal(f.calls.length,0);
+  assert.equal(root.hidden,true);assert.equal(root.children.length,0);assert.equal(f.calls.length,0);
+  await f.api.restore();assert.equal(root.children.length,0);assert.equal(f.calls.length,0);
 });
 
 
@@ -296,4 +297,11 @@ test('Video sound is analyzed and preserved without adding a second audio panel'
 test('Reference audio and video samples cannot populate recording analysis panels',async()=>{
   const samples={audio:Promise.resolve([{kind:'audio',acoustic:{level:-17,quiet:.3,clipping:0},transcript:'Reference text'},{kind:'video',acoustic:{level:-17,quiet:.3,clipping:0},transcript:'Reference video text'}])},f=voiceAnalysisFixture({samples});await samples.audio;await settle();
   assert.equal(f.panel('video'),undefined);assert.equal(f.panel('audio').dataset.resultSource,'missing');assert.equal(f.feature('audio','level').textContent,'Recording required');assert.equal(f.feature('audio','tone').textContent,'Voice analysis required');
+});
+
+
+test('A newly completed recording saves its analysis without rendering narrative text',async()=>{
+  const f=analysisFixture();let archiveRefreshes=0;f.window.missionBook={refresh(){archiveRefreshes++;}};
+  await f.api.submit('audio',new Blob(['audio']),2);
+  const panel=f.node('#voice-dialog').children[0];assert.equal(panel.hidden,true);assert.equal(panel.children.length,0);assert.equal(f.calls.length,1);assert.equal(archiveRefreshes,1);assert.equal(f.api.busy('audio'),false);
 });
