@@ -8,7 +8,7 @@ import {pipeline} from 'node:stream/promises';
 import {openStorage} from './storage.mjs';
 import {createSessions} from './session.mjs';
 const nativeFetch=globalThis.fetch.bind(globalThis),requestContext=new AsyncLocalStorage();
-const defaults={bodyBytes:26000000,requests:4,aiSessionDaily:20,aiGlobalDaily:100,aiConcurrent:2,sessionDaily:200};
+const defaults={bodyBytes:26000000,requests:4,aiSessionDaily:60,aiGlobalDaily:100,aiConcurrent:2,sessionDaily:200};
 class HttpError extends Error{constructor(code,status){super(code);this.code=code;this.status=status;}}
 function count(value,fallback,name,maximum=100000000){const result=value===undefined?fallback:Number(value);if(!Number.isSafeInteger(result)||result<0||result>maximum)throw new Error('Invalid limit: '+name);return result;}
 function publicAddress(value){const url=new URL(value);if(url.protocol!=='https:'||url.username||url.password||url.pathname!=='/'||url.search||url.hash)throw new Error('PUBLIC_ORIGIN must be an exact HTTPS origin');return url.origin;}

@@ -55,7 +55,7 @@
     if(view.pending===true){pending||={id:view.id,snapshot:view.snapshot};inProgress=true;message='Analysis in progress. Retry to check this snapshot.';return;}
     latest=view;inProgress=false;
     if(view.result.agentAvailable){if(pending?.id===view.id)pending=null;message='';}
-    else{pending||={id:view.id,snapshot:view.snapshot};message='AI unavailable. Rule results are shown. You can retry this snapshot.';}
+    else{pending||={id:view.id,snapshot:view.snapshot};message=view.result.agentError==='ai_daily_limit'?'Daily AI request limit reached. Your readings are saved. Try again after the daily reset.':view.result.agentError==='ai_concurrency_limit'?'AI is processing another request. Retry this snapshot shortly.':'AI unavailable. Rule results are shown. You can retry this snapshot.';}
   }
   async function load(){
     if(!scope||busy)return;const expected=scope,ticket=++generation;controller?.abort();const request=new AbortController(),timeout=setTimeout(()=>request.abort(),15000);controller=request;

@@ -56,6 +56,17 @@ class MemoryQdrant:
     def upsert(self, collection, points, wait):
         self.points.update({point.id: point for point in points})
 
+    def delete(self, collection, points_selector, wait):
+        def selected(point):
+            for condition in points_selector.filter.must:
+                match = condition.match
+                if hasattr(match, "value") and point.payload.get(condition.key) != match.value:
+                    return False
+                if hasattr(match, "any") and point.payload.get(condition.key) not in match.any:
+                    return False
+            return True
+        self.points = {key: point for key, point in self.points.items() if not selected(point)}
+
     def query_points(self, collection, query, query_filter, **kwargs):
         self.last_filter = query_filter
         required = {condition.key: condition.match.value for condition in query_filter.must}
@@ -163,6 +174,23 @@ class ApiTests(unittest.TestCase):
         invalid = self.client.post("/search", headers=self.headers,
                                    json={"ownerId": "owner-a", "astronautId": "unknown", "query": "Alpha"})
         self.assertEqual(invalid.status_code, 422)
+
+    def test_chat_deletion_preserves_diary_and_other_owners_without_loading_the_encoder(self):
+        entry_id = str(uuid.uuid4())
+        chat_owner = "nasagpt:" + "a" * 64
+        owners = (chat_owner, "nasagpt:" + "b" * 64, "diary-owner")
+        for owner in owners:
+            self.client.post("/upsert", headers=self.headers, json={
+                "id": entry_id, "ownerId": owner, "astronautId": "personal", "text": "Synthetic saved note",
+                "language": "en", "createdAt": "2026-11-14T10:00:00Z"})
+        calls = len(self.embedder.calls)
+        payload = {"ownerId": chat_owner, "astronautId": "personal", "ids": [entry_id]}
+        self.assertEqual(self.client.post("/forget-chat", json=payload).status_code, 401)
+        self.assertEqual(self.client.post("/forget-chat", headers=self.headers, json=payload).json(), {"removed": True})
+        self.assertEqual({point.payload["owner_id"] for point in self.qdrant.points.values()}, set(owners[1:]))
+        self.assertEqual(len(self.embedder.calls), calls)
+        self.assertEqual(self.client.post("/forget-chat", headers=self.headers, json={**payload, "ownerId": "diary-owner"}).status_code, 422)
+        self.assertEqual(self.client.post("/forget-chat", headers=self.headers, json={**payload, "astronautId": "jessica-meir"}).status_code, 422)
 
     def test_urdu_text_is_indexed_without_being_translated_or_enabling_generation(self):
         text = "یہ ایک محفوظ مشاہدہ ہے۔"

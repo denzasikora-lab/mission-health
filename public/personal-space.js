@@ -77,13 +77,14 @@
     const input=root.querySelector('input');input.setAttribute('aria-label','Your wellbeing from 1 to 100');root.querySelector('.wellbeing-range-shell').append(input);root.querySelector('label').remove();
     const reset=create('button','wellbeing-reset','Reset score');reset.type='button';reset.hidden=true;reset.addEventListener('click',()=>{if(!owner()||identity?.storageScope!==owner())return;selections.delete(selectionKey());try{if(identity)localStorage.removeItem(storageKey());}catch{}renderScores();scheduleExpiry();window.dispatchEvent(new Event('mission-wellbeing-change'));});root.append(reset);
     const widget={root,input,reset,value:root.querySelector('strong'),label:root.querySelector('.wellbeing-readout span'),mouth:root.querySelector('path'),time:root.querySelector('.wellbeing-time'),preview:null};
+    input.addEventListener('pointerdown',()=>input.focus({preventScroll:true}));
     input.addEventListener('input',()=>{const score=Number(input.value);if(input.disabled||!owner()||identity?.storageScope!==owner()||!Number.isInteger(score)||score<1||score>100)return;widget.preview={scope:owner(),score,at:Date.now()};renderScores();});
     const commit=()=>{const value=widget.preview;widget.preview=null;if(value&&value.scope===owner())choose(value.score);};
     input.addEventListener('change',commit);input.addEventListener('blur',commit);input.addEventListener('pointercancel',()=>{widget.preview=null;renderScores();});
     sliders.push(widget);renderScores();return root;
   }
   function badge(report){const scale=report.wellbeingScale===100?100:10,score=canonicalReport(report).score;const node=create('span','wellbeing-badge');node.innerHTML=window.missionGauge.markup({value:report.score,max:scale,label:'Wellbeing',compact:true});node.append(create('span','',report.label||label(score)));node.style.setProperty('--mood-hue',hue(score));return node;}
-  function store(kind){const key=(owner()||'unbound')+':'+(kind==='diary'?'diary:'+profile():kind);if(!cache.has(key))cache.set(key,{kind,profile:profile(),messages:[],loaded:false,loading:false,cursor:null,more:false,draft:'',files:[],pending:null,busy:false,notice:'',recoveredDraft:false});return cache.get(key);}
+  function store(kind){const key=(owner()||'unbound')+':'+(kind==='diary'?'diary:'+profile():kind);if(!cache.has(key))cache.set(key,{kind,profile:profile(),messages:[],loaded:false,loading:false,cursor:null,more:false,draft:'',files:[],pending:null,busy:false,notice:'',recoveredDraft:false,revision:0,generation:null,clearing:false});return cache.get(key);}
   function favoriteFor(type,id){return favoriteItems.find(item=>item.sourceType===type&&item.sourceId===id);}
   function star(entry,type='diary',id=profile()){
     const b=create('button','personal-star');b.type='button';b.dataset.favoriteSource=type;b.dataset.favoriteId=entry.id;
@@ -114,14 +115,24 @@
     const expected=owner(),ticket=identityVersion;if(!expected||identity?.storageScope!==expected)return;
     if(kind==='favorites'){await favorites(older);return;}
     if(kind==='scheduler'){await window.missionScheduler.refresh();return;}
-    const s=store(kind);if(s.loading||s.polling||s.busy)return;if(quiet)s.polling=true;else{s.loading=true;if(!s.recoveredDraft)s.notice='';renderViews();}let changed=!quiet;
+    const s=store(kind),revision=s.revision;if(s.loading||s.polling||s.busy||s.clearing)return;if(quiet)s.polling=true;else{s.loading=true;if(!s.recoveredDraft)s.notice='';renderViews();}let changed=!quiet;
     try{
       const suffix=older&&s.cursor?'?cursor='+encodeURIComponent(s.cursor):'';
       const data=await api(kind==='team'?'/api/team-chat'+suffix:kind==='chat'?'/api/chat'+suffix:'/api/astronauts/'+s.profile+'/book'+suffix);
-      if(!accountActive(expected,ticket))return;const items=['chat','team'].includes(kind)?data.messages:data.entries.filter(entry=>entry.role==='note').reverse();if(quiet)changed=items.some(item=>!s.messages.some(old=>old.id===item.id));
+      if(!accountActive(expected,ticket)||s.revision!==revision)return;const reset=kind==='chat'&&Number.isInteger(data.generation)&&s.generation!==null&&s.generation!==data.generation;if(reset){s.messages=[];s.draft='';s.files=[];s.pending=null;s.cursor=null;older=false;changed=true;}if(kind==='chat'&&Number.isInteger(data.generation))s.generation=data.generation;const items=['chat','team'].includes(kind)?data.messages:data.entries.filter(entry=>entry.role==='note').reverse();if(quiet)changed=reset||items.some(item=>!s.messages.some(old=>old.id===item.id));
       s.messages=older?[...items.filter(item=>!s.messages.some(old=>old.id===item.id)),...s.messages]:quiet?[...s.messages,...items.filter(item=>!s.messages.some(old=>old.id===item.id))]:items;s.cursor=data.cursor;s.more=data.hasMore;s.loaded=true;
-    }catch{if(accountActive(expected,ticket))s.notice='History failed to load. Press «Refresh», your text remains in the field.';}
-    finally{if(accountActive(expected,ticket)){if(quiet)s.polling=false;else s.loading=false;if(changed)renderViews();}}
+    }catch{if(accountActive(expected,ticket)&&s.revision===revision)s.notice='History failed to load. Press «Refresh», your text remains in the field.';}
+    finally{if(accountActive(expected,ticket)&&s.revision===revision){if(quiet)s.polling=false;else s.loading=false;if(changed)renderViews();}}
+  }
+  async function clearChat(){
+    const expected=owner(),ticket=identityVersion,s=store('chat');if(!expected||identity?.storageScope!==expected||s.clearing)return;
+    s.clearing=true;s.notice='Clearing NasaGPT chat...';renderViews('chat');
+    try{
+      const result=await api('/api/chat',{method:'DELETE'});if(!accountActive(expected,ticket))return;if(result.cleared!==true||!Number.isSafeInteger(result.generation))throw Error('invalid_clear_response');
+      s.revision++;s.generation=result.generation;s.messages=[];s.cursor=null;s.more=false;s.draft='';s.files=[];s.pending=null;s.busy=false;s.loading=false;s.polling=false;s.loaded=true;s.recoveredDraft=false;s.notice='NasaGPT chat cleared.';
+      for(const view of views)if(view.kind==='chat'){window.missionChatComposer.contextChanged(view);view.input.value='';}
+    }catch{if(accountActive(expected,ticket))s.notice='Could not clear NasaGPT chat. Try again.';}
+    finally{if(accountActive(expected,ticket)){s.clearing=false;renderViews('chat');}}
   }
   function messageNode(entry,kind,id){
     const item=create('article','personal-message '+(kind==='team'&&!entry.isOwn||entry.role==='assistant'?'assistant':'user'));
@@ -146,35 +157,36 @@
       }
       view.list.scrollTop=atBottom?view.list.scrollHeight:scrollTop;
       view.more.hidden=kind==='favorites'?!favoriteMore:!s.more;view.more.disabled=kind==='favorites'?favoriteLoading:s.loading;
-      view.refresh.disabled=kind==='favorites'?favoriteLoading:s.loading;
-      if(view.form){view.form.hidden=kind==='favorites';if(kind!=='favorites'){if(view.input.value!==s.draft)view.input.value=s.draft;view.input.disabled=s.busy;view.send.disabled=s.busy||s.loading||s.dictating||s.files.some(file=>!file.id)||!s.draft.trim()&&!s.files.length;view.send.textContent=s.busy?kind==='chat'?'Waiting for an answer...':'Saving...':['chat','team'].includes(kind)?'Send':'To diary';view.input.placeholder=kind==='team'?'Message the crew':['chat'].includes(kind)?'':'How do you feel? What changed today?';view.status.textContent=s.notice;window.missionChatComposer.refresh(view);}}
+      view.refresh.disabled=kind==='favorites'?favoriteLoading:s.loading||s.clearing;if(view.clear)view.clear.disabled=!owner()||Boolean(s?.clearing);
+      if(view.form){view.form.hidden=kind==='favorites';if(kind!=='favorites'){if(view.input.value!==s.draft)view.input.value=s.draft;view.input.disabled=s.busy||s.clearing;view.send.disabled=s.busy||s.clearing||s.loading||s.dictating||s.files.some(file=>!file.id)||!s.draft.trim()&&!s.files.length;view.send.textContent=s.busy?kind==='chat'?'Waiting for an answer...':'Saving...':['chat','team'].includes(kind)?'Send':'To diary';view.input.placeholder=kind==='team'?'Message the crew':['chat'].includes(kind)?'':'How do you feel? What changed today?';view.status.textContent=s.notice;window.missionChatComposer.refresh(view);}}
     }
     updateStars();
   }
   async function send(kind){
-    const expected=owner(),ticket=identityVersion;if(!expected||identity?.storageScope!==expected){store(kind).notice='Connection unavailable. Your draft was not sent. Use Retry beside your name in NasaGPT, then send again.';renderViews();return;}const s=store(kind);if(s.busy||s.dictating||s.files.some(file=>!file.id)||!s.draft.trim()&&!s.files.length)return;s.busy=true;s.notice='';
+    const expected=owner(),ticket=identityVersion;if(!expected||identity?.storageScope!==expected){store(kind).notice='Connection unavailable. Your draft was not sent. Use Retry beside your name in NasaGPT, then send again.';renderViews();return;}const s=store(kind),revision=s.revision;if(s.busy||s.clearing||s.dictating||s.files.some(file=>!file.id)||!s.draft.trim()&&!s.files.length)return;s.busy=true;s.notice='';
     s.pending||={id:crypto.randomUUID(),content:s.draft.trim(),attachments:s.files.map(file=>file.id),...(kind==='team'?{}:{wellbeing:currentReport(),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone}),...(kind==='chat'&&window.missionHealth?.snapshot?{healthSnapshot:window.missionHealth.snapshot()}: {})};const input=s.pending;renderViews();
     try{
-      const result=await api(kind==='team'?'/api/team-chat':kind==='chat'?'/api/chat':'/api/astronauts/'+s.profile+'/messages',{method:'POST',body:JSON.stringify({...input,...(kind==='diary'?{mode:'diary',language:typeof state!=='undefined'&&state.language==='ur'?'ur':'en',attachments:[]}:{} )})});
-      if(!accountActive(expected,ticket))return;for(const entry of [result.message,result.reply].filter(Boolean)){const index=s.messages.findIndex(item=>item.id===entry.id);if(index<0)s.messages.push(entry);else s.messages[index]=entry;}
+      const result=await api(kind==='team'?'/api/team-chat':kind==='chat'?'/api/chat':'/api/astronauts/'+s.profile+'/messages',{method:'POST',body:JSON.stringify({...input,...(kind==='chat'&&s.generation!==null?{generation:s.generation}:{}),...(kind==='diary'?{mode:'diary',language:typeof state!=='undefined'&&state.language==='ur'?'ur':'en',attachments:[]}:{} )})});
+      if(!accountActive(expected,ticket)||s.revision!==revision)return;for(const entry of [result.message,result.reply].filter(Boolean)){const index=s.messages.findIndex(item=>item.id===entry.id);if(index<0)s.messages.push(entry);else s.messages[index]=entry;}
       void window.missionActivity?.refresh();s.draft='';s.files=[];s.pending=null;s.recoveredDraft=false;s.loaded=true;s.notice=kind==='diary'?'Recording saved in the diary.':result.replyError?'NasaGPT could not answer yet. Try the request again.':'';
+      if(kind==='chat'&&Number.isInteger(result.generation))s.generation=result.generation;
       if(kind==='chat'&&result.tasks?.length){s.notice=(s.notice?s.notice+' ':'')+'In «Scheduled»: '+result.tasks.length+'.';void window.missionScheduler.refresh();}
       if(kind==='diary'){void window.missionBook?.refresh();void loadJournal();}
-    }catch{if(accountActive(expected,ticket))s.notice='Could not finish sending. Your text is preserved here; you can retry.';}
-    finally{if(accountActive(expected,ticket)){s.busy=false;renderViews();for(const view of views)if(view.kind===kind&&!view.host.hidden)view.list.scrollTop=view.list.scrollHeight;}}
+    }catch{if(accountActive(expected,ticket)&&s.revision===revision)s.notice='Could not finish sending. Your text is preserved here; you can retry.';}
+    finally{if(accountActive(expected,ticket)&&s.revision===revision){s.busy=false;renderViews();for(const view of views)if(view.kind===kind&&!view.host.hidden)view.list.scrollTop=view.list.scrollHeight;}}
   }
   async function retryChat(entry){
-    const expected=owner(),ticket=identityVersion;if(!expected||identity?.storageScope!==expected){store('chat').notice='Connection unavailable. Use Retry beside your name in NasaGPT, then retry this answer.';renderViews();return;}const s=store('chat');if(s.busy)return;s.busy=true;s.notice='';renderViews();
-    try{const data=await api('/api/chat',{method:'POST',body:JSON.stringify({id:entry.id,content:entry.content,wellbeing:canonicalReport(entry.wellbeing),attachments:(entry.attachments||[]).map(file=>file.id),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone})});if(!accountActive(expected,ticket))return;for(const row of [data.message,data.reply].filter(Boolean)){const i=s.messages.findIndex(item=>item.id===row.id);if(i<0)s.messages.push(row);else s.messages[i]=row;}if(data.tasks?.length)void window.missionScheduler.refresh();s.notice=data.replyError?'NasaGPT could not answer yet. Try the request again.':'';}catch{if(accountActive(expected,ticket))s.notice='Could not get an answer. Try again.';}finally{if(accountActive(expected,ticket)){s.busy=false;renderViews();}}
+    const expected=owner(),ticket=identityVersion;if(!expected||identity?.storageScope!==expected){store('chat').notice='Connection unavailable. Use Retry beside your name in NasaGPT, then retry this answer.';renderViews();return;}const s=store('chat'),revision=s.revision;if(s.busy||s.clearing)return;s.busy=true;s.notice='';renderViews();
+    try{const data=await api('/api/chat',{method:'POST',body:JSON.stringify({...(s.generation!==null?{generation:s.generation}:{}),id:entry.id,content:entry.content,wellbeing:canonicalReport(entry.wellbeing),attachments:(entry.attachments||[]).map(file=>file.id),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone})});if(!accountActive(expected,ticket)||s.revision!==revision)return;for(const row of [data.message,data.reply].filter(Boolean)){const i=s.messages.findIndex(item=>item.id===row.id);if(i<0)s.messages.push(row);else s.messages[i]=row;}if(data.tasks?.length)void window.missionScheduler.refresh();s.notice=data.replyError?'NasaGPT could not answer yet. Try the request again.':'';}catch{if(accountActive(expected,ticket)&&s.revision===revision)s.notice='Could not get an answer. Try again.';}finally{if(accountActive(expected,ticket)&&s.revision===revision){s.busy=false;renderViews();}}
   }
   function panel(host,kind,{favoriteShortcut=false,onKindChange}={}){
     const view={host,kind,favoriteShortcut,onKindChange};host.classList.add('personal-conversation');
-    host.innerHTML='<header class="personal-conversation-heading"><div><span class="personal-section-title"></span><small class="personal-section-caption"></small></div><div><button type="button" data-personal-search>✧ NasaGPT</button><button type="button" data-personal-favorites hidden>Favorites</button><button type="button" data-personal-refresh aria-label="Refresh history">↻</button></div></header><button type="button" class="personal-older" hidden>Earlier entries</button><div class="personal-messages" role="log" aria-live="polite"></div><form class="personal-composer"><label class="sr-only">Message text</label><textarea dir="auto" rows="2" maxlength="6000" aria-label="Message text"></textarea><footer><span class="personal-send-hint"></span><button type="submit"></button></footer></form><p class="personal-status" role="status"></p>';
-    Object.assign(view,{list:host.querySelector('.personal-messages'),form:host.querySelector('form'),input:host.querySelector('textarea'),send:host.querySelector('button[type=submit]'),status:host.querySelector('.personal-status'),more:host.querySelector('.personal-older'),refresh:host.querySelector('[data-personal-refresh]')});
+    host.innerHTML='<header class="personal-conversation-heading"><div><span class="personal-section-title"></span><small class="personal-section-caption"></small></div><div><button type="button" data-personal-search>✧ NasaGPT</button><button type="button" data-personal-favorites hidden>Favorites</button><button type="button" data-personal-refresh aria-label="Refresh history">↻</button><button type="button" data-personal-clear aria-label="Clear NasaGPT chat" title="Clear NasaGPT chat" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div></header><button type="button" class="personal-older" hidden>Earlier entries</button><div class="personal-messages" role="log" aria-live="polite"></div><form class="personal-composer"><label class="sr-only">Message text</label><textarea dir="auto" rows="2" maxlength="6000" aria-label="Message text"></textarea><footer><span class="personal-send-hint"></span><button type="submit"></button></footer></form><p class="personal-status" role="status"></p>';
+    Object.assign(view,{list:host.querySelector('.personal-messages'),form:host.querySelector('form'),input:host.querySelector('textarea'),send:host.querySelector('button[type=submit]'),status:host.querySelector('.personal-status'),more:host.querySelector('.personal-older'),refresh:host.querySelector('[data-personal-refresh]'),clear:host.querySelector('[data-personal-clear]')});
     view.form.addEventListener('submit',event=>{event.preventDefault();void send(view.kind);});
-    view.input.addEventListener('input',()=>{const s=store(view.kind);s.draft=view.input.value;s.pending=null;if(!s.draft.trim())s.recoveredDraft=false;view.send.disabled=!s.draft.trim()&&!s.files.length||s.files.some(file=>!file.id)||s.busy||s.loading||s.dictating;});
+    view.input.addEventListener('input',()=>{const s=store(view.kind);s.draft=view.input.value;s.pending=null;if(!s.draft.trim())s.recoveredDraft=false;view.send.disabled=!s.draft.trim()&&!s.files.length||s.files.some(file=>!file.id)||s.busy||s.clearing||s.loading||s.dictating;});
     view.input.addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();view.form.requestSubmit();}});
-    view.more.addEventListener('click',()=>void load(view.kind,true));view.refresh.addEventListener('click',()=>void load(view.kind));
+    view.clear.addEventListener('click',()=>{if(view.kind==='chat')void clearChat();});view.more.addEventListener('click',()=>void load(view.kind,true));view.refresh.addEventListener('click',()=>void load(view.kind));
     host.querySelector('[data-personal-favorites]').addEventListener('click',()=>setKind(view,view.kind==='favorites'?'chat':'favorites'));
     host.querySelector('[data-personal-search]').addEventListener('click',()=>{window.missionDesign.navigate('archive');document.getElementById('book-search-open').click();});
     window.missionChatComposer.attach(view,{store,render:renderViews});views.push(view);setKind(view,kind,false);return view;
@@ -182,7 +194,7 @@
   function setKind(view,kind,fetch=true){
     if(view.kind!==kind){window.missionChatComposer.contextChanged(view);view.status.textContent='';}view.kind=kind;view.host.querySelector('.personal-section-title').textContent=kind==='diary'?'Your diary':kind==='chat'?'NasaGPT':kind==='scheduler'?'Scheduled':kind==='team'?'Group chat':'Favorites';
     const heading=view.host.querySelector('.personal-conversation-heading'),nameForm=heading.querySelector('.profile-name-form');if(nameForm){nameForm.hidden=kind!=='chat';heading.classList.toggle('has-profile-name',kind==='chat');}
-    window.missionAstronautChat?.decorateHost(view.host,kind==='team');
+    if(view.clear)view.clear.hidden=kind!=='chat';window.missionAstronautChat?.decorateHost(view.host,kind==='team');
     const shortcut=view.host.querySelector('[data-personal-favorites]');shortcut.hidden=!view.favoriteShortcut;shortcut.textContent=kind==='favorites'?'Back to chat':'Favorites';view.onKindChange?.(kind);
     view.input.dataset.activityArea=kind==='diary'?'diary':kind==='team'?'team':'chat';
     view.host.querySelector('.personal-section-caption').textContent=kind==='diary'?'Personal observations / separate history and semantic search':kind==='chat'?'Let’s talk':kind==='scheduler'?'Tasks and reminders from chat':kind==='team'?'Crew / shared channel':'Important entries and answers';

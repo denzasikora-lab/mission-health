@@ -89,7 +89,7 @@ test('Aggregate object capacity returns a bounded error before adding another up
 test('Persistent upstream quotas block excess AI calls across cookies and restarts while preserving rule-only results',async t=>{
   let calls=0;const f=await fixture(t,{settings:azure,limits:{aiSessionDaily:1,aiGlobalDaily:2},upstreamFetch:async()=>{calls++;return completed();}}),a=await f.mint(),b=await f.mint(),c=await f.mint();
   const analyze=cookie=>f.run('/api/health-analysis',{method:'POST',cookie,headers:origin,body:health()});
-  assert.equal((await analyze(a)).body.result.agentAvailable,true);const blockedA=await analyze(a);assert.equal(blockedA.status,201);assert.equal(blockedA.body.result.agentAvailable,false);assert.equal(blockedA.headers['x-mission-ai-limit'],'daily');
+  assert.equal((await analyze(a)).body.result.agentAvailable,true);const blockedA=await analyze(a);assert.equal(blockedA.status,201);assert.equal(blockedA.body.result.agentAvailable,false);assert.equal(blockedA.body.result.agentError,'ai_daily_limit');assert.equal(blockedA.headers['x-mission-ai-limit'],'daily');
   assert.equal((await analyze(b)).body.result.agentAvailable,true);const blockedC=await analyze(c);assert.equal(blockedC.body.result.agentAvailable,false);assert.equal(blockedC.headers['x-mission-ai-limit'],'daily');assert.equal(calls,2);await f.restart();assert.equal((await analyze(c)).body.result.agentAvailable,false);assert.equal(calls,2);
   const usage=await f.storage.DB.prepare("SELECT requests FROM standalone_usage WHERE scope='ai:global'").first();assert.equal(usage.requests,2);
 });
@@ -104,7 +104,7 @@ test('Session recreation has its own persistent global cap while valid sessions 
 test('AI concurrency limits preserve the unavailable result without dispatching a second provider call',async t=>{
   let release,started,calls=0;const gate=new Promise(resolve=>{release=resolve;}),began=new Promise(resolve=>{started=resolve;}),f=await fixture(t,{settings:azure,limits:{aiConcurrent:1},upstreamFetch:async()=>{calls++;started();await gate;return completed();}}),a=await f.mint(),b=await f.mint();
   const pending=f.run('/api/health-analysis',{method:'POST',cookie:a,headers:origin,body:health()});await began;
-  try{const blocked=await f.run('/api/health-analysis',{method:'POST',cookie:b,headers:origin,body:health()});assert.equal(blocked.status,201);assert.equal(blocked.body.result.agentAvailable,false);assert.equal(blocked.headers['x-mission-ai-limit'],'concurrent');assert.equal(calls,1);}finally{release();}
+  try{const blocked=await f.run('/api/health-analysis',{method:'POST',cookie:b,headers:origin,body:health()});assert.equal(blocked.status,201);assert.equal(blocked.body.result.agentAvailable,false);assert.equal(blocked.body.result.agentError,'ai_concurrency_limit');assert.equal(blocked.headers['x-mission-ai-limit'],'concurrent');assert.equal(calls,1);}finally{release();}
   assert.equal((await pending).body.result.agentAvailable,true);
 });
 test('Provider concurrency remains reserved until the response body finishes',async t=>{

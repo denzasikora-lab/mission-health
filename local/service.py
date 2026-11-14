@@ -188,6 +188,12 @@ class Search(Scope):
     query: str = Field(min_length=1, max_length=6000)
 
 
+class ForgetChat(Scope):
+    ownerId: str = Field(pattern=r"^nasagpt:[a-f0-9]{64}$")
+    astronautId: Literal["personal"]
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=100)
+
+
 class Answer(Search):
     language: Literal["en", "ur"]
     references: list[dict] = Field(default_factory=list, max_length=6)
@@ -237,6 +243,18 @@ def upsert(entry: Entry):
         ) for index, vector in enumerate(vectors)]
         runtime["qdrant"].upsert(COLLECTION, points=points, wait=True)
     return {"indexed": True, "chunks": len(points)}
+
+
+@app.post("/forget-chat", dependencies=[Depends(authorize)])
+def forget_chat(query: ForgetChat):
+    conditions = scope_filter(query).must + [
+        models.FieldCondition(key="message_id", match=models.MatchAny(any=[str(value) for value in query.ids]))
+    ]
+    with LOCK:
+        runtime["qdrant"].delete(
+            COLLECTION, points_selector=models.FilterSelector(filter=models.Filter(must=conditions)), wait=True,
+        )
+    return {"removed": True}
 
 
 @app.post("/search", dependencies=[Depends(authorize)])

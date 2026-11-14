@@ -143,6 +143,11 @@ test('A stalled analysis times out, releases the button and preserves its retry 
 test('An unavailable agent shows deterministic rules and preserves the saved snapshot for retry',async()=>{
   const f=uiFixture();await flush();const value=manualSnapshot();value.readings.heart_rate.value=140;f.setSnapshot(value);f.handler(call=>{const item=f.analysis(call.body,{agentAvailable:false,status:'NORMAL',summary:'Rules are available; the AI service is unavailable.'});item.rules.status='CRITICAL';return item;});await f.api.analyze();assert.equal(f.get('health-analysis-status').textContent,'CRITICAL');assert.match(f.get('health-analysis-meta').textContent,/Rules only \/ AI unavailable/);assert.equal(f.get('health-analysis-button').textContent,'Retry analysis');assert.ok(!f.get('health-analysis-meta').textContent.includes('AI + rules'));
 });
+test('Quota and concurrency refusals explain the actual cause and retry the original snapshot',async()=>{
+  for(const [code,text]of [['ai_daily_limit','Daily AI request limit reached'],['ai_concurrency_limit','processing another request']]){
+    const f=uiFixture();await flush();f.handler(call=>{const item=f.analysis(call.body,{agentAvailable:false});item.result.agentError=code;return item;});await f.api.analyze();const sent=clone(f.calls.at(-1).body);assert.ok(f.get('health-analysis-notice').textContent.includes(text));assert.equal(f.get('health-analysis-button').textContent,'Retry analysis');f.handler(call=>f.analysis(call.body));await f.api.analyze();assert.deepEqual(f.calls.at(-1).body,sent);assert.ok(!f.get('health-analysis-notice').textContent.includes(text));
+  }
+});
 
 test('Incomplete core measurements cannot display NORMAL even if an upstream result claims it',async()=>{
   const f=uiFixture();await flush();f.handler(call=>f.analysis(call.body,{status:'NORMAL'}));await f.api.analyze();assert.equal(f.get('health-analysis-status').textContent,'Incomplete');
@@ -182,14 +187,26 @@ test('A saved pending lease can be retried after loading without creating a new 
 
 function chatFixture(initialOwner='owner-a'){
   const calls=[];let current=demoSnapshot(),handler=call=>call.body?({message:{id:call.body.id,content:call.body.content,attachments:[],createdAt:new Clock().toISOString()},reply:null}):({messages:[],hasMore:false,cursor:null});
-  const storage=new Map(),scope=events({document:{getElementById:()=>null,createElement:tag=>new Node(tag),querySelectorAll:()=>[]},Date:Clock,Intl,Event,crypto:webcrypto,personalProfileId:'personal',localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)},loadJournal(){},journalApi:async(path,options={})=>{const call={path,body:options.body?JSON.parse(options.body):undefined};calls.push(call);return handler(call);}});scope.window=scope;scope.missionProfileName={identity:initialOwner?{storageScope:initialOwner}:null};scope.missionChatComposer={refresh(){},contextChanged(){}};scope.missionHealth={snapshot:()=>clone(current)};scope.missionActivity={record(){},refresh(){}};
-  const setup=personalSource.slice(0,personalSource.indexOf('  const checkin=create('));vm.runInNewContext(setup+'window.test={store,send,retryChat,choose,currentReport,selection,prepare,profileChanged,load,favorites,favoriteItems:()=>favoriteItems,addView:value=>views.push(value)};})();',scope);
+  const storage=new Map(),scope=events({document:{getElementById:()=>null,createElement:tag=>new Node(tag),querySelectorAll:()=>[]},Date:Clock,Intl,Event,crypto:webcrypto,personalProfileId:'personal',localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)},loadJournal(){},journalApi:async(path,options={})=>{const call={path,method:options.method||'GET',body:options.body?JSON.parse(options.body):undefined};calls.push(call);return handler(call);}});scope.window=scope;scope.missionProfileName={identity:initialOwner?{storageScope:initialOwner}:null};scope.missionChatComposer={refresh(){},contextChanged(){}};scope.missionHealth={snapshot:()=>clone(current)};scope.missionActivity={record(){},refresh(){}};
+  const setup=personalSource.slice(0,personalSource.indexOf('  const checkin=create('));vm.runInNewContext(setup+'window.test={store,send,retryChat,clearChat,choose,currentReport,selection,prepare,profileChanged,load,favorites,favoriteItems:()=>favoriteItems,addView:value=>views.push(value)};})();',scope);
   return {scope,storage,api:scope.test,calls,addView(kind='chat'){const view={kind,host:new Node(),list:new Node(),form:new Node(),input:new Node('textarea'),send:new Node('button'),status:new Node('p'),more:new Node('button'),refresh:new Node('button')};scope.test.addView(view);return view;},setOwner(value){scope.missionProfileName.identity=value?{storageScope:value}:null;scope.test.profileChanged();},setSnapshot:value=>{current=clone(value);},handler:value=>{handler=value;}};
 }
 
 test('Chat captures its snapshot and attachments once and retains both after a network failure',async()=>{
   const f=chatFixture(),draft=f.api.store('chat');draft.draft='Analyze these readings';draft.files=[{id:importId}];f.handler(()=>{throw new Error('offline');});await f.api.send('chat');const first=clone(f.calls[0].body);assert.equal(first.healthSnapshot.profileId,'personal');assert.deepEqual(first.attachments,[importId]);
   const changed=demoSnapshot();changed.readings.heart_rate.value=140;f.setSnapshot(changed);draft.files=[];f.handler(call=>({message:{id:call.body.id,content:call.body.content},reply:null}));await f.api.send('chat');assert.deepEqual(f.calls[1].body,first);assert.equal(draft.pending,null);
+});
+test('Clearing chat discards only its messages and draft, preserving the other conversation caches',async()=>{
+  const f=chatFixture(),chat=f.api.store('chat'),team=f.api.store('team'),diary=f.api.store('diary');chat.messages=[{id:importId,content:'Old private message'}];chat.draft='Old draft';chat.files=[{id:importId}];team.draft='Crew draft';diary.draft='Diary draft';
+  f.handler(call=>call.method==='DELETE'?{cleared:true,generation:1}:{messages:[],generation:1,hasMore:false});await f.api.clearChat();
+  assert.deepEqual(clone(chat.messages),[]);assert.equal(chat.draft,'');assert.deepEqual(clone(chat.files),[]);assert.equal(chat.generation,1);assert.equal(team.draft,'Crew draft');assert.equal(diary.draft,'Diary draft');assert.equal(f.calls[0].method,'DELETE');
+});
+test('A slow send completion and a slow history load cannot restore a cleared client chat',async()=>{
+  const f=chatFixture(),chat=f.api.store('chat');let finish;f.handler(call=>call.method==='DELETE'?{cleared:true,generation:1}:new Promise(resolve=>{finish=resolve;}));chat.draft='A delayed question';const sending=f.api.send('chat');await f.api.clearChat();finish({message:{id:importId,content:'Old delayed response'},reply:null});await sending;assert.equal(chat.messages.length,0);assert.equal(chat.draft,'');
+  const loading=f.api.load('chat');await f.api.clearChat();finish({messages:[{id:importId,content:'Old history'}],generation:1,hasMore:false});await loading;assert.equal(chat.messages.length,0);
+});
+test('Failed clearing preserves all visible chat data and leaves retry available',async()=>{
+  const f=chatFixture(),chat=f.api.store('chat');chat.messages=[{id:importId,content:'Keep this'}];chat.draft='Keep draft';f.handler(()=>{throw Error('offline');});await f.api.clearChat();assert.equal(chat.messages[0].content,'Keep this');assert.equal(chat.draft,'Keep draft');assert.equal(chat.clearing,false);assert.match(chat.notice,/Could not clear/);
 });
 
 test('Crew chat and diary saves do not attach the personal dashboard, saved-message retry leaves its server snapshot intact',async()=>{

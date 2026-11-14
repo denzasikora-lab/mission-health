@@ -33,15 +33,15 @@ function plannedFromText(content,createdAt,timeZone){
 }
 function plannedTask(row){return{id:row.id,title:row.title,dueDate:row.due_date,dueAt:row.due_at,timeZone:row.time_zone,status:row.status,sourceMessageId:row.source_message_id,createdAt:row.created_at};}
 async function deliverTaskMessages(env,user,now=new Date()){
-  const db=database(env),{results}=await db.prepare("SELECT t.* FROM personal_tasks t WHERE t.owner_id=? AND t.status='planned' AND (t.due_at<=? OR t.due_at IS NULL) AND NOT EXISTS(SELECT 1 FROM task_deliveries d JOIN general_chat_messages m ON m.id=d.message_id AND m.owner_id=d.owner_id WHERE d.owner_id=t.owner_id AND d.task_id=t.id AND d.due_key=COALESCE(t.due_at,t.due_date)) ORDER BY t.due_date,t.due_at LIMIT 200").bind(user,now.toISOString()).all();let delivered=0;
+  const db=database(env),{results}=await db.prepare("SELECT t.* FROM personal_tasks t WHERE t.owner_id=? AND t.status='planned' AND (t.due_at<=? OR t.due_at IS NULL) AND NOT EXISTS(SELECT 1 FROM task_deliveries d WHERE d.owner_id=t.owner_id AND d.task_id=t.id AND d.due_key=COALESCE(t.due_at,t.due_date) AND (d.delivered_at IS NOT NULL OR EXISTS(SELECT 1 FROM general_chat_messages m WHERE m.id=d.message_id AND m.owner_id=d.owner_id))) ORDER BY t.due_date,t.due_at LIMIT 200").bind(user,now.toISOString()).all();let delivered=0;
   for(const task of results){
     if(!task.due_at&&task.due_date>taskDateString(taskDateParts(now,taskTimeZone(task.time_zone))))continue;
     const dueKey=task.due_at||task.due_date;
     await db.prepare('INSERT OR IGNORE INTO task_deliveries (owner_id,task_id,due_key,message_id) VALUES (?,?,?,?)').bind(user,task.id,dueKey,crypto.randomUUID()).run();
-    const delivery=await db.prepare('SELECT message_id FROM task_deliveries WHERE owner_id=? AND task_id=? AND due_key=?').bind(user,task.id,dueKey).first();
-    if(await db.prepare('SELECT id FROM general_chat_messages WHERE id=? AND owner_id=?').bind(delivery.message_id,user).first())continue;
+    const delivery=await db.prepare('SELECT message_id,delivered_at FROM task_deliveries WHERE owner_id=? AND task_id=? AND due_key=?').bind(user,task.id,dueKey).first();
+    if(delivery.delivered_at||await db.prepare('SELECT id FROM general_chat_messages WHERE id=? AND owner_id=?').bind(delivery.message_id,user).first())continue;
     const time=task.due_at?new Intl.DateTimeFormat('en-GB',{dateStyle:'medium',timeStyle:'medium',timeZone:task.time_zone}).format(new Date(task.due_at)):task.due_date;
-    await db.prepare("INSERT OR IGNORE INTO general_chat_messages (id,owner_id,role,content,created_at,vector_status) VALUES (?,?,'assistant',?,?,'not_applicable')").bind(delivery.message_id,user,'Reminder: '+task.title+'\nScheduled for '+time+' / '+task.time_zone,now.toISOString()).run();delivered++;
+    await db.prepare("INSERT OR IGNORE INTO general_chat_messages (id,owner_id,role,content,created_at,vector_status) VALUES (?,?,'assistant',?,?,'not_applicable')").bind(delivery.message_id,user,'Reminder: '+task.title+'\nScheduled for '+time+' / '+task.time_zone,now.toISOString()).run();await db.prepare('UPDATE task_deliveries SET delivered_at=? WHERE owner_id=? AND task_id=? AND due_key=?').bind(now.toISOString(),user,task.id,dueKey).run();delivered++;
   }
   return delivered;
 }

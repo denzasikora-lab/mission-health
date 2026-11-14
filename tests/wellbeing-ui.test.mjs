@@ -16,7 +16,7 @@ class Node{
   querySelector(selector){if(!this.selectors.has(selector))this.selectors.set(selector,new Node());return this.selectors.get(selector);}
   addEventListener(type,callback){this.events[type]=callback;}
   click(){this.events.click?.();}
-  focus(){this.focused=true;}
+  focus(options){this.focused=true;this.focusOptions=options;}
   remove(){}
 }
 function fixture(storage=new Map()){
@@ -63,7 +63,7 @@ test('The slider shows the current score, color and accessible label out of 100'
   f.api.choose(77);assert.notEqual(widget.mouth.attributes.d,'M7 14 Q12 20 17 14');assert.match(widget.value.innerHTML,/aria-valuenow="77"/);
 });
 test('Dragging previews the score without saving, dispatching dashboard updates or sending activity until change',()=>{
-  const f=fixture(),root=f.api.slider(),input=root.querySelector('input');input.focus();
+  const f=fixture(),root=f.api.slider(),input=root.querySelector('input');input.events.pointerdown();assert.deepEqual(clone(input.focusOptions),{preventScroll:true});
   for(const score of [61,72,83]){input.value=String(score);input.events.input();assert.match(root.querySelector('strong').innerHTML,new RegExp('aria-valuenow="'+score+'"'));}
   assert.equal(input.focused,true);assert.equal(f.api.currentReport(),null);assert.equal(f.storage.size,0);assert.equal(f.events.length,0);assert.equal(f.activity.length,0);
   input.events.change();assert.equal(f.api.currentReport().score,83);assert.equal(JSON.parse(f.storage.get(key)).score,83);assert.deepEqual(f.events,['mission-wellbeing-change']);assert.equal(f.activity.length,1);
@@ -92,7 +92,7 @@ test('Stories save the new scale, while archive captions8/10 are not rewritten',
   const f=fixture();f.api.choose(82);f.window.missionCheckin={current:f.api.currentReport};vm.runInNewContext(storySource,{window:f.window,document:f.document,Intl,Date});
   const snapshot=f.window.missionStoryHealth.snapshot();assert.deepEqual(clone(snapshot.wellbeing),{score:82,wellbeingScale:100});
   for(const [wellbeing,expected]of [[{score:8},'Wellbeing: 8 / 10 · self-report'],[{score:82,wellbeingScale:100},'Wellbeing: 82 / 100 · self-report']]){
-    const host=new Node();f.window.missionStoryHealth.render(host,{...snapshot,wellbeing});assert.ok(host.children.some(child=>child.textContent===expected));
+    const host=new Node();f.window.missionStoryHealth.render(host,{...snapshot,version:2,source:'self_report',wellbeing});assert.ok(host.children.some(child=>child.textContent===expected));
   }
 });
 test('Four tabs are available in the capture view, keyboard navigation cycles through them',()=>{

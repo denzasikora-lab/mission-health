@@ -12,7 +12,7 @@ For external-script development, use http://localhost:8765 and the [local Postma
 | --- | --- | --- |
 | GET | `/api/status` | Configured capabilities |
 | GET, PUT | `/api/me` | Profile; PUT body: `{"name":"Cdr. Sara Khan"}` |
-| GET, POST | `/api/chat` | Personal NasaGPT conversation; Send attaches current readings |
+| GET, POST, DELETE | `/api/chat` | NasaGPT conversation; DELETE clears only this chat, preserving Favorites, Scheduled, Group chat and Archive |
 | GET, POST | `/api/team-chat` | Shared astronaut messages; no AI reply |
 | GET, POST | `/api/readings` | Persist personal measurements and their provenance |
 | GET, POST | `/api/health-analysis` | Saved analysis or Analyze: rules plus Azure explanation |

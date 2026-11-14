@@ -9,6 +9,8 @@ export async function buildWidgets(root){
   await build({absWorkingDir:root,entryPoints:['ui/notifications.jsx'],outfile:'public/vendor/mission-notifications.js',bundle:true,minify:true,format:'iife',target:['safari16'],define:{'process.env.NODE_ENV':'"production"'},legalComments:'eof'});
   await execute(process.execPath,[resolve(root,'node_modules/@tailwindcss/cli/dist/index.mjs'),'-i','ui/notifications.css','-o','public/vendor/mission-notifications.css','--minify'],{cwd:root,maxBuffer:1024*1024});
   const css=resolve(root,'public/vendor/mission-notifications.css');await writeFile(css,(await readFile(css,'utf8')).replace(/(-?(?:\d*\.)?\d+)rem\b/g,(_match,value)=>Number(value)*16+'px'),'utf8');
+  await execute(process.execPath,[resolve(root,'node_modules/@tailwindcss/cli/dist/index.mjs'),'-i','ui/story-widgets.css','-o','public/vendor/story-widgets.css','--minify'],{cwd:root,maxBuffer:1024*1024});
+  const chips=resolve(root,'public/vendor/story-widgets.css');await writeFile(chips,(await readFile(chips,'utf8')).replace(/(-?(?:\d*\.)?\d+)rem\b/g,(_match,value)=>Number(value)*16+'px'),'utf8');
   await cp(resolve(root,'ui/konsta-LICENSE.txt'),resolve(root,'public/vendor/konsta-LICENSE.txt'));
   for(const name of ['react','react-dom'])await cp(resolve(root,'node_modules',name,'LICENSE'),resolve(root,'public/vendor',name+'-LICENSE.txt'));
 }

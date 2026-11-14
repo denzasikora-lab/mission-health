@@ -168,7 +168,7 @@ async function completeLanguageMessages(env,messages,options={}){
   const attempts=options.attempts??2;
   for(let attempt=0;attempt<attempts;attempt++){
     try{response=await fetch(endpoint,{method:'POST',headers,body:JSON.stringify(body),signal:AbortSignal.timeout(options.timeoutMs??40000),...(azure?{redirect:'manual'}:options.redirect?{redirect:options.redirect}:{})})}
-    catch(error){if(attempt+1<attempts)continue;console.error('Language service connection unavailable:',error.name);fail('assistant_unavailable',503)}
+    catch(error){if(['ai_daily_limit','ai_concurrency_limit'].includes(error.code))throw error;if(attempt+1<attempts)continue;console.error('Language service connection unavailable:',error.name);fail('assistant_unavailable',503)}
     if(response.ok||![502,503,504].includes(response.status)||attempt+1===attempts)break;
     await response.body?.cancel();
   }
@@ -221,8 +221,9 @@ async function addMessage(request,env,user,astronaut){
 }
 const missionHandler={
   async scheduled(_controller,env){
-    const {results}=await database(env).prepare("SELECT DISTINCT t.owner_id FROM personal_tasks t WHERE t.status='planned' AND (t.due_at<=? OR t.due_at IS NULL) AND NOT EXISTS(SELECT 1 FROM task_deliveries d JOIN general_chat_messages m ON m.id=d.message_id AND m.owner_id=d.owner_id WHERE d.owner_id=t.owner_id AND d.task_id=t.id AND d.due_key=COALESCE(t.due_at,t.due_date)) LIMIT 200").bind(new Date().toISOString()).all();
+    const {results}=await database(env).prepare("SELECT DISTINCT t.owner_id FROM personal_tasks t WHERE t.status='planned' AND (t.due_at<=? OR t.due_at IS NULL) AND NOT EXISTS(SELECT 1 FROM task_deliveries d WHERE d.owner_id=t.owner_id AND d.task_id=t.id AND d.due_key=COALESCE(t.due_at,t.due_date) AND (d.delivered_at IS NOT NULL OR EXISTS(SELECT 1 FROM general_chat_messages m WHERE m.id=d.message_id AND m.owner_id=d.owner_id))) LIMIT 200").bind(new Date().toISOString()).all();
     for(const row of results)await deliverTaskMessages(env,row.owner_id);
+    if(memoryConfigured(env)){const pending=await database(env).prepare('SELECT DISTINCT owner_id FROM chat_cleared_messages WHERE vector_pending=1 AND retry_at<=? LIMIT 1').bind(new Date().toISOString()).all();for(const row of pending.results)await forgetClearedChat(env,row.owner_id);}
   },
   async fetch(request,env,ctx){
     const url=new URL(request.url);

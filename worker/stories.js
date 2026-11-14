@@ -1,7 +1,20 @@
 function validatedStoryHealth(raw){
   if(raw===null||raw===undefined||raw==='')return null;
-  if(typeof raw!=='string'||raw.length>2000)fail('invalid_story_health',400);
+  if(typeof raw!=='string'||raw.length>6000)fail('invalid_story_health',400);
   let value;try{value=JSON.parse(raw)}catch{fail('invalid_story_health',400)}
+  if(value?.version===3){
+    const fields={hr:['bpm',20,250],spo2:['%',50,100],temp:['°C',30,45],fatigue:['/100',0,100],wellbeing:['/100',1,100],recovery:['/100',0,100],skin:['°C',20,45],respiration:['/min',4,60]};
+    if(value.source!=='personal_dashboard'||value.profileId!=='personal'||typeof value.capturedAt!=='string'||!Number.isFinite(Date.parse(value.capturedAt))||Date.parse(value.capturedAt)>Date.now()+300000||!Array.isArray(value.widgets)||value.widgets.length>8||!value.readings||typeof value.readings!=='object'||Array.isArray(value.readings))fail('invalid_story_health',400);
+    const readings={},widgets=[];
+    for(const item of value.widgets){
+      if(!item||!Object.hasOwn(fields,item.key)||widgets.some(old=>old.key===item.key)||!Number.isFinite(item.x)||item.x<0||item.x>1||!Number.isFinite(item.y)||item.y<0||item.y>1)fail('invalid_story_health',400);
+      const [unit,min,max]=fields[item.key],reading=value.readings[item.key];
+      if(!reading||!Number.isFinite(reading.value)||reading.value<min||reading.value>max||!['manual','import','demo'].includes(reading.source)||item.key==='wellbeing'&&!Number.isInteger(reading.value))fail('invalid_story_health',400);
+      if(reading.source!=='demo'&&(!Number.isFinite(Date.parse(reading.observedAt))||Date.parse(reading.observedAt)>Date.now()+300000))fail('invalid_story_health',400);
+      readings[item.key]={value:reading.value,unit,source:reading.source,observedAt:reading.source==='demo'?null:new Date(reading.observedAt).toISOString()};widgets.push({key:item.key,x:item.x,y:item.y});
+    }
+    return {version:3,source:'personal_dashboard',profileId:'personal',capturedAt:new Date(value.capturedAt).toISOString(),readings,widgets,wellbeing:readings.wellbeing?.source==='manual'?selfReport({score:readings.wellbeing.value,wellbeingScale:100}):null};
+  }
   if(value?.version===2){
     if(value.source!=='self_report'||value.profileId!=='personal'||typeof value.capturedAt!=='string'||!Number.isFinite(Date.parse(value.capturedAt))||Date.parse(value.capturedAt)>Date.now()+300000)fail('invalid_story_health',400);
     const report=selfReport(value.wellbeing);
@@ -13,7 +26,7 @@ function validatedStoryHealth(raw){
   return {version:1,source:'demo_dashboard',profileId:value.profileId,profileName:profiles[value.profileId],capturedAt:new Date(value.capturedAt).toISOString(),metrics};
 }
 function savedStoryHealth(row){try{const value=row.health_json?JSON.parse(row.health_json):null;return value?.version===2&&value.source==='self_report'?{...value,wellbeing:storedSelfReport(value.wellbeing)}:value}catch{return null}}
-function storyView(row){return {id:row.id,author:'Cdr. Sara Khan',caption:row.caption,health:savedStoryHealth(row),kind:row.media_kind,createdAt:row.created_at,duration:row.duration_ms?row.duration_ms/1000:null,url:'/api/stories/'+row.id+'/media',poster:row.poster_key?'/api/stories/'+row.id+'/media?poster=1':'/api/stories/'+row.id+'/media'}}
+function storyView(row){return {id:row.id,author:'Cdr. Sara Khan',caption:row.caption,health:savedStoryHealth(row),kind:row.media_kind,width:row.width,height:row.height,createdAt:row.created_at,duration:row.duration_ms?row.duration_ms/1000:null,url:'/api/stories/'+row.id+'/media',poster:row.poster_key?'/api/stories/'+row.id+'/media?poster=1':'/api/stories/'+row.id+'/media'}}
 async function storyRow(env,user,id){return database(env).prepare('SELECT * FROM personal_stories WHERE id=? AND owner_id=?').bind(id,user).first()}
 async function storiesRoute(request,env,user,id,media,url){
   if(!id){
