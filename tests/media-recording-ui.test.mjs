@@ -247,7 +247,7 @@ function voiceAnalysisFixture({decode,samples}={}){
 const savedVoice={kind:'audio',createdAt:'2026-11-05T08:10:00Z',features:{acoustic:{level:-25.4,quiet:.2,clipping:.001,seconds:5},model:'embeddinggemma-2:daa72c51243991dfcaf9f9137d2c573d8f7790c0:q4:768',tone:[{label:'neutral',similarity:.62}]},transcript:'Saved speech'};
 test('Personal acoustic panels stay empty before recording and restore actual saved analysis',async()=>{
   const samples=audioSamples(),f=voiceAnalysisFixture({samples});await samples.audio;await settle();
-  for(const kind of ['audio','video']){assert.equal(f.panel(kind).dataset.resultSource,'missing');assert.ok(f.panel(kind).children[1].children.every(card=>card.dataset.resultSource==='missing'));for(const key of ['level','pauses','clipping'])assert.equal(f.feature(kind,key).textContent,'Recording required');assert.equal(f.feature(kind,'tone').textContent,'Voice analysis required');}
+  assert.equal(f.panel('video'),undefined);for(const kind of ['audio']){assert.equal(f.panel(kind).dataset.resultSource,'missing');assert.ok(f.panel(kind).children[1].children.every(card=>card.dataset.resultSource==='missing'));for(const key of ['level','pauses','clipping'])assert.equal(f.feature(kind,key).textContent,'Recording required');assert.equal(f.feature(kind,'tone').textContent,'Voice analysis required');}
   assert.equal(f.api.restore('audio',{...savedVoice,createdAt:'2025-01-01T00:00:00Z'}),true);assert.equal(f.panel('audio').dataset.resultSource,'saved');assert.equal(f.feature('audio','level').textContent,'-25 dBFS');assert.equal(f.feature('audio','tone').textContent,'Neutral / 0.62');
 });
 test('A late reference file does not replace a new recording or its decode failure',async()=>{
@@ -255,7 +255,7 @@ test('A late reference file does not replace a new recording or its decode failu
   pendingSample.resolve(await audioSamples().audio);await settle();assert.equal(f.panel('audio').dataset.resultSource,'pending');assert.notEqual(f.feature('audio','tone').textContent,'Synthesized speech / Samantha');pendingDecode.resolve(null);await analysis;assert.equal(f.panel('audio').dataset.resultSource,'missing');assert.equal(f.feature('audio','level').textContent,'No measurement');
 });
 test('Without originals, cards name missing data explicitly rather than showing dashes',()=>{
-  const f=voiceAnalysisFixture();for(const kind of ['audio','video']){for(const key of ['level','pauses','clipping'])assert.equal(f.feature(kind,key).textContent,'Recording required');assert.equal(f.feature(kind,'tone').textContent,'Voice analysis required');}
+  const f=voiceAnalysisFixture();assert.equal(f.panel('video'),undefined);for(const kind of ['audio']){for(const key of ['level','pauses','clipping'])assert.equal(f.feature(kind,key).textContent,'Recording required');assert.equal(f.feature(kind,'tone').textContent,'Voice analysis required');}
 });
 test('Saved acoustic results restore numbers, circular gauges and tone',()=>{
   const f=voiceAnalysisFixture();assert.equal(f.api.restore('audio',savedVoice),true);assert.equal(f.feature('audio','level').textContent,'-25 dBFS');assert.equal(f.feature('audio','pauses').innerHTML,'gauge:20');assert.equal(f.feature('audio','clipping').innerHTML,'gauge:0.1');assert.equal(f.feature('audio','tone').textContent,'Neutral / 0.62');assert.match(f.panel('audio').children[0].children[1].textContent,/Latest recording/);assert.equal(f.panel('audio').children[4].children[1].textContent,'Saved speech');
@@ -281,4 +281,19 @@ test('Acoustic values appear after decoding before the embedder responds',async(
   const pending=f.api.analyze('audio',new Blob(['sound']),[],null,'2026-11-05T09:30:00Z');await settle();
   assert.equal(f.workers.length,1);assert.equal(f.feature('audio','level').textContent,'-20 dBFS');assert.equal(f.feature('audio','pauses').innerHTML,'gauge:0');assert.equal(f.feature('audio','clipping').innerHTML,'gauge:0');assert.equal(f.feature('audio','tone').textContent,'Voice analysis...');assert.equal(f.panel('audio').dataset.recordedAt,'2026-11-05T09:30:00Z');
   f.workers[0].onmessage({data:{id:f.workers[0].id,type:'error',reason:'model_unavailable'}});await pending;assert.equal(f.feature('audio','level').textContent,'-20 dBFS');assert.equal(f.feature('audio','tone').textContent,'No model result');
+});
+
+
+test('Video sound is analyzed and preserved without adding a second audio panel',async()=>{
+  const data=new Float32Array(16000).fill(.1),f=voiceAnalysisFixture({decode:Promise.resolve({length:data.length,sampleRate:16000,numberOfChannels:1,getChannelData:()=>data})});
+  assert.equal(f.panel('video'),undefined);assert.equal(f.api.restore('video',{...savedVoice,kind:'video'}),true);assert.equal(f.panel('video'),undefined);
+  const pending=f.api.analyze('video',new Blob(['sound']),[],null,'2026-11-06T09:30:00Z');await settle();assert.equal(f.workers.length,1);
+  f.workers[0].onmessage({data:{id:f.workers[0].id,type:'result',result:{model:savedVoice.features.model,tone:[{label:'neutral',similarity:.62}]}}});
+  const features=await pending;assert.equal(Math.round(features.acoustic.level),-20);assert.equal(features.tone[0].label,'neutral');assert.equal(f.panel('video'),undefined);assert.equal(f.workers[0].terminated,true);
+  f.api.transcript('video','Actual video transcription');assert.equal(f.panel('video'),undefined);assert.equal(f.feature('audio','level').textContent,'Recording required');
+});
+
+test('Reference audio and video samples cannot populate recording analysis panels',async()=>{
+  const samples={audio:Promise.resolve([{kind:'audio',acoustic:{level:-17,quiet:.3,clipping:0},transcript:'Reference text'},{kind:'video',acoustic:{level:-17,quiet:.3,clipping:0},transcript:'Reference video text'}])},f=voiceAnalysisFixture({samples});await samples.audio;await settle();
+  assert.equal(f.panel('video'),undefined);assert.equal(f.panel('audio').dataset.resultSource,'missing');assert.equal(f.feature('audio','level').textContent,'Recording required');assert.equal(f.feature('audio','tone').textContent,'Voice analysis required');
 });

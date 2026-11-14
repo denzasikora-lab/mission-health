@@ -2,25 +2,16 @@
   const tones={neutral:'Neutral',happy:'Happy',sad:'Sad',angry:'Irritated',tense:'Tense'},panels=new Map();
   function element(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;}
   for(const kind of ['audio','video']){
-    const host=document.querySelector('#voice-dialog'),root=element('section','voice-analysis-panel');root.dataset.voiceAnalysis=kind;
-    const heading=element('header'),title=element('h3','',kind==='audio'?'Audio recording analysis':'Video audio track'),status=element('span','voice-analysis-state','Recording has not been made yet');status.setAttribute('role','status');heading.append(title,status);
+    const host=kind==='audio'?document.querySelector('#voice-dialog'):null,root=element('section','voice-analysis-panel');root.dataset.voiceAnalysis=kind;
+    const heading=element('header'),title=element('h3','','Audio recording analysis'),status=element('span','voice-analysis-state','Recording has not been made yet');status.setAttribute('role','status');heading.append(title,status);
     const metrics=element('div','voice-analysis-metrics');for(const [key,label]of [['level','Average level'],['pauses','Quiet intervals'],['clipping','Clipping'],['tone','Voice tone']]){const item=element('div');item.dataset.voiceFeature=key;const number=element('strong','',key==='tone'?'Voice analysis required':'Recording required');item.append(element('span','',label),number);metrics.append(item);}
     const speech=element('details','voice-analysis-speech'),summary=element('summary','','Recognized speech / Whisper'),transcript=element('p','','Speech appears after recording.');speech.append(summary,transcript);
     const model=element('p','voice-analysis-model','EmbeddingGemma 2 / audio'+(kind==='video'?' and frames':'')),hint=element('small','voice-analysis-hint','Tone: similarity to voice descriptions, not a diagnosis.'),details=element('details','voice-analysis-method');details.innerHTML='<summary>Analysis models</summary><p>EmbeddingGemma 2 embeds the original audio and compares it with intonation descriptions. Similarity is not emotion probability. Whisper transcribes speech. NasaGPT uses these observations for analysis. AudioFM is not connected yet: published weights or an API are required.</p><a href="https://huggingface.co/onnx-community/embeddinggemma-2-ONNX" target="_blank" rel="noopener">https://huggingface.co/onnx-community/embeddinggemma-2-ONNX</a>';
-    root.append(heading,metrics,model,hint,speech,details);host.append(root);panels.set(kind,{root,status,metrics,model,hint,summary,transcript,latest:null,sample:null,started:false,analyzing:false});
+    root.append(heading,metrics,model,hint,speech,details);host?.append(root);panels.set(kind,{root,status,metrics,model,hint,summary,transcript,latest:null,started:false,analyzing:false});
     markSource(panels.get(kind),'missing');
   }
   function markSource(panel,source){panel.root.dataset.resultSource=source;for(const card of panel.metrics.children)card.dataset.resultSource=source;}
   function value(kind,key,text,percent=null){const node=panels.get(kind).root.querySelector('[data-voice-feature='+key+'] strong');if(percent!==null)node.innerHTML=window.missionGauge.markup({value:percent,label:key==='pauses'?'Quiet intervals':'Clipping',unit:'%',reverse:true,digits:1});else node.textContent=text;}
-  function showSample(kind,item){
-    const panel=panels.get(kind);if(!panel||panel.latest||panel.analyzing||panel.started)return;
-    const a=item.acoustic;panel.sample=item;markSource(panel,'sample');panel.root.dataset.recordedAt='';
-    value(kind,'level',a.level.toLocaleString('en-GB',{maximumFractionDigits:1})+' dBFS');value(kind,'pauses','',a.quiet*100);value(kind,'clipping','',a.clipping*100);value(kind,'tone','Synthesized speech / Samantha');
-    panel.status.textContent='Reference sample / '+String(item.mediaUrl||'technical recording').split('/').at(-1);panel.model.textContent='Reference file acoustics / '+item.source;panel.hint.textContent='Measured synthesized sample, not the user’s voice. Tone and emotions were not inferred.';panel.summary.textContent='Reference sample text';panel.transcript.textContent=item.transcript;
-  }
-  function clearSample(kind){
-    const panel=panels.get(kind);if(!panel.sample)return;panel.sample=null;for(const key of ['level','pauses','clipping'])value(kind,key,'Processing');value(kind,'tone','Voice analysis...');panel.summary.textContent='Recognized speech / Whisper';panel.hint.textContent='Tone: similarity to voice descriptions, not a diagnosis.';panel.transcript.textContent='Speech recognition...';
-  }
   async function decode(blob){
     const Engine=window.AudioContext||window.webkitAudioContext;if(!Engine)throw new Error('decode_unavailable');const engine=new Engine();
     try{const buffer=await engine.decodeAudioData(await blob.arrayBuffer()),count=Math.min(buffer.length,Math.ceil(buffer.sampleRate*125)),mono=new Float32Array(count);for(let channel=0;channel<buffer.numberOfChannels;channel++){const data=buffer.getChannelData(channel);for(let i=0;i<count;i++)mono[i]+=data[i]/buffer.numberOfChannels;}
@@ -37,14 +28,14 @@
     const panel=panels.get(kind),features=item?.features,a=features?.acoustic,top=features?.model&&features.tone?.find(value=>tones[value.label]&&Number.isFinite(value.similarity));
     const measured=a&&['level','quiet','clipping','seconds'].every(key=>Number.isFinite(a[key]))&&a.level>=-120&&a.level<=1&&a.quiet>=0&&a.quiet<=1&&a.clipping>=0&&a.clipping<=1&&a.seconds>0;
     if(!measured&&!top)return false;
-    const sample=Boolean(panel.sample);panel.sample=null;panel.latest=item;markSource(panel,source);panel.root.dataset.recordedAt=item.createdAt||'';panel.summary.textContent='Recognized speech / Whisper';panel.hint.textContent='Tone: similarity to voice descriptions, not a diagnosis.';
+    panel.latest=item;markSource(panel,source);panel.root.dataset.recordedAt=item.createdAt||'';panel.summary.textContent='Recognized speech / Whisper';panel.hint.textContent='Tone: similarity to voice descriptions, not a diagnosis.';
     value(kind,'level',measured?Math.round(a.level)+' dBFS':'Audio not decoded');
     value(kind,'pauses',measured?'':'No measurement',measured?a.quiet*100:null);
     value(kind,'clipping',measured?'':'No measurement',measured?a.clipping*100:null);
     value(kind,'tone',top?tones[top.label]+' / '+top.similarity.toFixed(2):'No model result');
     panel.status.textContent='Latest recording / '+recordedAt(item.createdAt);
     panel.model.textContent=top?'EmbeddingGemma 2 / voice tone calculated':'Acoustic measurements / voice tone not calculated';
-    if(item.transcript!==undefined)panel.transcript.textContent=item.transcript||'No intelligible speech detected.';else if(sample)panel.transcript.textContent='Transcript unavailable.';
+    if(item.transcript!==undefined)panel.transcript.textContent=item.transcript||'No intelligible speech detected.';
     return true;
   }
   function restore(kind,item){
@@ -59,7 +50,7 @@
   }
   async function analyze(kind,blob,frames=[],ageInput=null,createdAt=new Date().toISOString()){
     if(kind==='video')window.missionApparentAge?.begin();
-    const panel=panels.get(kind);panel.started=true;clearSample(kind);panel.analyzing=true;markSource(panel,panel.latest?'saved':'pending');panel.status.textContent=panel.latest?'New recording is being analyzed / showing recording from '+recordedAt(panel.latest.createdAt):'Analyzing signal';if(!panel.latest)panel.transcript.textContent='Speech recognition...';let audio=null,metrics=null;
+    const panel=panels.get(kind);panel.started=true;panel.analyzing=true;markSource(panel,panel.latest?'saved':'pending');panel.status.textContent=panel.latest?'New recording is being analyzed / showing recording from '+recordedAt(panel.latest.createdAt):'Analyzing signal';if(!panel.latest)panel.transcript.textContent='Speech recognition...';let audio=null,metrics=null;
     try{
       try{audio=await decode(blob);metrics=acoustic(audio);show(kind,{createdAt,features:{acoustic:metrics}});value(kind,'tone','Voice analysis...');panel.status.textContent='Signal measured / '+recordedAt(createdAt);}catch{unavailable(kind,'New recording audio was not decoded');panel.model.textContent='Audio embedding unavailable';if(!frames.length)return null;}
       if(metrics&&metrics.level<-60){show(kind,{createdAt,features:{acoustic:metrics}});panel.status.textContent='Recording too quiet / '+recordedAt(createdAt);panel.model.textContent='EmbeddingGemma 2 / not enough audio';if(!frames.length)return{acoustic:metrics};audio=null;}
@@ -76,7 +67,6 @@
       }
     }finally{panel.analyzing=false;}
   }
-  function transcript(kind,text){const panel=panels.get(kind);if(panel.sample){clearSample(kind);markSource(panel,'missing');}panel.transcript.textContent=text||'No intelligible speech detected.';}
-  window.missionAnalysisSamples?.audio?.then(items=>{for(const item of items)showSample(item.kind,item);});
+  function transcript(kind,text){const panel=panels.get(kind);panel.transcript.textContent=text||'No intelligible speech detected.';}
   window.missionVoiceAnalysis={analyze,transcript,restore};
 })();
