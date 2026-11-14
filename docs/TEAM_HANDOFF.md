@@ -47,7 +47,7 @@ There are 20 application POST route patterns in the current API. Five may invoke
 | `/api/health-analysis` | Analyze in Health; Retry analysis | Deterministic rules, Azure explanation, saved structured result |
 | `/api/media-analysis` | Automatic processing after stopping Audio or Camera recording; retry processing | Save media, transcribe when needed, analyze with Azure, save archive result |
 | `/api/astronauts/{profile}/messages` | Save in the archive entry editor; retained diary Ask/Send flow | `mode: "note"` saves only; `mode: "ask"` retrieves diary context and asks Azure |
-| `/api/astronauts/{profile}/book-answer` | Automatic after an Archive search returns owned entries | Azure answer grounded in the selected retrieved entries |
+| `/api/astronauts/{profile}/book-answer` | Archive -> Search archive -> Find; automatic when the search returns owned entries | Azure answer grounded in the selected retrieved entries, shown above the matched pages |
 | `/api/compose` | Debounced typing in a supported text editor | ProxyAPI mini draft continuation |
 | `/api/story-tags` | Debounced story-caption editing | ProxyAPI mini English topical hashtags with local fallback |
 | `/api/transcriptions` | Cloud speech recognition from recording/dictation flows | Configured speech service; ProxyAPI Whisper when selected |

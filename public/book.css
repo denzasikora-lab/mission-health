@@ -76,3 +76,5 @@ audio.book-observation-media{height:54px;max-height:54px}
 .book-observation-section h4{font:600 13px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0 0 5px;color:var(--ink)}
 .book-observation-section p{font:inherit;margin:0;white-space:pre-wrap;color:var(--ink)}
 .book-page-structured .book-page-running{font-size:9px;letter-spacing:.05em}
+
+.book-search-actions{display:flex;justify-content:flex-end;margin:0 14px 5px}.book-search-actions #book-search-open{min-height:30px;padding:5px 10px;font:inherit;font-size:.65rem;line-height:1.4;white-space:nowrap}

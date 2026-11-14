@@ -1,7 +1,7 @@
 (() => {
   const ur={
     'Home':'مرکزی صفحہ','Health':'صحت','Diary':'ڈائری','Archive':'محفوظات','Research':'تحقیق',
-    'Favorites':'پسندیدہ','Scheduled':'طے شدہ','Group chat':'گروپ چیٹ','Your diary':'آپ کی ڈائری','Personal diary':'ذاتی ڈائری',
+    'Favorites':'پسندیدہ','Scheduled':'طے شدہ','Group chat':'گروپ چیٹ','Your diary':'آپ کی ڈائری','Personal diary':'ذاتی ڈائری','Search archive':'محفوظات میں تلاش کریں',
     'Let’s talk':'آئیے بات کریں','Back to chat':'گفتگو پر واپس جائیں','Important entries and answers':'اہم اندراجات اور جوابات',
     'Tasks and reminders from chat':'گفتگو سے بنائے گئے کام اور یاد دہانیاں','Crew / shared channel':'عملہ / مشترکہ گفتگو',
     'Personal observations / separate history and semantic search':'ذاتی مشاہدات / الگ تاریخ اور معنوی تلاش',
@@ -51,6 +51,7 @@
   add('[data-favorite-source]',['Add to favorites','Remove from favorites'],'aria-label');
   add('#mission-home-button',['Home'],'aria-label');add('#mission-home-button',['Home'],'title');
   add('.brand',['Home / Mission Health'],'aria-label');
+  add('#book-search-open',['Search archive']);
   add('.home-body-panel > header > h2',['My readings']);
   add('.home-sample-button',['FILL SAMPLE']);add('.home-sample-button',['Generate fictional sample readings'],'title');
   add('.home-sample-clear',['Clear generated sample'],'aria-label');add('.home-sample-clear',['Clear generated sample'],'title');
