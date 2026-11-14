@@ -10,7 +10,7 @@
     'Refresh history':'گفتگو تازہ کریں','Message text':'پیغام کا متن','Message files':'پیغام کی فائلیں',
     'Earlier entries':'پرانے اندراجات','Retry request answer':'جواب کے لیے دوبارہ کوشش کریں',
     'Add to favorites':'پسندیدہ میں شامل کریں','Remove from favorites':'پسندیدہ سے نکالیں',
-    'My readings':'میری پیمائشیں','Pulse':'نبض','Skin temperature':'جلد کا درجہ حرارت','Wellbeing':'کیفیت','Sleep':'نیند',
+    'My readings':'میری پیمائشیں','FILL SAMPLE':'نمونہ بھریں','Generate fictional sample readings':'نمونے کے فرضی اعداد بنائیں','Clear generated sample':'بنایا ہوا نمونہ ہٹائیں','Generated sample':'بنایا ہوا نمونہ','Pulse':'نبض','Skin temperature':'جلد کا درجہ حرارت','Wellbeing':'کیفیت','Sleep':'نیند',
     'HRV':'دل کی دھڑکن کے وقفوں میں فرق','Respiration':'سانس کی رفتار','Blood pressure':'فشار خون','Recovery':'بحالی',
     'Steps':'قدم','Movement':'حرکت','Illuminance':'روشنی کی شدت','Calculated index':'حسابی اشاریہ',
     'Select a score below':'نیچے اسکور منتخب کریں','No measurements':'کوئی پیمائش موجود نہیں','Your self-report':'آپ کی بتائی گئی کیفیت','Wellbeing scale':'کیفیت کا پیمانہ',
@@ -52,9 +52,11 @@
   add('#mission-home-button',['Home'],'aria-label');add('#mission-home-button',['Home'],'title');
   add('.brand',['Home / Mission Health'],'aria-label');
   add('.home-body-panel > header > h2',['My readings']);
+  add('.home-sample-button',['FILL SAMPLE']);add('.home-sample-button',['Generate fictional sample readings'],'title');
+  add('.home-sample-clear',['Clear generated sample'],'aria-label');add('.home-sample-clear',['Clear generated sample'],'title');
   add('.home-vitals',['My readings'],'aria-label');
   add('.home-vital > span:first-child',['Pulse','Skin temperature','Wellbeing','Sleep','HRV','Respiration','Blood pressure','Recovery','Steps','Movement','Illuminance']);
-  add('.home-vital > small',['Select a score below','No measurements','Your self-report','Wellbeing scale','Calculated index']);
+  add('.home-vital > small',['Select a score below','No measurements','Your self-report','Wellbeing scale','Calculated index','Generated sample']);
   add('.wellbeing-checkin .personal-eyebrow',['CHECK IN']);add('.wellbeing-checkin h3',['How are you now?']);
   add('.wellbeing-readout > span',['Select how you feel','Very poor','Below usual','Okay','Good','Excellent']);
   add('.wellbeing-endpoints > span',['Very poor','Excellent']);add('.wellbeing-reset',['Reset score']);

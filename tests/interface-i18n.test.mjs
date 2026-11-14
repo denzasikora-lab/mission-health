@@ -53,6 +53,10 @@ test('Messages, names, input values, numeric measurements and model analyses are
   f.language('en');assert.equal(nameInput.value,'Hassan Ali');assert.equal(analysis.textContent,'Example');
 });
 
+test('Sample generation controls and source labels switch language without changing numeric readings',()=>{
+  const f=fixture(),fill=f.add('.home-sample-button','FILL SAMPLE',{title:'Generate fictional sample readings'}),clear=f.add('.home-sample-clear','×',{'aria-label':'Clear generated sample',title:'Clear generated sample'}),note=f.add('.home-vital > small','Generated sample'),number=f.add('.home-vital > strong','98');f.start();f.language('ur');assert.equal(fill.textContent,'نمونہ بھریں');assert.equal(fill.getAttribute('title'),'نمونے کے فرضی اعداد بنائیں');assert.equal(clear.textContent,'×');assert.equal(clear.getAttribute('aria-label'),'بنایا ہوا نمونہ ہٹائیں');assert.equal(note.textContent,'بنایا ہوا نمونہ');assert.equal(number.textContent,'98');f.language('en');assert.equal(fill.textContent,'FILL SAMPLE');assert.equal(fill.getAttribute('title'),'Generate fictional sample readings');assert.equal(clear.getAttribute('title'),'Clear generated sample');assert.equal(note.textContent,'Generated sample');
+});
+
 test('Async send, microphone and health retry labels are localized without mutation loops',()=>{
   const f=fixture('ur'),send=f.add('.personal-composer button[type="submit"]','Send'),mic=f.add('.chat-composer-tools button','',{'aria-label':'Voice input',title:'Voice input'}),health=f.add('.health-analysis-button','Analyze');f.start();
   assert.equal(mic.getAttribute('aria-label'),'آواز سے لکھیں');send.textContent='Waiting for an answer...';health.textContent='Retry analysis';mic.setAttribute('aria-label','Stop voice input');mic.setAttribute('title','Stop voice input');f.flush();

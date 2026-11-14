@@ -51,7 +51,7 @@
   function active(ticket,expected){return ticket===generation&&scope===expected&&owner()===expected;}
   function accept(value){
     const view=item(value);
-    if(view.rules.isDemo===true||rulesFor(view.snapshot)?.isDemo===true){latest=null;pending=null;inProgress=false;message='';return;}
+    if((view.rules.isDemo===true||rulesFor(view.snapshot)?.isDemo===true)&&(!window.missionHome.sampleActive?.()||pending?.id!==view.id)){latest=null;pending=null;inProgress=false;message='';return;}
     if(view.pending===true){pending||={id:view.id,snapshot:view.snapshot};inProgress=true;message='Analysis in progress. Retry to check this snapshot.';return;}
     latest=view;inProgress=false;
     if(view.result.agentAvailable){if(pending?.id===view.id)pending=null;message='';}
@@ -65,7 +65,7 @@
   }
   async function analyze(){
     if(owner()!==scope)profileChanged();if(busy||!scope)return;
-    if(!pending){try{const value=window.MissionHealthRules.normalize(snapshot());if(Object.values(value.readings).some(reading=>reading?.source==='demo'))throw new Error('example_readings');pending={id:crypto.randomUUID(),snapshot:value};}catch{message='Could not prepare the readings. Please try again.';render();return;}}
+    if(!pending){try{const value=window.MissionHealthRules.normalize(snapshot());if(Object.values(value.readings).some(reading=>reading?.source==='demo')&&!window.missionHome.sampleActive?.())throw new Error('example_readings');pending={id:crypto.randomUUID(),snapshot:value};}catch{message='Could not prepare the readings. Please try again.';render();return;}}
     const expected=scope,ticket=++generation,payload=pending;controller?.abort();const request=new AbortController(),timeout=setTimeout(()=>request.abort(),75000);controller=request;busy=true;message='';render();
     try{
       const data=await journalApi('/api/health-analysis',{method:'POST',body:JSON.stringify(payload),signal:request.signal});if(!active(ticket,expected))return;
@@ -76,6 +76,8 @@
   function profileChanged(){
     const next=owner();if(next!==scope){scope=next;generation++;controller?.abort();controller=null;latest=null;pending=null;busy=false;inProgress=false;message='';render();if(scope)void load();}else render();
   }
+  function sampleChanged(){generation++;controller?.abort();controller=null;latest=null;pending=null;busy=false;inProgress=false;message='';render();}
+  window.addEventListener('mission-sample-change',sampleChanged);
   button.addEventListener('click',()=>void analyze());newSnapshot.addEventListener('click',()=>{if(busy)return;pending=null;inProgress=false;void analyze();});window.addEventListener('mission-profile-change',profileChanged);window.addEventListener('mission-wellbeing-change',render);window.addEventListener('mission-readings-change',render);window.addEventListener('mission-actiwatch-change',render);
   window.addEventListener('pagehide',()=>{generation++;controller?.abort();controller=null;busy=false;if(staleTimer)clearTimeout(staleTimer);staleTimer=0;});window.addEventListener('pageshow',profileChanged);document.addEventListener?.('visibilitychange',()=>{if(!document.hidden)profileChanged();});
   window.missionHealth=Object.freeze({snapshot,refresh:load,analyze});render();

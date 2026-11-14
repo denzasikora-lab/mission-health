@@ -70,9 +70,39 @@ test('Numeric card text and data attributes reflect actual stored steps and move
   assert.equal(f.home.querySelector('[data-home-metric=steps]').querySelector('strong').textContent,'6240steps');assert.equal(f.home.querySelector('[data-home-metric=activity]').dataset.readingValue,'66218');assert.equal(f.api.snapshot().readings.steps.value,6240);
 });
 
+test('Card source labels cannot replace the unit inside a nested percentage gauge',()=>{
+  const f=homeFixture(),card=f.home.querySelector('[data-home-metric=spo2]'),unit=new Node('small');unit.textContent='%';card.querySelector('strong').append(unit);f.api.setSource('spo2','Generated sample');assert.equal(unit.textContent,'%');assert.equal(card.querySelector(':scope > small').textContent,'Generated sample');f.api.setSource('spo2','Instrument','https://example.com/instrument');assert.equal(unit.textContent,'%');assert.equal(card.querySelector(':scope > small').children[0].textContent,'Instrument');
+});
+
 test('Only actual watch imports are displayed and their ID resolves authoritative analysis values',()=>{
   const f=homeFixture();f.watch({source:'demo',simulation:true,summary:{latest24h:{sleepSeconds:21600,activityCounts:12345,meanLightLux:44}}});let snapshot=f.api.snapshot();for(const key of ['sleep_hours','activity','light'])assert.equal(snapshot.readings[key],null);
   f.watch({id:importId,source:'actiwatch',summary:{end:new Clock(now-60000).toISOString(),latest24h:{sleepSeconds:28800,activityCounts:99999,meanLightLux:1000}}});snapshot=f.api.snapshot();assert.equal(snapshot.actiwatchImportId,importId);for(const key of ['sleep_hours','activity','light'])assert.equal(snapshot.readings[key],null);assert.equal(snapshot.readings.steps,null);const model=f.api.model();assert.equal(model.readings.sleep_hours.value,8);assert.equal(model.readings.activity.value,99999);assert.equal(model.readings.activity.source,'import');assert.equal(model.readings.activity.observedAt,new Clock(now-60000).toISOString());
+});
+
+test('Explicit sample generation fills every card with valid fictional values without changing saved readings',()=>{
+  const f=homeFixture(),actual=manualSnapshot();f.readings(actual);f.report({score:83,wellbeingScale:100});f.watch({id:importId,source:'actiwatch',summary:{end:new Clock().toISOString(),latest24h:{sleepSeconds:28800,activityCounts:99999,meanLightLux:1000}}});
+  const original=clone(f.api.snapshot());f.scope.journalApi=()=>{throw new Error('Sample generation must stay local');};vm.runInNewContext(coreSource,f.scope);
+  for(const random of [0,.5,1]){
+    f.scope.Math=Object.create(Math);f.scope.Math.random=()=>random;f.home.querySelector('.home-sample-button').emit('click');const value=clone(f.api.snapshot()),normalized=f.scope.MissionHealthRules.normalize(value);
+    assert.equal(Object.keys(normalized.readings).length,16);assert.equal(value.actiwatchImportId,null);assert.equal(f.api.sampleActive(),true);assert.equal(f.scope.MissionHealthRules.evaluate(value).isDemo,true);
+    for(const reading of Object.values(value.readings)){assert.ok(Number.isFinite(reading.value));assert.equal(reading.source,'demo');assert.equal(reading.observedAt,null);}
+    assert.ok(value.readings.bp_systolic.value>value.readings.bp_diastolic.value);assert.ok(value.readings.skin_temperature.value<value.readings.body_temperature.value);assert.ok(value.readings.spo2.value>=95);assert.ok(value.readings.sleep_hours.value<=9);
+    assert.equal(f.home.querySelectorAll('.home-vital').filter(card=>card.dataset.source==='demo').length,15);assert.deepEqual(clone(f.scope.missionReadings.current()),actual);
+  }
+  const sample=clone(f.api.snapshot());sample.readings.heart_rate.value=999;assert.notEqual(f.api.snapshot().readings.heart_rate.value,999);f.home.querySelector('.home-sample-clear').emit('click');assert.equal(f.api.sampleActive(),false);assert.deepEqual(clone(f.api.snapshot()),original);assert.equal(f.home.querySelector('.home-sample-clear').hidden,true);
+});
+
+test('Repeated generation changes the sample while unchanged polling and layout updates preserve it',()=>{
+  const f=homeFixture(),actual=manualSnapshot();f.scope.missionProfileName={identity:{storageScope:'owner-a'}};f.readings(actual);f.scope.Math=Object.create(Math);f.scope.Math.random=()=>0;f.home.querySelector('.home-sample-button').emit('click');const first=clone(f.api.snapshot());
+  f.scope.Math.random=()=>1;f.home.querySelector('.home-sample-button').emit('click');const second=clone(f.api.snapshot());assert.notDeepEqual(second.readings,first.readings);
+  f.readings(actual);for(const type of ['mission-wellbeing-change','mission-actiwatch-change','mission-profile-change'])f.scope.dispatchEvent(new Event(type));assert.deepEqual(clone(f.api.snapshot()),second);assert.equal(f.api.sampleActive(),true);
+  actual.readings.heart_rate.value=101;f.readings(actual);assert.equal(f.api.sampleActive(),false);assert.equal(f.api.snapshot().readings.heart_rate.value,101);
+  f.home.querySelector('.home-sample-button').emit('click');f.scope.missionProfileName.identity={storageScope:'owner-b'};assert.equal(f.api.sampleActive(),false);f.scope.dispatchEvent(new Event('mission-profile-change'));assert.equal(f.home.querySelector('.home-sample-clear').hidden,true);
+});
+
+test('A committed check-in or newly imported watch data restores actual values after a sample',()=>{
+  const f=homeFixture();f.home.querySelector('.home-sample-button').emit('click');f.report({score:81,wellbeingScale:100});f.scope.dispatchEvent(new Event('mission-wellbeing-change'));assert.equal(f.api.sampleActive(),false);assert.equal(f.api.snapshot().readings.wellbeing.value,81);assert.equal(f.api.snapshot().readings.wellbeing.source,'manual');
+  f.home.querySelector('.home-sample-button').emit('click');f.watch({id:importId,source:'actiwatch',summary:{end:new Clock().toISOString(),latest24h:{sleepSeconds:28800,activityCounts:99999,meanLightLux:1000}}});f.scope.dispatchEvent(new Event('mission-actiwatch-change'));assert.equal(f.api.sampleActive(),false);assert.equal(f.api.snapshot().actiwatchImportId,importId);assert.equal(f.api.model().readings.activity.value,99999);
 });
 
 test('The initial UI shows provided readings and Incomplete, makes only a GET and never starts automatic AI analysis',async()=>{
@@ -192,6 +222,22 @@ test('Expired saved results cannot hide newer current critical readings',async()
 });
 test('Legacy example analyses stay in history and cannot become the current personal result or retry payload',async()=>{
   const f=uiFixture();await flush();const historical=f.analysis({id:importId,snapshot:demoSnapshot()},{agentAvailable:false,status:'ATTENTION',summary:'Old example assessment'});f.handler(()=>({item:historical}));await f.api.refresh();assert.equal(f.get('health-analysis-scope').textContent,'Provided readings');assert.equal(f.get('health-analysis-button').textContent,'Analyze');assert.equal(f.get('health-analysis-new').hidden,true);assert.ok(!f.panel.textContent.includes('Old example assessment'));f.handler(call=>f.analysis(call.body,{agentAvailable:false,status:null}));await f.api.analyze();const sent=f.calls.at(-1).body;assert.notEqual(sent.id,importId);assert.ok(Object.values(sent.snapshot.readings).filter(Boolean).every(reading=>reading.source==='manual'));
+});
+
+test('An explicitly generated sample can be analyzed with its fictional provenance intact',async()=>{
+  const home=homeFixture();home.home.querySelector('.home-sample-button').emit('click');const f=uiFixture();await flush();f.scope.missionHome.sampleActive=()=>true;f.setSnapshot(home.api.snapshot());f.scope.dispatchEvent(new Event('mission-sample-change'));assert.equal(f.get('health-analysis-scope').textContent,'Example');assert.equal(f.calls.filter(call=>call.method==='POST').length,0);
+  f.handler(call=>f.analysis(call.body,{status:'NORMAL',summary:'Generated sample result'}));await f.api.analyze();const sent=f.calls.at(-1).body;assert.equal(Object.keys(sent.snapshot.readings).length,16);assert.ok(Object.values(sent.snapshot.readings).every(reading=>reading.source==='demo'&&reading.observedAt===null));assert.equal(f.get('health-analysis-summary').textContent,'Generated sample result');assert.equal(f.get('health-analysis-scope').textContent,'Example');assert.equal(f.get('health-analysis-button').textContent,'Analyze');assert.match(f.get('health-analysis-meta').textContent,/AI \+ rules/);
+});
+
+test('Unrequested legacy samples cannot be analyzed or loaded over an active generated sample',async()=>{
+  const f=uiFixture();await flush();f.setSnapshot(demoSnapshot());await f.api.analyze();assert.equal(f.calls.filter(call=>call.method==='POST').length,0);assert.match(f.get('health-analysis-notice').textContent,/Could not prepare/);
+  f.scope.missionHome.sampleActive=()=>true;f.scope.dispatchEvent(new Event('mission-sample-change'));const legacy=f.analysis({id:importId,snapshot:demoSnapshot()},{summary:'Unrelated legacy result'});f.handler(()=>({item:legacy}));await f.api.refresh();assert.ok(!f.panel.textContent.includes('Unrelated legacy result'));assert.equal(f.get('health-analysis-button').textContent,'Analyze');
+});
+
+test('Clearing or replacing a sample discards its pending analysis and cannot resurrect it on completion',async()=>{
+  for(const replacement of [manualSnapshot(),demoSnapshot()]){
+    const f=uiFixture();await flush();f.scope.missionHome.sampleActive=()=>true;f.setSnapshot(demoSnapshot());f.scope.dispatchEvent(new Event('mission-sample-change'));let finish;f.handler(()=>new Promise(resolve=>{finish=resolve;}));const work=f.api.analyze(),old=f.calls.at(-1);f.setSnapshot(replacement);f.scope.missionHome.sampleActive=()=>replacement.readings.heart_rate.source==='demo';f.scope.dispatchEvent(new Event('mission-sample-change'));assert.equal(old.signal.aborted,true);assert.equal(f.get('health-analysis-button').disabled,false);assert.equal(f.get('health-analysis-button').textContent,'Analyze');finish(f.analysis(old.body,{summary:'Discarded sample result'}));await work;assert.ok(!f.panel.textContent.includes('Discarded sample result'));assert.equal(f.get('health-analysis-new').hidden,true);
+  }
 });
 
 
