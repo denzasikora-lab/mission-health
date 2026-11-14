@@ -17,6 +17,7 @@ class Node{
   addEventListener(type,callback){this.events[type]=callback;}
   click(){this.events.click?.();}
   focus(){this.focused=true;}
+  remove(){}
 }
 function fixture(storage=new Map()){
   const calls=[],events=[],activity=[];
@@ -28,7 +29,7 @@ function fixture(storage=new Map()){
   vm.runInNewContext(gaugeSource,sandbox);
   // Separate panel initialization from actual storage, sending and rendering functions.
   const setup=source.slice(0,source.indexOf('  const checkin=create('));
-  vm.runInNewContext(setup+'window.test={choose,restoreScore,selection,currentReport,badge,canonicalReport,label,hue,store,send,retryChat,panel,setKind,setIdentity:value=>identity=value,addWidget:value=>sliders.push(value)};})();',sandbox);
+  vm.runInNewContext(setup+'window.test={choose,restoreScore,selection,currentReport,badge,canonicalReport,label,hue,store,send,retryChat,panel,setKind,slider,setIdentity:value=>identity=value,addWidget:value=>sliders.push(value)};})();',sandbox);
   window.test.setIdentity({storageScope:'owner'});
   return {api:window.test,window,document,storage,calls,events,activity};
 }
@@ -60,6 +61,18 @@ test('The slider shows the current score, color and accessible label out of 100'
   const f=fixture(),widget={root:new Node(),input:new Node(),value:new Node(),label:new Node(),mouth:new Node(),time:new Node(),reset:new Node()};f.api.addWidget(widget);f.api.choose(76);
   assert.equal(widget.input.value,76);assert.match(widget.value.innerHTML,/aria-valuenow="76"/);assert.match(widget.value.innerHTML,/stroke-dashoffset="24.000"/);assert.equal(widget.label.textContent,'Good');assert.equal(widget.input.attributes['aria-valuetext'],'76 from 100 / Good');assert.equal(widget.root.properties['--mood-hue'],f.api.hue(76));assert.equal(widget.reset.hidden,false);
   f.api.choose(77);assert.notEqual(widget.mouth.attributes.d,'M7 14 Q12 20 17 14');assert.match(widget.value.innerHTML,/aria-valuenow="77"/);
+});
+test('Dragging previews the score without saving, dispatching dashboard updates or sending activity until change',()=>{
+  const f=fixture(),root=f.api.slider(),input=root.querySelector('input');input.focus();
+  for(const score of [61,72,83]){input.value=String(score);input.events.input();assert.match(root.querySelector('strong').innerHTML,new RegExp('aria-valuenow="'+score+'"'));}
+  assert.equal(input.focused,true);assert.equal(f.api.currentReport(),null);assert.equal(f.storage.size,0);assert.equal(f.events.length,0);assert.equal(f.activity.length,0);
+  input.events.change();assert.equal(f.api.currentReport().score,83);assert.equal(JSON.parse(f.storage.get(key)).score,83);assert.deepEqual(f.events,['mission-wellbeing-change']);assert.equal(f.activity.length,1);
+  input.events.blur();assert.equal(f.activity.length,1);assert.equal(f.events.length,1);
+});
+test('Cancelling a drag restores the saved score and an account change cannot commit an old preview',()=>{
+  const f=fixture();f.api.choose(54);const root=f.api.slider(),input=root.querySelector('input');
+  input.value='91';input.events.input();input.events.pointercancel();assert.equal(input.value,54);assert.equal(f.api.currentReport().score,54);assert.equal(f.activity.length,1);
+  input.value='88';input.events.input();f.api.setIdentity({storageScope:'other-owner'});input.events.change();assert.equal(f.api.currentReport(),null);assert.equal(f.activity.length,1);
 });
 test('Old badges retain scale10, new badges use scale100',()=>{
   const f=fixture(),old=f.api.badge({score:8,label:'Good'}),current=f.api.badge({score:80,label:'Good',wellbeingScale:100});

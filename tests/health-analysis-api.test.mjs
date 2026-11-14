@@ -129,6 +129,14 @@ test('Chat rejects injected rules and saves the canonical Actiwatch summary',asy
   const saved=await f.run('/api/chat',{method:'POST',body:{id:webcrypto.randomUUID(),content:'Review data.',healthSnapshot:value}});assert.equal(saved.status,201);assert.equal(saved.body.message.healthContext.snapshot.readings.activity.value,1234);assert.equal(saved.body.message.healthContext.rules.status,'NORMAL');
   const context=JSON.parse(f.outgoing[0].body.input.find(item=>item.role==='system'&&item.content.includes('Context: ')).content.split('Context: ')[1]);assert.equal(context.provenance.readings.activity.value,1234);assert.equal(context.latest.fatigue,null);
 });
+test('NasaGPT forwards all sixteen card readings with their units and observation times to Azure',async t=>{
+  const f=fixture(t),values={heart_rate:[72,'bpm'],spo2:[98,'%'],body_temperature:[36.8,'C'],skin_temperature:[36.2,'C'],bp_systolic:[118,'mmHg'],bp_diastolic:[76,'mmHg'],respiratory_rate:[14,'/min'],fatigue_index:[18,'/100'],stress_index:[22,'/100'],wellbeing:[83,'/100'],recovery:[86,'/100'],sleep_hours:[7.5,'h'],hrv:[46,'ms'],steps:[6240,'steps'],activity:[1234,'counts'],light:[56,'lx']};
+  const input=snapshot(Object.fromEntries(Object.entries(values).map(([key,[value,unit]])=>[key,reading(value,unit)])));
+  const response=await f.run('/api/chat',{method:'POST',body:{id:webcrypto.randomUUID(),content:'Review the synthetic card readings.',attachments:[],healthSnapshot:input}});assert.equal(response.status,201);assert.equal(f.outgoing.length,1);
+  const context=JSON.parse(f.outgoing[0].body.input.find(item=>item.role==='system'&&item.content.includes('Context: ')).content.split('Context: ')[1]);
+  for(const [key,[value,unit]]of Object.entries(values)){assert.equal(context.provenance.readings[key].value,value,key);assert.equal(context.provenance.readings[key].unit,unit,key);assert.equal(context.provenance.readings[key].observedAt,input.readings[key].observedAt,key);assert.equal(response.body.message.healthContext.snapshot.readings[key].value,value,key);}
+  assert.equal(Object.values(context.provenance.readings).filter(Boolean).length,16);
+});
 
 test('Trends compare ten distinct manual timestamps and leave demonstration trends unknown',async t=>{
   const f=fixture(t),base=Date.parse(now);

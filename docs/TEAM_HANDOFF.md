@@ -11,7 +11,7 @@ Mission Health / Bug Busters / NASA Space Apps.
 - Importable requests: [mission-health.postman_collection.json](mission-health.postman_collection.json)
 - Development and pull requests: [CONTRIBUTING.md](../CONTRIBUTING.md)
 
-The repository is private. Give the owner your exact GitHub username and accept the invitation. Use your own account, a feature branch, and a pull request into `main`. Source access, hosted-site access, and upstream Azure credentials are separate permissions. A repository link alone does not grant any of them.
+The repository is public. Anyone can read the source or propose a fork/pull request. Direct collaborators still need an invitation. Use your own account, a feature branch, and a pull request into `main`. Source access, hosted-site access, and upstream Azure credentials are separate permissions.
 
 ## What is already implemented
 
@@ -32,6 +32,64 @@ These are real application routes, not proposed paths. See API.md for all routes
 The browser calls this application's `/api/` endpoints. The Worker then calls Hanzala's Azure **NASA-AI Responses agent** using a server-side secret. Chat, diary replies, recording summaries, and readings analysis use that primary provider. Utility features use their separate configured provider. Hammad can work on frontend/API wiring in the same repository while Hanzala maintains the upstream agent.
 
 Do not put the Azure key in frontend code or send it as an authentication key to this application's routes. The GPT-site API uses an authenticated Sites browser session. The separate Vercel deployment uses signed guest browser sessions with private owner scopes; it does not offer a separately provisioned server-to-server bearer token. Test external scripts against the local development server. A new server-to-server integration needs an explicit authentication contract rather than forged identity headers or relaxed CORS checks.
+
+## Request flow and interface triggers
+
+The active frontend is Vercel. Its `/api/*` rewrite reaches Nginx on t213, then the Node.js 24 API at loopback port 8092. This is a Node HTTP adapter running the application's Worker-compatible handlers, not Express or FastAPI. The Python FastAPI memory service and the native Qdrant process are on t4. The Node API reaches memory through the private t213-to-t4 tunnel. Browsers use the Vercel origin and its signed session cookie.
+
+The primary language provider is Hanzala's Azure agent. The separate ProxyAPI utility provider uses `https://api.proxyapi.ru/v1` with `openai/gpt-5-mini`. It handles draft completions, story hashtags and legacy Cyrillic-to-English display translation. Cloud transcription separately uses `openai/whisper-1`; a text mini model does not replace a speech recognizer. ProxyAPI is not an automatic failover for the primary Azure agent. The Azure resource key authenticates calls to the configured agent endpoint; neither the key nor `NASA-AI` in its URL identifies the agent's underlying model.
+
+There are 20 application POST route patterns in the current API. Five may invoke the Azure language agent; not every POST invokes a model, and not every POST has a separate visible button.
+
+| POST route | Interface trigger | Processing |
+| --- | --- | --- |
+| `/api/chat` | Send in the NasaGPT tab; retry an unanswered message | Azure conversation with a frozen snapshot of current personal readings |
+| `/api/health-analysis` | Analyze in Health; Retry analysis | Deterministic rules, Azure explanation, saved structured result |
+| `/api/media-analysis` | Automatic processing after stopping Audio or Camera recording; retry processing | Save media, transcribe when needed, analyze with Azure, save archive result |
+| `/api/astronauts/{profile}/messages` | Save in the archive entry editor; retained diary Ask/Send flow | `mode: "note"` saves only; `mode: "ask"` retrieves diary context and asks Azure |
+| `/api/astronauts/{profile}/book-answer` | Automatic after an Archive search returns owned entries | Azure answer grounded in the selected retrieved entries |
+| `/api/compose` | Debounced typing in a supported text editor | ProxyAPI mini draft continuation |
+| `/api/story-tags` | Debounced story-caption editing | ProxyAPI mini English topical hashtags with local fallback |
+| `/api/transcriptions` | Cloud speech recognition from recording/dictation flows | Configured speech service; ProxyAPI Whisper when selected |
+| `/api/readings` | Save readings or Save imported readings in Health | Persist manual/imported values and index their factual archive note |
+| `/api/team-chat` | Send in Group chat | Store a shared astronaut message; no AI reply |
+| `/api/tasks` | Save a new task in Scheduled | Store a task; chat-based task extraction also happens inside `/api/chat` |
+| `/api/activity` | Automatic navigation, committed check-in and other supported actions | Store an activity event |
+| `/api/astronauts/{profile}/book-search` | Submit an Archive search | Qdrant retrieval through the text embedder; browser-vector fallback if needed |
+| `/api/astronauts/{profile}/book-vectors` | Automatic indexing during browser-vector search fallback | Store validated browser text vectors |
+| `/api/astronauts/{profile}/photos` | Save material in the retained photo/video comparison flow | Store comparison material; no language-agent call by this route |
+| `/api/stories` | Publish a captured story | Store the story and its supplied media |
+| `/api/chat-files` | Select a file with the chat paperclip | Store a private or shared chat attachment |
+| `/api/actiwatch` | Confirm a validated Actiwatch CSV import | Persist owned recorded epochs and their canonical summary |
+| `/api/astronauts/{profile}/training` | Confirm a local training job in the fine-tuning dialog | Request the configured local training adapter |
+| `/api/astronauts/{profile}/messages/{id}/reply` | Retained local assistant fallback | Save an allowed local history/comparison reply |
+
+All 15 personal cards use one canonical model with 16 numeric channels, because blood pressure has systolic and diastolic values. Send in NasaGPT automatically attaches the current snapshot. Analyze takes the same snapshot. Every supplied channel retains value, unit, source and observation time in the agent payload's `provenance.readings`. Missing values remain null. Import IDs are resolved against the current owner's saved Actiwatch summary on the server. Recording analysis has its own audio/video inputs; sharing a text-embedding store does not make raw media available to every chat.
+
+The ordinary NasaGPT chat uses its conversation and attached current readings; it does not automatically retrieve the personal diary. The diary Ask flow retrieves previous entries for the selected owner/profile. Archive search uses `/book-search` followed by `/book-answer`. Their histories and purposes remain separate.
+
+The server-side Azure call has this shape (pseudocode):
+
+```js
+fetch(process.env.AZURE_AGENT_ENDPOINT, {
+  method: "POST",
+  headers: {
+    "content-type": "application/json",
+    "api-key": process.env.AZURE_AGENT_API_KEY
+  },
+  body: JSON.stringify({
+    input: [
+      {type: "message", role: "system", content: instructionsAndValidatedContext},
+      {type: "message", role: "user", content: userQuestion}
+    ],
+    max_output_tokens: 1536,
+    stream: false,
+    store: false
+  })
+});
+```
+
+The dedicated agent selects its deployed model, so this request has no `model` field. The adapter accepts a completed response and reads assistant `output_text` items. Health Analyze requests a JSON object with `status`, `alerts` and `summary`; ordinary NasaGPT requests a conversational text answer. The application validates health output and preserves its deterministic severity floor.
 
 ## Run a checkout
 

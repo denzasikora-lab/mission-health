@@ -59,6 +59,12 @@ test('Actual wellbeing retains its original timestamp and never substitutes the 
   assert.deepEqual(clone(f.api.snapshot().readings.wellbeing),{value:8,unit:'/100',source:'manual',observedAt:new Clock(now-600000).toISOString()});
   for(const [report,at]of [[{score:80,wellbeingScale:100},now-13*3600000],[{score:80,wellbeingScale:100},now+1000],[{score:8,wellbeingScale:10},now],[{score:NaN,wellbeingScale:100},now]]){f.report(report,at);assert.equal(f.api.snapshot().readings.wellbeing,null);}
 });
+test('Reading updates change card values without rerunning layout or moving the check-in',()=>{
+  const f=homeFixture(),checkin=f.home.querySelector('.home-checkin'),parent=checkin.parentElement;
+  f.document.querySelector=()=>{throw new Error('A value update must not rerun layout');};f.document.querySelectorAll=()=>{throw new Error('A value update must not rerun navigation');};
+  f.report({score:77,wellbeingScale:100});f.scope.dispatchEvent(new Event('mission-wellbeing-change'));assert.equal(f.home.querySelector('[data-home-metric=wellbeing]').dataset.readingValue,'77');
+  f.readings(manualSnapshot());f.scope.dispatchEvent(new Event('mission-actiwatch-change'));assert.equal(f.home.querySelector('.home-checkin'),checkin);assert.equal(checkin.parentElement,parent);
+});
 test('Numeric card text and data attributes reflect actual stored steps and movement',()=>{
   const f=homeFixture();assert.equal(f.home.querySelector('[data-home-metric=steps]').querySelector('strong').textContent,'-');const actual=manualSnapshot();for(const reading of Object.values(actual.readings).filter(Boolean)){reading.source='manual';reading.observedAt=new Clock().toISOString();}f.readings(actual);
   assert.equal(f.home.querySelector('[data-home-metric=steps]').querySelector('strong').textContent,'6240steps');assert.equal(f.home.querySelector('[data-home-metric=activity]').dataset.readingValue,'66218');assert.equal(f.api.snapshot().readings.steps.value,6240);

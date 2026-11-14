@@ -45,5 +45,5 @@
     const chat=document.getElementById('nasagpt-sidebar');if(!isOverview&&!chat.hidden)window.missionChatComposer.stopWithin(chat);chat.hidden=!isOverview;if(chat.parentElement!==home.parentElement)home.before(chat);friendProfile.classList.toggle('friend-profile',true);renderValues();
     if(state.workspace==='crew'&&state.view==='health'&&state.visiting){document.getElementById('mission-heading-title').textContent='Visiting / '+crew[state.crew].name;document.getElementById('mission-heading-description').textContent='Friend profile readings';}
   }
-  window.missionHome={render,renderValues,setSource,model,snapshot};for(const event of ['mission-profile-change','mission-wellbeing-change','mission-readings-change','mission-actiwatch-change'])window.addEventListener(event,render);render();window.dispatchEvent(new Event('mission-home-ready'));
+  window.missionHome={render,renderValues,setSource,model,snapshot};window.addEventListener('mission-profile-change',render);for(const event of ['mission-wellbeing-change','mission-readings-change','mission-actiwatch-change'])window.addEventListener(event,renderValues);render();window.dispatchEvent(new Event('mission-home-ready'));
 })();

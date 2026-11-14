@@ -61,9 +61,10 @@
     renderScores();scheduleExpiry();window.dispatchEvent(new Event('mission-wellbeing-change'));void window.missionActivity?.record('wellbeing',{score,wellbeingScale:100});
   }
   function renderScores(){
-    const chosen=selection();
+    const saved=selection();
     for(const widget of sliders){
-      const score=chosen?.score||50;widget.input.disabled=!owner()||identity?.storageScope!==owner();widget.input.value=score;widget.root.style.setProperty('--mood-hue',hue(score));widget.root.style.setProperty('--mood-value',(score-1)/99);widget.root.dataset.chosen=String(Boolean(chosen));
+      if(widget.preview?.scope!==owner())widget.preview=null;
+      const chosen=widget.preview||saved,score=chosen?.score||50;widget.input.disabled=!owner()||identity?.storageScope!==owner();if(String(widget.input.value)!==String(score))widget.input.value=score;widget.root.style.setProperty('--mood-hue',hue(score));widget.root.style.setProperty('--mood-value',(score-1)/99);widget.root.dataset.chosen=String(Boolean(chosen));
       widget.value.innerHTML=window.missionGauge.markup({value:chosen?score:null,label:'Wellbeing',compact:true});widget.label.textContent=chosen?label(score):'Select how you feel';widget.input.setAttribute('aria-valuetext',chosen?score+' from 100 / '+label(score):'Wellbeing not selected yet');
       widget.mouth.setAttribute('d','M7 14 Q12 '+(9+(score-1)/99*11).toFixed(2)+' 17 14');
       widget.time.textContent=chosen?'Your score / '+new Date(chosen.at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'Self-report, not a sensor reading';
@@ -74,9 +75,12 @@
     const root=create('section','wellbeing-checkin');
     root.innerHTML='<header><div><span class="personal-eyebrow">CHECK IN</span><h3>How are you now?</h3></div><div class="wellbeing-face" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="9" r="1"/><circle cx="16" cy="9" r="1"/><path d="M7 14Q12 14 17 14"/></svg></div></header><div class="wellbeing-readout"><strong></strong><span></span></div><label class="sr-only">Your wellbeing from 1 to 100<input type="range" min="1" max="100" step="1" value="50"></label><div class="wellbeing-range-shell"></div><div class="wellbeing-endpoints"><span>Very poor</span><span>Excellent</span></div><small class="wellbeing-time"></small>';
     const input=root.querySelector('input');input.setAttribute('aria-label','Your wellbeing from 1 to 100');root.querySelector('.wellbeing-range-shell').append(input);root.querySelector('label').remove();
-    input.addEventListener('input',()=>choose(Number(input.value)));
     const reset=create('button','wellbeing-reset','Reset score');reset.type='button';reset.hidden=true;reset.addEventListener('click',()=>{if(!owner()||identity?.storageScope!==owner())return;selections.delete(selectionKey());try{if(identity)localStorage.removeItem(storageKey());}catch{}renderScores();scheduleExpiry();window.dispatchEvent(new Event('mission-wellbeing-change'));});root.append(reset);
-    sliders.push({root,input,reset,value:root.querySelector('strong'),label:root.querySelector('.wellbeing-readout span'),mouth:root.querySelector('path'),time:root.querySelector('.wellbeing-time')});renderScores();return root;
+    const widget={root,input,reset,value:root.querySelector('strong'),label:root.querySelector('.wellbeing-readout span'),mouth:root.querySelector('path'),time:root.querySelector('.wellbeing-time'),preview:null};
+    input.addEventListener('input',()=>{const score=Number(input.value);if(input.disabled||!owner()||identity?.storageScope!==owner()||!Number.isInteger(score)||score<1||score>100)return;widget.preview={scope:owner(),score,at:Date.now()};renderScores();});
+    const commit=()=>{const value=widget.preview;widget.preview=null;if(value&&value.scope===owner())choose(value.score);};
+    input.addEventListener('change',commit);input.addEventListener('blur',commit);input.addEventListener('pointercancel',()=>{widget.preview=null;renderScores();});
+    sliders.push(widget);renderScores();return root;
   }
   function badge(report){const scale=report.wellbeingScale===100?100:10,score=canonicalReport(report).score;const node=create('span','wellbeing-badge');node.innerHTML=window.missionGauge.markup({value:report.score,max:scale,label:'Wellbeing',compact:true});node.append(create('span','',report.label||label(score)));node.style.setProperty('--mood-hue',hue(score));return node;}
   function store(kind){const key=(owner()||'unbound')+':'+(kind==='diary'?'diary:'+profile():kind);if(!cache.has(key))cache.set(key,{kind,profile:profile(),messages:[],loaded:false,loading:false,cursor:null,more:false,draft:'',files:[],pending:null,busy:false,notice:'',recoveredDraft:false});return cache.get(key);}
