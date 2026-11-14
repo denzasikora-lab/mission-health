@@ -63,9 +63,9 @@ test('The slider shows the current score, color and accessible label out of 100'
   f.api.choose(77);assert.notEqual(widget.mouth.attributes.d,'M7 14 Q12 20 17 14');assert.match(widget.value.innerHTML,/aria-valuenow="77"/);
 });
 test('Dragging previews the score without saving, dispatching dashboard updates or sending activity until change',()=>{
-  const f=fixture(),root=f.api.slider(),input=root.querySelector('input');assert.equal(input.events.pointerdown,undefined);assert.equal(input.events.pointercancel,undefined);
+  const f=fixture(),root=f.api.slider(),input=root.querySelector('input');assert.equal(typeof input.events.pointerdown,'function');input.events.pointerdown();assert.equal(input.focusOptions.preventScroll,true);assert.equal(input.events.pointercancel,undefined);
   for(const score of [61,72,83]){input.value=String(score);input.events.input();assert.match(root.querySelector('strong').innerHTML,new RegExp('aria-valuenow="'+score+'"'));}
-  assert.equal(input.focused,undefined);assert.equal(f.api.currentReport(),null);assert.equal(f.storage.size,0);assert.equal(f.events.length,0);assert.equal(f.activity.length,0);
+  assert.equal(input.focused,true);assert.equal(f.api.currentReport(),null);assert.equal(f.storage.size,0);assert.equal(f.events.length,0);assert.equal(f.activity.length,0);
   input.events.change();assert.equal(f.api.currentReport().score,83);assert.equal(JSON.parse(f.storage.get(key)).score,83);assert.deepEqual(f.events,['mission-wellbeing-change']);assert.equal(f.activity.length,1);
   input.events.blur();assert.equal(f.activity.length,1);assert.equal(f.events.length,1);
 });

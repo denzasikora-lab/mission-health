@@ -9,6 +9,7 @@
     if(!view.chatTools)return;
     const enabled=['chat','team'].includes(view.kind),s=enabled?view.chatAdapter.store(view.kind):null;
     view.chatTools.hidden=!enabled;view.chatFiles.hidden=!enabled;view.chatFiles.replaceChildren();
+    const medical=view.kind==='chat',clipLabel=medical?'Attach health data file':'Attach file';view.chatClip.setAttribute('aria-label',clipLabel);view.chatClip.title=clipLabel;view.chatClip.classList.toggle('chat-health-file',medical);view.chatClipText.hidden=!medical;view.chatFileHelp.hidden=!medical;view.chatPicker.accept=medical?'.csv,.json,.txt,text/csv,application/json,text/plain':'';view.chatPicker.setAttribute('aria-label',medical?'Medical and health data files':'Message files');
     view.chatClip.disabled=Boolean(s?.busy||s?.files?.length>=4);view.chatMic.disabled=Boolean(s?.busy||voices.get(view)?.processing);
     const voice=voices.get(view),label=voice&&!voice.processing?'Stop voice input':'Voice input';view.chatMic.setAttribute('aria-label',label);view.chatMic.title=label;view.chatMic.setAttribute('aria-pressed',String(Boolean(voice&&!voice.processing)));
     for(const file of s?.files||[]){
@@ -21,10 +22,11 @@
     const kind=view.kind,s=view.chatAdapter.store(kind);if(!['chat','team'].includes(kind)||s.busy)return;
     for(const file of files){
       if(s.files.length>=4){s.notice='You can attach up to four files to a message.';break;}
-      if(!file.size||file.size>20000000){s.notice='File size must be from 1 byte to 20 MB.';continue;}
+      if(kind==='chat'&&!/\.(csv|json|txt)$/i.test(file.name)){s.notice='Attach medical reports or health readings as CSV, JSON or TXT.';continue;}
+      if(!file.size||file.size>(kind==='chat'?65536:20000000)){s.notice=kind==='chat'?'Health files must be from 1 byte to 64 KB.':'File size must be from 1 byte to 20 MB.';continue;}
       const item={name:file.name,bytes:file.size};s.files.push(item);s.pending=null;view.chatAdapter.render();
-      try{const form=new FormData();form.set('room',kind==='team'?'team':'private');form.set('file',file);const response=await fetch('/api/chat-files',{method:'POST',body:form});const result=await response.json();if(!response.ok||!result.file?.id)throw new Error();Object.assign(item,result.file);}
-      catch{item.error=true;s.notice='Could not attach the file. Remove it and select it again.';}
+      try{const form=new FormData();form.set('room',kind==='team'?'team':'private');form.set('file',file);const response=await fetch('/api/chat-files',{method:'POST',body:form});const result=await response.json();if(!response.ok||!result.file?.id)throw new Error(result.error?.code||result.error||'upload_failed');Object.assign(item,result.file);}
+      catch(error){item.error=true;const messages={file_text_too_long:'Health files can contain up to 6,000 text characters.',invalid_file_text:'Use a UTF-8 text file with readable health data.',unsupported_medical_file:'Supported health files: CSV, JSON and TXT.',invalid_file_json:'The JSON file is not valid. Check its format and try again.',invalid_file_csv:'The CSV needs a header and data rows with consistent delimiters.',medical_file_too_large:'Health files can be up to 64 KB.'};s.notice=messages[error.message]||'Could not read the file. Remove it and select it again.';}
       view.chatAdapter.render();
     }
   }
@@ -60,9 +62,10 @@
   function attach(view,adapter){
     view.chatAdapter=adapter;views.add(view);
     const tools=document.createElement('div');tools.className='chat-composer-tools';view.chatTools=tools;
-    view.chatClip=button('Attach file',icons.clip);view.chatMic=button('Voice input',icons.mic);
-    const picker=document.createElement('input');picker.type='file';picker.multiple=true;picker.hidden=true;picker.setAttribute('aria-label','Message files');
+    view.chatClip=button('Attach file',icons.clip);view.chatClipText=document.createElement('span');view.chatClipText.textContent='Health files';view.chatClip.append(view.chatClipText);view.chatMic=button('Voice input',icons.mic);
+    const picker=document.createElement('input');view.chatPicker=picker;picker.type='file';picker.multiple=true;picker.hidden=true;picker.setAttribute('aria-label','Message files');
     view.chatFiles=document.createElement('div');view.chatFiles.className='chat-pending-files';view.input.before(view.chatFiles,picker);
+    view.chatFileHelp=document.createElement('small');view.chatFileHelp.className='chat-file-help';view.chatFileHelp.textContent='Attach medical reports or health readings for analysis and search. CSV / JSON / TXT, UTF-8, up to 64 KB and 6,000 characters per file.';view.form.append(view.chatFileHelp);
     tools.append(view.chatClip,view.chatMic);view.form.querySelector('footer').prepend(tools);
     view.chatClip.addEventListener('click',()=>picker.click());picker.addEventListener('change',()=>{const files=[...picker.files];picker.value='';void upload(view,files);});
     view.chatMic.addEventListener('click',()=>void microphone(view));

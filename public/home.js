@@ -57,7 +57,7 @@
       const stamp=JSON.stringify([reading,second,note]);if(renderedValues.get(card)===stamp)continue;renderedValues.set(card,stamp);
       card.dataset.source=(reading||second)?.source||'missing';card.dataset.readingValue=valid?String(reading.value):'';card.dataset.observedAt=observed||second?.observedAt||'';
       if(key==='pressure'){card.dataset.diastolic=Number.isFinite(second?.value)?String(second.value):'';number.textContent=(valid?format(reading.value):'-')+'/'+(Number.isFinite(second?.value)?format(second.value):'-');if(!valid&&!second)number.textContent='-';}
-      else if(['spo2','wellbeing','recovery','fatigue','stress'].includes(key))number.innerHTML=window.missionGauge.markup({value:valid?reading.value:null,label,unit:unit==='%'?'%':undefined,reverse:key==='fatigue'||key==='stress'});
+      else if(['spo2','wellbeing','recovery','fatigue','stress'].includes(key))window.missionGauge.update(number,{value:valid?reading.value:null,label,unit:unit==='%'?'%':undefined,reverse:key==='fatigue'||key==='stress'});
       else if(key==='sleep'&&valid){const minutes=Math.round(reading.value*60);number.textContent=String(Math.floor(minutes/60));number.append(make('span','home-vital-unit','h '+minutes%60+' min'));}
       else number.textContent=valid?format(reading.value,key):'-';
       if((valid||Number.isFinite(second?.value))&&key!=='sleep'&&!['spo2','wellbeing','recovery','fatigue','stress'].includes(key))number.append(make('span','home-vital-unit',unit==='C'?'°C':unit));

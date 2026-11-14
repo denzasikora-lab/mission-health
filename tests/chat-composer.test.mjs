@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 const source=await readFile(new URL('../public/chat-composer.js',import.meta.url),'utf8');
 class Node{
-  constructor(){this.children=[];this.events={};this.attributes={};this.style={};this.dataset={};this.scrollHeight=80;this.files=[];this.value='';}
+  constructor(){this.children=[];this.events={};this.attributes={};this.style={};this.dataset={};this.scrollHeight=80;this.files=[];this.value='';this.classList={toggle(){}};}
   append(...nodes){this.children.push(...nodes);}
   prepend(...nodes){this.children.unshift(...nodes);}
   before(...nodes){this.beforeNodes=nodes;}
@@ -40,7 +40,7 @@ function fixture({permission,configuration}={}){
   return {view,store,calls,recorders,tracks,api:window.missionChatComposer,microphoneCalls:()=>microphoneCalls};
 }
 test('Conversations retain attachments and microphone without an expand button',()=>{
-  const f=fixture();assert.equal(f.view.chatTools.children.length,2);assert.equal(f.view.chatTools.children[0].attributes['aria-label'],'Attach file');assert.equal(f.view.chatTools.children[1].attributes['aria-label'],'Voice input');assert.equal(f.view.input.style.height,'80px');assert.equal(f.calls.length,0);
+  const f=fixture();assert.equal(f.view.chatTools.children.length,2);assert.equal(f.view.chatTools.children[0].attributes['aria-label'],'Attach health data file');assert.equal(f.view.chatPicker.accept,'.csv,.json,.txt,text/csv,application/json,text/plain');assert.match(f.view.chatFileHelp.textContent,/medical reports or health readings/);assert.equal(f.view.chatTools.children[1].attributes['aria-label'],'Voice input');assert.equal(f.view.input.style.height,'80px');assert.equal(f.calls.length,0);
 });
 test('Cancellation before configuration returns does not request microphone permission',async()=>{
   let resolve;const configuration=new Promise(r=>{resolve=r;});const f=fixture({configuration});f.view.chatMic.click();f.api.contextChanged(f.view);resolve({ok:true,json:async()=>({api:true})});await settle();assert.equal(f.microphoneCalls(),0);assert.equal(f.store('chat').dictating,false);

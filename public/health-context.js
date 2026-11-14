@@ -29,23 +29,25 @@
     const now=Date.now(),times=['heart_rate','spo2','body_temperature','bp_systolic','bp_diastolic','respiratory_rate','fatigue_index','stress_index'].map(key=>value?.readings?.[key]).filter(reading=>reading&&reading.source!=='demo').map(reading=>Date.parse(reading.observedAt)+900001).filter(at=>Number.isFinite(at)&&at>now);
     if(times.length)staleTimer=setTimeout(()=>{staleTimer=0;render();},Math.max(1,Math.min(...times)-now));
   }
+  const setText=(node,value)=>{if(node.textContent!==value)node.textContent=value;};
+  let renderedAlerts='';
   function render(){
     const current=snapshot(),saved=pending&&pending.id!==latest?.id?null:latest,value=pending?.snapshot||saved?.snapshot||current,snapshotRules=rulesFor(value),expired=Boolean(saved&&snapshotRules?.stale?.length),rules=expired?rulesFor(current):saved?.rules||snapshotRules,result=saved?.result;
     const status=statusFor(!expired&&result?.agentAvailable?result.status:rules?.status,rules),example=rules?.isDemo===true;scheduleStaleness(expired?current:value);
-    scopeBadge.textContent=example?'Preflight':'Provided readings';statusBadge.textContent=status||'Incomplete';statusBadge.dataset.level=status?status.toLowerCase():'incomplete';
-    panel.setAttribute('aria-busy',String(busy));button.disabled=busy||!scope||!window.MissionHealthRules;button.textContent=busy?'Analyzing...':pending?'Retry analysis':'Analyze';newSnapshot.hidden=!pending||signature(pending.snapshot)===signature(current);newSnapshot.disabled=busy;
+    setText(scopeBadge,example?'Preflight':'Provided readings');setText(statusBadge,status||'Incomplete');statusBadge.dataset.level=status?status.toLowerCase():'incomplete';
+    panel.setAttribute('aria-busy',String(busy));button.disabled=busy||!scope||!window.MissionHealthRules;setText(button,busy?'Analyzing...':pending?'Retry analysis':'Analyze');newSnapshot.hidden=!pending||signature(pending.snapshot)===signature(current);newSnapshot.disabled=busy;
 
-    summary.textContent=result?(expired?'Saved analysis: ':'')+String(result.summary||'Rule results are shown below.').replace(/\*\*/g,'').replace(/No signal/gi,'Awaiting reading'):!rules?'Health checks are temporarily unavailable.':'Review available readings with the prototype rules.';
-    fullSummary.textContent='Next steps: keep regular check-ins, compare changes in MARS Health Report, and record voice and face observations under consistent conditions.';
-    alerts.replaceChildren();for(const text of (result?.alerts||[]).map(alertText).filter(text=>text&&!/No signal|Check the (?:missing )?sensor/i.test(text)))alerts.append(make('li','',text));alerts.hidden=!alerts.children.length;
+    setText(summary,result?(expired?'Saved analysis: ':'')+String(result.summary||'Rule results are shown below.').replace(/\*\*/g,'').replace(/No signal/gi,'Awaiting reading'):!rules?'Health checks are temporarily unavailable.':'Review available readings with the prototype rules.');
+    setText(fullSummary,'Next steps: keep regular check-ins, compare changes in MARS Health Report, and record voice and face observations under consistent conditions.');
+    const alertValues=(result?.alerts||[]).map(alertText).filter(text=>text&&!/No signal|Check the (?:missing )?sensor/i.test(text)),alertKey=JSON.stringify(alertValues);if(renderedAlerts!==alertKey){renderedAlerts=alertKey;alerts.replaceChildren(...alertValues.map(text=>make('li','',text)));}alerts.hidden=!alertValues.length;
     const parts=[];
     if(example)parts.push('Synthetic preflight rehearsal.');
     if(rules?.flags?.length)parts.push('Rule flags: '+rules.flags.map(key=>labels[key]||key).join(', ')+'.');
-    details.textContent=parts.join(' ');details.hidden=!parts.length;
+    setText(details,parts.join(' '));details.hidden=!parts.length;
     const stamp=time(saved?.createdAt||value.capturedAt);
-    meta.textContent=inProgress?'Analysis in progress':saved?(expired?'Saved analysis / current rules only':result.agentAvailable?'AI + rules':'Rules only / AI unavailable')+(stamp?' / '+stamp:''):pending?'Retry uses the original snapshot.':'Local rule preview / no AI request';
+    setText(meta,inProgress?'Analysis in progress':saved?(expired?'Saved analysis / current rules only':result.agentAvailable?'AI + rules':'Rules only / AI unavailable')+(stamp?' / '+stamp:''):pending?'Retry uses the original snapshot.':'Local rule preview / no AI request');
     const changed=saved&&signature(saved.snapshot)!==signature(current);
-    notice.textContent=!scope?'Sign in to analyze.':expired?'Saved observations have expired. Current status uses only unexpired readings. Add current measurements and analyze again.':message||(changed?'Readings changed. Analyze to update.':'');notice.hidden=!notice.textContent;
+    setText(notice,!scope?'Sign in to analyze.':expired?'Saved observations have expired. Current status uses only unexpired readings. Add current measurements and analyze again.':message||(changed?'Readings changed. Analyze to update.':''));notice.hidden=!notice.textContent;
   }
   function active(ticket,expected){return ticket===generation&&scope===expected&&owner()===expected;}
   function accept(value){

@@ -61,12 +61,13 @@
     renderScores();scheduleExpiry();window.dispatchEvent(new Event('mission-wellbeing-change'));void window.missionActivity?.record('wellbeing',{score,wellbeingScale:100});
   }
   function renderScores(){const saved=selection();for(const widget of sliders)renderScore(widget,saved);}
+  const scoreText=(node,value)=>{if(node.textContent!==value)node.textContent=value;};
   function renderScore(widget,saved=selection()){
       if(widget.preview?.scope!==owner())widget.preview=null;
       const chosen=widget.preview||saved,score=chosen?.score||50;widget.input.disabled=!owner()||identity?.storageScope!==owner();if(String(widget.input.value)!==String(score))widget.input.value=score;widget.root.style.setProperty('--mood-hue',hue(score));widget.root.style.setProperty('--mood-value',(score-1)/99);widget.root.dataset.chosen=String(Boolean(chosen));
-      window.missionGauge.update(widget.value,{value:chosen?score:null,label:'Wellbeing',compact:true});widget.label.textContent=chosen?label(score):'Select how you feel';widget.input.setAttribute('aria-valuetext',chosen?score+' from 100 / '+label(score):'Wellbeing not selected yet');
+      window.missionGauge.update(widget.value,{value:chosen?score:null,label:'Wellbeing',compact:true});scoreText(widget.label,chosen?label(score):'Select how you feel');widget.input.setAttribute('aria-valuetext',chosen?score+' from 100 / '+label(score):'Wellbeing not selected yet');
       widget.mouth.setAttribute('d','M7 14 Q12 '+(9+(score-1)/99*11).toFixed(2)+' 17 14');
-      widget.time.textContent=chosen?'Your score / '+new Date(chosen.at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'Self-report, not a sensor reading';
+      scoreText(widget.time,chosen?'Your score / '+new Date(chosen.at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'Self-report, not a sensor reading');
       widget.reset.hidden=!chosen;
   }
   function slider(){
@@ -75,6 +76,8 @@
     const input=root.querySelector('input');input.setAttribute('aria-label','Your wellbeing from 1 to 100');root.querySelector('.wellbeing-range-shell').append(input);root.querySelector('label').remove();
     const reset=create('button','wellbeing-reset','Reset score');reset.type='button';reset.hidden=true;reset.addEventListener('click',()=>{if(!owner()||identity?.storageScope!==owner())return;selections.delete(selectionKey());try{if(identity)localStorage.removeItem(storageKey());}catch{}renderScores();scheduleExpiry();window.dispatchEvent(new Event('mission-wellbeing-change'));});root.append(reset);
     const widget={root,input,reset,value:root.querySelector('strong'),label:root.querySelector('.wellbeing-readout span'),mouth:root.querySelector('path'),time:root.querySelector('.wellbeing-time'),preview:null};
+    // Фокус перед штатным перетаскиванием запрашивается без прокрутки к полю.
+    input.addEventListener('pointerdown',()=>{if(!input.disabled&&document.activeElement!==input)input.focus({preventScroll:true});});
     input.addEventListener('input',()=>{const score=Number(input.value);if(input.disabled||!owner()||identity?.storageScope!==owner()||!Number.isInteger(score)||score<1||score>100)return;widget.preview={scope:owner(),score,at:Date.now()};renderScore(widget);});
     const commit=()=>{const value=widget.preview;widget.preview=null;if(value&&value.scope===owner())choose(value.score);};
     input.addEventListener('change',commit);input.addEventListener('blur',commit);
@@ -161,7 +164,7 @@
   }
   async function send(kind){
     const expected=owner(),ticket=identityVersion;if(!expected||identity?.storageScope!==expected){store(kind).notice='Connection unavailable. Your draft was not sent. Use Retry beside your name in NasaGPT, then send again.';renderViews();return;}const s=store(kind),revision=s.revision;if(s.busy||s.clearing||s.dictating||s.files.some(file=>!file.id)||!s.draft.trim()&&!s.files.length)return;s.busy=true;s.notice='';
-    s.pending||={id:crypto.randomUUID(),content:s.draft.trim(),attachments:s.files.map(file=>file.id),...(kind==='team'?{}:{wellbeing:currentReport(),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone}),...(kind==='chat'&&window.missionHealth?.snapshot?{healthSnapshot:window.missionHealth.snapshot()}: {})};const input=s.pending;renderViews();
+    s.pending||={id:crypto.randomUUID(),content:s.draft.trim(),attachments:s.files.map(file=>file.id),...(kind==='team'?{}:{wellbeing:currentReport(),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone})};const input=s.pending;renderViews();
     try{
       const result=await api(kind==='team'?'/api/team-chat':kind==='chat'?'/api/chat':'/api/astronauts/'+s.profile+'/messages',{method:'POST',body:JSON.stringify({...input,...(kind==='chat'&&s.generation!==null?{generation:s.generation}:{}),...(kind==='diary'?{mode:'diary',language:typeof state!=='undefined'&&state.language==='ur'?'ur':'en',attachments:[]}:{} )})});
       if(!accountActive(expected,ticket)||s.revision!==revision)return;for(const entry of [result.message,result.reply].filter(Boolean)){const index=s.messages.findIndex(item=>item.id===entry.id);if(index<0)s.messages.push(entry);else s.messages[index]=entry;}

@@ -15,6 +15,7 @@
 .chat-composer-tools[hidden],.chat-pending-files[hidden]{display:none!important}
 .personal-composer .chat-composer-tools button,.media-diary .personal-composer .chat-composer-tools button{display:grid;place-items:center;width:34px;min-width:34px;height:36px;min-height:36px;padding:7px;border-radius:9px;background:transparent;line-height:1}
 .chat-composer-tools svg,.chat-pending-file svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.personal-composer .chat-composer-tools .chat-health-file,.media-diary .personal-composer .chat-composer-tools .chat-health-file{display:flex;width:auto;gap:6px;padding-inline:9px;font-size:.65rem}.chat-health-file svg{flex:none}.chat-file-help{display:block;margin-top:9px;color:var(--muted);font-size:.61rem;line-height:1.5;overflow-wrap:anywhere}.chat-file-help[hidden]{display:none!important}
 .chat-composer-tools button[aria-pressed=true]{color:#ff9b91;border-color:#bc625b;background:#9c383322}
 .chat-pending-files{display:grid;gap:6px;margin-bottom:8px}.chat-pending-files:empty{display:none}
 .chat-pending-file{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:.65rem;min-width:0}.chat-pending-file>span{flex:1;min-width:0;overflow-wrap:anywhere}

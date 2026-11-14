@@ -7,6 +7,8 @@
     'Personal observations / separate history and semantic search':'ذاتی مشاہدات / الگ تاریخ اور معنوی تلاش',
     'Send':'بھیجیں','Waiting for an answer...':'جواب کا انتظار ہے...','Saving...':'محفوظ کیا جا رہا ہے...','To diary':'ڈائری میں محفوظ کریں',
     'Attach file':'فائل منسلک کریں','Voice input':'آواز سے لکھیں','Stop voice input':'آواز سے لکھنا بند کریں',
+    'Health files':'صحت کی فائلیں','Attach health data file':'صحت کے ڈیٹا کی فائل منسلک کریں','Medical and health data files':'طبی اور صحت کے ڈیٹا کی فائلیں',
+    'Attach medical reports or health readings for analysis and search. CSV / JSON / TXT, UTF-8, up to 64 KB and 6,000 characters per file.':'تجزیے اور تلاش کے لیے طبی رپورٹس یا صحت کی پیمائشیں منسلک کریں. CSV / JSON / TXT، UTF-8، ہر فائل زیادہ سے زیادہ 64 KB اور 6,000 حروف.',
     'Refresh history':'گفتگو تازہ کریں','Message text':'پیغام کا متن','Message files':'پیغام کی فائلیں',
     'Earlier entries':'پرانے اندراجات','Retry request answer':'جواب کے لیے دوبارہ کوشش کریں',
     'Add to favorites':'پسندیدہ میں شامل کریں','Remove from favorites':'پسندیدہ سے نکالیں',
@@ -42,16 +44,18 @@
   add('.personal-composer button[type="submit"]',['Send','Waiting for an answer...','Saving...','To diary']);
   add('.personal-older',['Earlier entries']);
   add('.personal-retry',['Retry request answer']);
-  add('.chat-composer-tools button',['Attach file','Voice input','Stop voice input'],'aria-label');
-  add('.chat-composer-tools button',['Attach file','Voice input','Stop voice input'],'title');
+  add('.chat-composer-tools button',['Attach file','Attach health data file','Voice input','Stop voice input'],'aria-label');
+  add('.chat-composer-tools button',['Attach file','Attach health data file','Voice input','Stop voice input'],'title');
+  add('.chat-health-file > span',['Health files']);
+  add('.chat-file-help',['Attach medical reports or health readings for analysis and search. CSV / JSON / TXT, UTF-8, up to 64 KB and 6,000 characters per file.']);
   add('[data-personal-refresh]',['Refresh history'],'aria-label');
   add('.personal-composer textarea, .personal-composer .sr-only',['Message text'],'aria-label');
   add('.personal-composer .sr-only',['Message text']);
-  add('.personal-composer input[type="file"]',['Message files'],'aria-label');
+  add('.personal-composer input[type="file"]',['Message files','Medical and health data files'],'aria-label');
   add('[data-favorite-source]',['Add to favorites','Remove from favorites'],'aria-label');
   add('#mission-home-button',['Home'],'aria-label');add('#mission-home-button',['Home'],'title');
   add('.brand',['Home / Mission Health'],'aria-label');
-  add('#book-search-open',['Search archive']);
+  add('#book-search-open > span',['Search archive']);
   add('.home-body-panel > header > h2',['My readings']);
   add('.home-example-button',['PREFLIGHT RUN']);add('.home-example-button',['Load clearly labeled example readings'],'title');add('.home-sample-button',['LOAD READINGS']);add('.home-sample-button',['Load saved readings and imported device data'],'title');
   add('.home-sample-clear',['Clear generated sample'],'aria-label');add('.home-sample-clear',['Clear generated sample'],'title');

@@ -15,11 +15,11 @@
   document.body.append(editor);
   const $b=id=>document.getElementById(id),B={profile:null,entries:[],samples:[],snapshot:null,pages:[],index:0,cover:true,hasMore:false,cursor:null,version:0,loading:false,loaded:false,demo:false,name:'My archive'};
   const searchActions=create('div','book-search-actions'),searchLaunch=$b('book-search-open');
-  searchLaunch.textContent='Search archive';searchLaunch.setAttribute('aria-controls',search.id);searchLaunch.setAttribute('aria-haspopup','dialog');searchActions.append(searchLaunch);$b('book-stage').before(searchActions);
+  searchLaunch.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><span>Search archive</span>';searchLaunch.title='Find saved health records and observations by meaning';searchLaunch.setAttribute('aria-controls',search.id);searchLaunch.setAttribute('aria-haspopup','dialog');searchActions.append(searchLaunch);$b('book-stage').after(searchActions);
   let saveId=null,saving=false;
   let worker=null,job=null,searchVersion=0,controller=null,searching=false,turnTimer,resizeTimer,layoutSignature='',preloadTask;
   for(const id of ['book-position','book-notice']){const status=$b(id);status.className='sr-only';$b('book-stage').before(status);}
-  $b('book-spread').setAttribute('aria-description','Right half of the page - next, left - back. Swipe or use keyboard arrows to turn pages.');
+  $b('book-spread').setAttribute('aria-description','Right half of the page - next, left - back. Going back from the first page closes the book. Swipe or use keyboard arrows to turn pages.');
   const demoEntries=[
     {id:'demo-sleep',createdAt:'2026-10-26T07:10:00Z',content:'Sleep and quiet\n\nI slept for six hours. I woke up several times because of-the fan noise. It was hard to concentrate in the morning. I want to compare how I feel after a quieter night.'},
     {id:'demo-exercise',createdAt:'2026-10-27T17:30:00Z',content:'After exercise\n\nI finished my usual exercise bike workout. I took a break, drank water and recorded how I felt. By evening I felt less tired. Tomorrow I want to start with a gentle warm-up.'},
@@ -63,7 +63,7 @@
     $b('book-cover').hidden=!B.cover;spread.hidden=B.cover;pauseMedia();spread.replaceChildren();spread.dataset.pages=count;
     if(!B.cover){spread.append(pageNode(B.pages[B.index],B.index+1));if(count===2)spread.append(pageNode(B.pages[B.index+1],B.index+2));}
     $b('book-position').textContent=B.cover?'Cover':B.pages.length?'Pages '+(B.index+1)+(count===2?' / '+(B.index+2):'')+' · entries: '+B.entries.length:'Blank page';
-    $b('book-prev').disabled=B.cover||B.index===0;$b('book-next').disabled=B.loading||!B.cover&&B.index+count>=B.pages.length;
+    $b('book-prev').disabled=B.cover;$b('book-next').disabled=B.loading||!B.cover&&B.index+count>=B.pages.length;
     $b('book-older').hidden=B.demo||!B.hasMore;$b('book-older').disabled=B.loading;$b('book-demo-banner').hidden=!B.demo;window.missionTraining?.render({visible:visible(),profile:B.profile,demo:B.demo});$b('book-demo').hidden=B.demo;
     $b('book-author').textContent=B.name;$b('book-scope').textContent=(B.profile===personalProfileId?'Your personal entries':'Your earlier archive / '+(crew.find(person=>person.id===B.profile)?.name||''))+(B.demo?' / sample':'');
     $b('book-cover').setAttribute('aria-label','Open book / '+B.name);
@@ -133,11 +133,12 @@
     if(on&&!B.loaded&&!B.loading)void load();if(on)draw();window.missionTraining?.render({visible:on,profile:B.profile,demo:B.demo});
   }
   async function turn(direction){
-    if(B.cover){B.cover=false;B.index=0;draw();return}
+    if(B.cover){if(direction>0){B.cover=false;B.index=0;draw()}return}
+    if(direction<0&&B.index===0){clearTimeout(turnTimer);B.cover=true;draw();$b('book-cover').focus({preventScroll:true});return}
     const firstPersonal=B.pages.findIndex(page=>!page.entry.archiveSample&&!page.entry.archiveCurrent),version=B.version;
     if(direction<0&&firstPersonal>=0&&B.index<=firstPersonal&&B.index+perSpread()>firstPersonal&&B.hasMore&&!B.demo&&!B.loading)await load(true,{id:B.pages[firstPersonal].entry.id,offset:0});
     if(version!==B.version)return;
-    const index=B.index+direction*perSpread();if(index<0||index>=B.pages.length)return;
+    const index=Math.max(0,B.index+direction*perSpread());if(index===B.index||index>=B.pages.length)return;
     clearTimeout(turnTimer);$b('book-spread').querySelectorAll('.book-turn-leaf').forEach(node=>node.remove());const old=$b('book-spread').querySelector(direction>0?'.book-page:last-child':'.book-page:first-child')?.cloneNode(true);B.index=index;draw();if(old){old.classList.add('book-turn-leaf');if(direction<0)old.classList.add('previous');old.setAttribute('aria-hidden','true');$b('book-spread').append(old);turnTimer=setTimeout(()=>old.remove(),520);}
   }
   function openEditor(){editor.showModal();$b('book-entry-text').focus();}
