@@ -1,6 +1,7 @@
 (() => {
   const modal=document.getElementById('media-diary-dialog'),views=[],sliders=[],cache=new Map(),selections=new Map(),favoriteBusy=new Set();
   let identity=window.missionProfileName?.identity||null,identityTask,identityVersion=0,modalKind='chat',mainKind='chat',profileSeen='',favoriteItems=[],favoriteLoaded=false,favoriteCursor=null,favoriteMore=false,favoriteLoading=false;
+  let confirmedOwnerSeen=Boolean(identity?.storageScope);
   const profile=()=>personalProfileId;
   const owner=()=>window.missionProfileName?window.missionProfileName.identity?.storageScope||null:identity?.storageScope||null;
   const accountActive=(expected,ticket)=>owner()===expected&&identity?.storageScope===expected&&ticket===identityVersion;
@@ -20,10 +21,13 @@
   function bindIdentity(value){
     const next=value?.storageScope?value:null;
     if(next?.storageScope!==identity?.storageScope){
+      const initialDrafts=!confirmedOwnerSeen&&!identity?.storageScope&&next?.storageScope?[...cache.entries()].filter(([key,item])=>key.startsWith('unbound:')&&typeof item.draft==='string'&&item.draft.trim()).map(([,item])=>({kind:item.kind,text:item.draft})):[];
       identityVersion++;identityTask=null;identity=next;cache.clear();selections.clear();favoriteItems=[];favoriteLoaded=false;favoriteCursor=null;favoriteMore=false;favoriteLoading=false;favoriteBusy.clear();profileSeen='';
       for(const view of views){window.missionChatComposer?.contextChanged(view);view.input.value='';view.status.textContent='';}
+      for(const draft of initialDrafts){const item=store(draft.kind);item.draft=draft.text;item.recoveredDraft=true;item.notice='Connection restored. Your draft was not sent. Review it and press Send.';}
       renderScores();scheduleExpiry();window.dispatchEvent(new Event('mission-wellbeing-change'));
     }else identity=next;
+    if(next?.storageScope)confirmedOwnerSeen=true;
     restoreScore();renderViews();
   }
   async function prepare(){
@@ -75,7 +79,7 @@
     sliders.push({root,input,reset,value:root.querySelector('strong'),label:root.querySelector('.wellbeing-readout span'),mouth:root.querySelector('path'),time:root.querySelector('.wellbeing-time')});renderScores();return root;
   }
   function badge(report){const scale=report.wellbeingScale===100?100:10,score=canonicalReport(report).score;const node=create('span','wellbeing-badge');node.innerHTML=window.missionGauge.markup({value:report.score,max:scale,label:'Wellbeing',compact:true});node.append(create('span','',report.label||label(score)));node.style.setProperty('--mood-hue',hue(score));return node;}
-  function store(kind){const key=(owner()||'unbound')+':'+(kind==='diary'?'diary:'+profile():kind);if(!cache.has(key))cache.set(key,{kind,profile:profile(),messages:[],loaded:false,loading:false,cursor:null,more:false,draft:'',files:[],pending:null,busy:false,notice:''});return cache.get(key);}
+  function store(kind){const key=(owner()||'unbound')+':'+(kind==='diary'?'diary:'+profile():kind);if(!cache.has(key))cache.set(key,{kind,profile:profile(),messages:[],loaded:false,loading:false,cursor:null,more:false,draft:'',files:[],pending:null,busy:false,notice:'',recoveredDraft:false});return cache.get(key);}
   function favoriteFor(type,id){return favoriteItems.find(item=>item.sourceType===type&&item.sourceId===id);}
   function star(entry,type='diary',id=profile()){
     const b=create('button','personal-star');b.type='button';b.dataset.favoriteSource=type;b.dataset.favoriteId=entry.id;
@@ -106,7 +110,7 @@
     const expected=owner(),ticket=identityVersion;if(!expected||identity?.storageScope!==expected)return;
     if(kind==='favorites'){await favorites(older);return;}
     if(kind==='scheduler'){await window.missionScheduler.refresh();return;}
-    const s=store(kind);if(s.loading||s.polling||s.busy)return;if(quiet)s.polling=true;else{s.loading=true;s.notice='';renderViews();}let changed=!quiet;
+    const s=store(kind);if(s.loading||s.polling||s.busy)return;if(quiet)s.polling=true;else{s.loading=true;if(!s.recoveredDraft)s.notice='';renderViews();}let changed=!quiet;
     try{
       const suffix=older&&s.cursor?'?cursor='+encodeURIComponent(s.cursor):'';
       const data=await api(kind==='team'?'/api/team-chat'+suffix:kind==='chat'?'/api/chat'+suffix:'/api/astronauts/'+s.profile+'/book'+suffix);
@@ -144,19 +148,19 @@
     updateStars();
   }
   async function send(kind){
-    const expected=owner(),ticket=identityVersion;if(!expected||identity?.storageScope!==expected)return;const s=store(kind);if(s.busy||s.dictating||s.files.some(file=>!file.id)||!s.draft.trim()&&!s.files.length)return;s.busy=true;s.notice='';
+    const expected=owner(),ticket=identityVersion;if(!expected||identity?.storageScope!==expected){store(kind).notice='Connection unavailable. Your draft was not sent. Use Retry beside your name in NasaGPT, then send again.';renderViews();return;}const s=store(kind);if(s.busy||s.dictating||s.files.some(file=>!file.id)||!s.draft.trim()&&!s.files.length)return;s.busy=true;s.notice='';
     s.pending||={id:crypto.randomUUID(),content:s.draft.trim(),attachments:s.files.map(file=>file.id),...(kind==='team'?{}:{wellbeing:currentReport(),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone}),...(kind==='chat'&&window.missionHealth?.snapshot?{healthSnapshot:window.missionHealth.snapshot()}: {})};const input=s.pending;renderViews();
     try{
       const result=await api(kind==='team'?'/api/team-chat':kind==='chat'?'/api/chat':'/api/astronauts/'+s.profile+'/messages',{method:'POST',body:JSON.stringify({...input,...(kind==='diary'?{mode:'diary',language:typeof state!=='undefined'&&state.language==='ur'?'ur':'en',attachments:[]}:{} )})});
       if(!accountActive(expected,ticket))return;for(const entry of [result.message,result.reply].filter(Boolean)){const index=s.messages.findIndex(item=>item.id===entry.id);if(index<0)s.messages.push(entry);else s.messages[index]=entry;}
-      void window.missionActivity?.refresh();s.draft='';s.files=[];s.pending=null;s.loaded=true;s.notice=kind==='diary'?'Recording saved in the diary.':result.replyError?'NasaGPT could not answer yet. Try the request again.':'';
+      void window.missionActivity?.refresh();s.draft='';s.files=[];s.pending=null;s.recoveredDraft=false;s.loaded=true;s.notice=kind==='diary'?'Recording saved in the diary.':result.replyError?'NasaGPT could not answer yet. Try the request again.':'';
       if(kind==='chat'&&result.tasks?.length){s.notice=(s.notice?s.notice+' ':'')+'In «Scheduled»: '+result.tasks.length+'.';void window.missionScheduler.refresh();}
       if(kind==='diary'){void window.missionBook?.refresh();void loadJournal();}
     }catch{if(accountActive(expected,ticket))s.notice='Could not finish sending. Your text is preserved here; you can retry.';}
     finally{if(accountActive(expected,ticket)){s.busy=false;renderViews();for(const view of views)if(view.kind===kind&&!view.host.hidden)view.list.scrollTop=view.list.scrollHeight;}}
   }
   async function retryChat(entry){
-    const expected=owner(),ticket=identityVersion;if(!expected||identity?.storageScope!==expected)return;const s=store('chat');if(s.busy)return;s.busy=true;s.notice='';renderViews();
+    const expected=owner(),ticket=identityVersion;if(!expected||identity?.storageScope!==expected){store('chat').notice='Connection unavailable. Use Retry beside your name in NasaGPT, then retry this answer.';renderViews();return;}const s=store('chat');if(s.busy)return;s.busy=true;s.notice='';renderViews();
     try{const data=await api('/api/chat',{method:'POST',body:JSON.stringify({id:entry.id,content:entry.content,wellbeing:canonicalReport(entry.wellbeing),attachments:(entry.attachments||[]).map(file=>file.id),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone})});if(!accountActive(expected,ticket))return;for(const row of [data.message,data.reply].filter(Boolean)){const i=s.messages.findIndex(item=>item.id===row.id);if(i<0)s.messages.push(row);else s.messages[i]=row;}if(data.tasks?.length)void window.missionScheduler.refresh();s.notice=data.replyError?'NasaGPT could not answer yet. Try the request again.':'';}catch{if(accountActive(expected,ticket))s.notice='Could not get an answer. Try again.';}finally{if(accountActive(expected,ticket)){s.busy=false;renderViews();}}
   }
   function panel(host,kind,{favoriteShortcut=false,onKindChange}={}){
@@ -164,7 +168,7 @@
     host.innerHTML='<header class="personal-conversation-heading"><div><span class="personal-section-title"></span><small class="personal-section-caption"></small></div><div><button type="button" data-personal-search>✧ NasaGPT</button><button type="button" data-personal-favorites hidden>Favorites</button><button type="button" data-personal-refresh aria-label="Refresh history">↻</button></div></header><button type="button" class="personal-older" hidden>Earlier entries</button><div class="personal-messages" role="log" aria-live="polite"></div><form class="personal-composer"><label class="sr-only">Message text</label><textarea dir="auto" rows="2" maxlength="6000" aria-label="Message text"></textarea><footer><span class="personal-send-hint"></span><button type="submit"></button></footer></form><p class="personal-status" role="status"></p>';
     Object.assign(view,{list:host.querySelector('.personal-messages'),form:host.querySelector('form'),input:host.querySelector('textarea'),send:host.querySelector('button[type=submit]'),status:host.querySelector('.personal-status'),more:host.querySelector('.personal-older'),refresh:host.querySelector('[data-personal-refresh]')});
     view.form.addEventListener('submit',event=>{event.preventDefault();void send(view.kind);});
-    view.input.addEventListener('input',()=>{const s=store(view.kind);s.draft=view.input.value;s.pending=null;view.send.disabled=!s.draft.trim()&&!s.files.length||s.files.some(file=>!file.id)||s.busy||s.loading||s.dictating;});
+    view.input.addEventListener('input',()=>{const s=store(view.kind);s.draft=view.input.value;s.pending=null;if(!s.draft.trim())s.recoveredDraft=false;view.send.disabled=!s.draft.trim()&&!s.files.length||s.files.some(file=>!file.id)||s.busy||s.loading||s.dictating;});
     view.input.addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();view.form.requestSubmit();}});
     view.more.addEventListener('click',()=>void load(view.kind,true));view.refresh.addEventListener('click',()=>void load(view.kind));
     host.querySelector('[data-personal-favorites]').addEventListener('click',()=>setKind(view,view.kind==='favorites'?'chat':'favorites'));

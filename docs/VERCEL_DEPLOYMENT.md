@@ -6,14 +6,14 @@ The Vercel project is `mission-health` in the `acme-2c0d` team and is connected 
 
 ## Topology
 
-The backend migration targets the topology below. It is not complete until the HTTPS and browser acceptance checks in this document have passed for the deployed release.
+The t213 public API route was activated on 14 November 2026. Public Vercel checks passed for guest sessions, Sara profile loading and saving, NasaGPT sending and saved replies, task editing/deletion, private file upload, measurement persistence, Qdrant search and a cited RAG answer. Verification used separate synthetic guest sessions. The acceptance steps below remain the release checklist.
 
 - Vercel serves the frontend and rewrites `/api/*` to `https://users.fereyuserstopstrongcloudwinter.shop/mission-health-api/api/*` on t213.
 - The existing Nginx HTTPS server on t213 uses `/etc/nginx/sites-enabled/users` and proxies that dedicated prefix to `127.0.0.1:8092`. It sets Host to `mission-health-bug-busters.vercel.app` and preserves the other applications and TLS configuration.
 - `server/standalone.mjs` adapts the existing Worker routes to Node.js. It keeps the same input validation, deterministic rules, primary Azure provider, and utility provider.
 - SQLite and recording/object files are private under `/home/t213/mission-health/backend/data`. They are separate from the GPT site's D1/R2 storage. Existing GPT-site personal records are not copied to this deployment.
 - The text memory service and embedder remain on t4 at `127.0.0.1:8091`; Qdrant remains on t4 loopback at port 6333. A dedicated SSH tunnel exposes the memory service only at `127.0.0.1:18091` on t213 and forwards it to t4 loopback port 8091. The API uses `MEMORY_URL=http://127.0.0.1:18091` with its private memory credential.
-- This topology uses no public memory endpoint. The browser receives neither memory credentials nor direct access to the tunnel, embedder, or Qdrant ports.
+- The browser receives neither memory credentials nor direct access to the tunnel, embedder, or Qdrant ports. The additional `/mission-health-memory/` HTTPS route on t213 requires the private bearer credential and rejects requests with an Origin header; it is reserved for server-to-server clients. Vercel uses the API routes, and the standalone API continues to use its loopback tunnel.
 - Existing VPN services and other applications on both servers are outside this deployment.
 
 The GPT site's runtime and audience remain independent. Its authenticated Sites identity is not reused as an anonymous Vercel identity.
