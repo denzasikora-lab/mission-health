@@ -8,9 +8,9 @@
   const results=new Map(),ownerScopes=new Map();let currentScope='',displayed,ownerIdentity='';
   const sampleVisual=window.missionAnalysisSamples?.visual;let sampleAllowed=true;
   const label=range=>range.max===null?range.min+' years and older':range.min+'-'+range.max+' years';
-  function showSample(){
-    if(!sampleVisual||!sampleAllowed||displayed)return;
-    root.setAttribute('data-result-source','sample');value.textContent='≈ '+label(sampleVisual.age);state.textContent='Reference sample / illustrative range, not a user estimate';referenceLabel.textContent='Reference sample / no personal baseline';
+  function showSample(force=false){
+    if(!sampleVisual||!sampleAllowed||displayed&&!force)return;
+    root.setAttribute('data-result-source','preflight');value.textContent='≈ '+label(sampleVisual.age);state.textContent='Preflight data / synthetic appearance range';referenceLabel.textContent='Preflight baseline / synthetic';
   }
   const resultKey=scope=>'mission-apparent-age-result-v1:'+scope;
   function scopeOwner(scope){try{if(!scope.startsWith('mission-appearance-v2:'))return '';const parts=JSON.parse(scope.slice('mission-appearance-v2:'.length));return Array.isArray(parts)&&parts.length===3&&parts.every(value=>typeof value==='string')?JSON.stringify(parts.slice(0,2)):'';}catch{return '';}}
@@ -46,5 +46,6 @@
     if(report?.status==='estimated'&&currentScope){displayed={report,conditions:displayed?.conditions||null,at:createdAt};results.set(currentScope,displayed);try{localStorage.setItem(resultKey(currentScope),JSON.stringify(displayed));}catch{}}
   }
   value.textContent='Recording required';root.setAttribute('data-result-source','missing');showSample();
-  window.missionApparentAge={begin,finish,setScope,setIdentity,restoreSession};
+  function preflight(enabled){sampleAllowed=enabled;if(enabled)showSample(true);else{const scope=currentScope;currentScope='';setScope(scope);}}
+  window.missionApparentAge={begin,finish,setScope,setIdentity,restoreSession,preflight};
 })();

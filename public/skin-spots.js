@@ -12,15 +12,15 @@
   reset.disabled=true;
   const names={'forehead':'Forehead','left-cheek':'Left frame area / cheek','right-cheek':'Right frame area / cheek'},reasons={need_camera:'Enable the camera for comparison.',need_frames:'A complete sharp face frame is required.',need_closeup:'Move closer: there are not enough pixels for individual spots.',not_enough_detail:'Could not reliably isolate the regions. Repeat the close-up and lighting.',no_reference:'Skin baseline required.',unstable:'Waiting for three stable frames.',conditions_changed:'Match lighting, baseline distance and angle.',collecting:'Collecting skin baseline'};
   let scope='',reference=null,samples=[],lastTime=0,latestTime=0,latest=null,report=core.unavailable('need_camera'),storageOk=true;
-  const sampleVisual=window.missionAnalysisSamples?.visual;let sampleAllowed=true;
+  const sampleVisual=window.missionAnalysisSamples?.visual;let sampleAllowed=true,trial=false;
   const key=()=> 'mission-skin-spots-v1:'+scope,fmt=n=>new Intl.NumberFormat('en',{maximumFractionDigits:1}).format(n),hex=c=>'#'+['r','g','b'].map(k=>c[k].toString(16).padStart(2,'0')).join('');
   function render(){
-    list.replaceChildren();const compared=report.status==='compared',sample=sampleAllowed&&Boolean(sampleVisual)&&!compared;
-    root.setAttribute('data-result-source',sample?'sample':compared?'current':'missing');
-    for(const [index,card] of cards.entries()){card.value.textContent=compared?(index===0?report.newCount:report.changedCount):sample?(index===0?sampleVisual.skin.newCount:sampleVisual.skin.changedCount):'-';card.node.setAttribute('data-result-source',compared?'current':sample?'sample':'missing');card.status.textContent=sample?'Reference sample':compared?'Baseline comparison':'No comparison';}
-    status.textContent=sample?'Reference sample / zero counters illustrate the interface, user skin was not measured':compared?'Available regions compared / candidates require review':reasons[report.reason]||reasons.need_frames;
-    referenceLabel.textContent=sample?'Reference sample / no personal baseline':reference?'Baseline '+new Date(reference.at).toLocaleString('en-GB',{dateStyle:'short',timeStyle:'short'})+(storageOk?' / on this device':' / this session only'):'Forehead and both cheeks / baseline '+samples.length+' from 5 frames';
-    if(sample){reset.disabled=true;search.textContent='The reference sample is not saved to your personal archive.';}
+    list.replaceChildren();const compared=report.status==='compared'&&!trial,sample=(trial||sampleAllowed)&&Boolean(sampleVisual)&&!compared;
+    root.setAttribute('data-result-source',sample?'preflight':compared?'current':'missing');
+    for(const [index,card] of cards.entries()){card.value.textContent=compared?(index===0?report.newCount:report.changedCount):sample?(index===0?sampleVisual.skin.newCount:sampleVisual.skin.changedCount):'-';card.node.setAttribute('data-result-source',compared?'current':sample?'preflight':'missing');card.status.textContent=sample?'Preflight data / synthetic':compared?'Baseline comparison':'No comparison';}
+    status.textContent=sample?'Preflight data / synthetic skin comparison':compared?'Available regions compared / candidates require review':reasons[report.reason]||reasons.need_frames;
+    referenceLabel.textContent=sample?'Preflight baseline / 5 simulated frames':reference?'Baseline '+new Date(reference.at).toLocaleString('en-GB',{dateStyle:'short',timeStyle:'short'})+(storageOk?' / on this device':' / this session only'):'Forehead and both cheeks / baseline '+samples.length+' from 5 frames';
+    if(sample){reset.disabled=true;search.textContent='Synthetic area / 3.4 px diameter / color change 2.1 ΔE';return;}
     for(const item of report.items){
       const node=document.createElement('article'),title=document.createElement('strong'),detail=document.createElement('p'),colors=document.createElement('div');node.className='skin-spot-item';title.textContent=(item.change==='new'?'New contrasting area':item.change==='changed'?'Area changed':'Area matched')+' / '+names[item.region];
       detail.textContent='Equiv. diameter ≈ '+fmt(item.diameterPixels)+' px · area '+fmt(item.areaPixels)+' px²'+(item.baseline?' · area '+(item.areaChangePercent>0?'+':'')+fmt(item.areaChangePercent)+'% · color '+fmt(item.deltaE)+' ΔE':' · not detected in baseline');
@@ -29,7 +29,7 @@
     }
   }
   function setScope(value){
-    sampleAllowed=false;scope=value;reset.disabled=true;samples=[];lastTime=latestTime=0;latest=null;reference=null;storageOk=true;report=core.unavailable('need_camera');search.textContent='Matching earlier entries becomes available after video analysis.';
+    sampleAllowed=false;trial=false;scope=value;reset.disabled=true;samples=[];lastTime=latestTime=0;latest=null;reference=null;storageOk=true;report=core.unavailable('need_camera');search.textContent='Matching earlier entries becomes available after video analysis.';
     try{const stored=JSON.parse(localStorage.getItem(key())||'null');if(core.referenceValid(stored))reference=stored;}catch{storageOk=false;}render();
   }
   function observe(value,time){
@@ -63,5 +63,6 @@
   function pending(value){const clean=core.validate(value);if(clean?.status==='compared'&&clean.trackingKey===reference?.trackingKey&&!latest){sampleAllowed=false;report=clean;render();search.textContent='Size and color measured / recording vectorization pending.';}}
   function encoded(value){const clean=core.validate(value);if(!clean||clean.status==='compared'&&clean.trackingKey!==reference?.trackingKey)return;sampleAllowed=false;if(!latest){report=clean;render();}const count=clean.items.filter(v=>v.vector).length;search.textContent=count?'For '+count+' regions vectorized / searching earlier entries.':'Region vectors unavailable / pixel comparison preserved.';}
   function matches(value,trackingKey){if(trackingKey!==reference?.trackingKey||!Array.isArray(value)||value.length>4)return;search.textContent=value.length?'Similar regions found in '+new Set(value.map(v=>v.recordId)).size+' earlier entries. Similarity helps matching, it does not confirm the spot type.':'No comparable earlier vectors yet.';}
-  window.missionSkinSpots={setScope,observe,pause,snapshot,pending,encoded,matches};render();
+  function preflight(enabled){trial=enabled;sampleAllowed=enabled;render();}
+  window.missionSkinSpots={setScope,observe,pause,snapshot,pending,encoded,matches,preflight};render();
 })();

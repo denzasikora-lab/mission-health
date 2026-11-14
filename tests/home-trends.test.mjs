@@ -147,3 +147,8 @@ test('Color requires at least three earlier actual observations from the same so
 test('Downsampling retains actual endpoints and extremes without synthesizing observations',()=>{
   const f=fixture(),points=Array.from({length:10000},(_,index)=>({at:index*173,value:index%231,sourceKey:'actual'}));points[203].value=-123;points[9400].value=10000;const sampled=f.core.sample(points);assert.ok(sampled.length<=500);assert.equal(sampled[0],points[0]);assert.equal(sampled.at(-1),points.at(-1));assert.ok(sampled.includes(points[203]));assert.ok(sampled.includes(points[9400]));assert.ok(sampled.every(point=>points.includes(point)));assert.ok(sampled.every((point,index)=>index===0||sampled[index-1].at<point.at));
 });
+
+test('Preflight totals remain fixed while temperatures move by hundredths and pulse stays bounded',()=>{
+ const f=fixture(),base=sampleSnapshot();for(const seconds of [0,1,15,60,600]){const current=f.core.sampleSnapshot(base,initialNow+seconds*1000);for(const key of ['steps','activity','sleep_hours','recovery','wellbeing','fatigue_index','stress_index','light'])assert.equal(current.readings[key].value,base.readings[key].value);assert.ok(Math.abs(current.readings.body_temperature.value-base.readings.body_temperature.value)<.25);assert.ok(Math.abs(current.readings.heart_rate.value-base.readings.heart_rate.value)<6);}
+ const values=Array.from({length:60},(_,i)=>f.core.sampleSnapshot(base,initialNow+i*1000).readings.body_temperature.value);assert.ok(values.some(value=>Math.abs(value*10-Math.round(value*10))>.01));
+});

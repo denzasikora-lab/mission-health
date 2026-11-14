@@ -5,6 +5,7 @@ import {readFile,readdir} from 'node:fs/promises';
 import {DatabaseSync} from 'node:sqlite';
 import {webcrypto} from 'node:crypto';
 const root=new URL('../',import.meta.url);
+const preflightSource=await readFile(new URL('public/analysis-samples.js',root),'utf8');
 const source=(await Promise.all(['activity','scheduler','personal','photos','stories','speech','training','book','index'].map(name=>readFile(new URL('worker/'+name+'.js',root),'utf8')))).join('\n').replace('export default','globalThis.app =');
 const migrations=await Promise.all((await readdir(new URL('drizzle/',root))).filter(name=>name.endsWith('.sql')).sort().map(name=>readFile(new URL('drizzle/'+name,root),'utf8')));
 const hostedMemoryMigration=await readFile(new URL('drizzle/0015_hosted_memory_reindex.sql',root),'utf8');
@@ -18,7 +19,7 @@ function fixture(options={}){
   },async batch(commands){sql.exec('BEGIN');try{for(const item of commands)sql.prepare(item.query).run(...item.values);sql.exec('COMMIT');}catch(error){sql.exec('ROLLBACK');throw error;}}};
   let answerPause=null;let memoryHandler=async()=>({matches:[],indexed:true}),status=200,answer='Test response based on supplied context.',intentStatus=200,intentAnswer=JSON.stringify({isScheduler:false,tasks:[]});
   const scope={URL,Request,Response,FormData,Blob,Uint8Array,TextEncoder,DataView,AbortSignal,crypto:webcrypto,atob,console:{warn(){},error(){}},fetch:async(url,options)=>{const body=JSON.parse(options.body);if(body.messages?.[0]?.content?.startsWith('Mission Health scheduler intent.')){intentCalls.push({url,body});return intentStatus===200?Response.json({choices:[{message:{content:intentAnswer}}]}):new Response('unavailable',{status:intentStatus});}if(String(url).startsWith('http://memory.internal/')){memoryCalls.push({url,body});return Response.json(await memoryHandler(url,body));}out.push({url,body});if(answerPause)await answerPause;if(String(url).startsWith('http://trainer.internal/'))return Response.json({id:body.id});return status===200?Response.json(body.input?{status:'completed',output:[{type:'message',role:'assistant',content:[{type:'output_text',text:answer}]}]}:{choices:[{message:{content:answer}}]}):new Response('unavailable',{status});}};
-  vm.runInNewContext(source,scope);
+  vm.runInNewContext(preflightSource,scope);vm.runInNewContext(source,scope);
   const env={DB,PHOTOS,LLM_API_KEY:'test-key',LLM_BASE_URL:'https://model.test/v1',LLM_MODEL:'test-model'};
   const run=async(path,{owner='owner-a',method='GET',body,environment={},origin,name,email,nameEncoding,expectedScope}={})=>{
     const headers=body instanceof FormData?{}:{'content-type':'application/json'};if(name)headers['oai-authenticated-user-full-name']=name;if(email)headers['oai-authenticated-user-email']=email;if(nameEncoding)headers['oai-authenticated-user-full-name-encoding']=nameEncoding;if(owner)headers['oai-authenticated-user-id']=owner;if(origin)headers.origin=origin;if(expectedScope!==undefined)headers['x-mission-profile-scope']=expectedScope;
@@ -377,7 +378,7 @@ test('Reminder requests and their delivered messages carry no wellbeing rating',
 });
 test('Preflight creates private, labeled and idempotent archive records without inventing sensor connections',async()=>{
   const f=fixture();assert.equal((await f.run('/api/preflight',{method:'POST',owner:null,body:{confirm:true}})).status,401);assert.equal((await f.run('/api/preflight',{method:'POST',body:{confirm:false}})).status,400);
-  const first=await f.run('/api/preflight',{method:'POST',body:{confirm:true}});assert.equal(first.status,201);assert.equal(first.body.inserted,4);assert.equal(first.body.synthetic,true);assert.equal((await f.run('/api/preflight',{method:'POST',body:{confirm:true}})).body.inserted,0);
-  const rows=f.sql.prepare("SELECT * FROM journal_messages WHERE owner_id='owner-a'").all();assert.equal(rows.length,4);assert.ok(rows.every(row=>row.assistant_source==='preflight:v1'&&row.content.includes('rehearsal')));assert.equal(f.sql.prepare("SELECT COUNT(*) n FROM journal_messages WHERE owner_id='owner-b'").get().n,0);
-  const book=await f.run('/api/astronauts/personal/book');assert.equal(book.body.entries.filter(item=>item.preflight).length,4);assert.equal(book.body.entries.find(item=>item.observation)?.observation.mediaUrl,'/assets/archive/preflight-checkin.mp3');
+  const first=await f.run('/api/preflight',{method:'POST',body:{confirm:true}});assert.equal(first.status,201);assert.equal(first.body.inserted,5);assert.equal(first.body.synthetic,true);assert.equal((await f.run('/api/preflight',{method:'POST',body:{confirm:true}})).body.inserted,0);
+  const rows=f.sql.prepare("SELECT * FROM journal_messages WHERE owner_id='owner-a'").all();assert.equal(rows.length,5);assert.ok(rows.every(row=>row.assistant_source==='preflight:v1'&&row.content.includes('rehearsal')));assert.equal(f.sql.prepare("SELECT COUNT(*) n FROM journal_messages WHERE owner_id='owner-b'").get().n,0);
+  const book=await f.run('/api/astronauts/personal/book');assert.equal(book.body.entries.filter(item=>item.preflight).length,5);assert.equal(book.body.entries.find(item=>item.observation)?.observation.mediaUrl,'/assets/archive/preflight-checkin.mp3');
 });

@@ -9,16 +9,14 @@
   home.querySelector('.home-checkin').append(window.missionCheckin.widget());
   const cards=new Map(),renderedValues=new WeakMap();
   for(const [key,readingKey,label]of fields){const card=make('article','home-vital panel glass');card.dataset.homeMetric=key;card.dataset.readingKey=readingKey;card.append(make('span','',label),make('strong','','-'),make('small','','No measurement'));home.querySelector('.home-vitals').append(card);cards.set(key,card);}
-  const sampleActions=make('div','home-sample-actions'),sampleButton=make('button','home-sample-button','LOAD READINGS'),exampleButton=make('button','home-example-button','PREFLIGHT RUN'),sampleClear=make('button','home-sample-clear','×');sampleButton.type=exampleButton.type=sampleClear.type='button';sampleButton.title='Load saved readings and imported device data';exampleButton.title='Load clearly labeled example readings';sampleClear.setAttribute('aria-label','Clear generated sample');sampleClear.title='Clear generated sample';sampleClear.hidden=true;sampleActions.append(sampleButton,exampleButton,sampleClear);home.querySelector('.home-body-panel > header').append(sampleActions);
-  let generated=null,generatedOwner=null,generatedBaseline='';
+  const sampleActions=make('div','home-sample-actions'),sampleButton=make('button','home-sample-button','LOAD READINGS'),exampleButton=make('button','home-example-button','PREFLIGHT RUN'),sampleClear=make('button','home-sample-clear','×');sampleButton.type=exampleButton.type=sampleClear.type='button';sampleButton.title='Load saved readings and imported device data';exampleButton.title='Fill all categories with synthetic preflight data';sampleClear.setAttribute('aria-label','Clear preflight data');sampleClear.title='Clear preflight data';sampleClear.hidden=true;sampleActions.append(sampleButton,exampleButton,sampleClear);home.querySelector('.home-body-panel > header').append(sampleActions);
+  let generated=null,generatedOwner=null,generatedBaseline='',preflight=null;
   const owner=()=>window.missionProfileName?.identity?.storageScope||null;
   const actualSignature=()=>JSON.stringify({readings:window.missionReadings?.current?.()?.readings||{},watch:window.missionActiwatch?.current?.()?.id||null});
   function sampleActive(){return generated!==null&&generatedOwner===owner();}
-  function clearSample(){if(!generated)return;generated=null;generatedOwner=null;generatedBaseline='';sampleClear.hidden=true;renderValues();window.dispatchEvent(new Event('mission-sample-change'));}
+  function clearSample(){if(!generated)return;generated=null;preflight=null;generatedOwner=null;generatedBaseline='';sampleClear.hidden=true;renderValues();window.dispatchEvent(new Event('mission-sample-change'));}
   function fillSample(){
-    const random=(low,high,digits=0)=>Number((low+Math.random()*(high-low)).toFixed(digits)),sleep=random(6.5,9,1),fatigue=random(12,38),stress=random(10,35),steps=random(2500,9500),values={heart_rate:random(60,88),spo2:random(96,99),body_temperature:random(36.6,37.3,1),skin_temperature:random(32.5,35.5,1),bp_systolic:random(100,120),bp_diastolic:random(64,80),respiratory_rate:random(12,18),fatigue_index:fatigue,stress_index:stress,wellbeing:random(70,94),recovery:Math.min(96,Math.max(65,Math.round(75+(sleep-7)*6-fatigue*.15+random(0,12)))),sleep_hours:sleep,hrv:random(30,65),steps,activity:Math.round(steps*random(3,7,1)),light:random(100,600)};
-    const units={heart_rate:'bpm',spo2:'%',body_temperature:'C',skin_temperature:'C',bp_systolic:'mmHg',bp_diastolic:'mmHg',respiratory_rate:'/min',fatigue_index:'/100',stress_index:'/100',wellbeing:'/100',recovery:'/100',sleep_hours:'h',hrv:'ms',steps:'steps',activity:'counts',light:'lx'};
-    generated={profileId:'personal',capturedAt:new Date().toISOString(),actiwatchImportId:null,readings:Object.fromEntries(keys.map(key=>[key,{value:values[key],unit:units[key],source:'demo',observedAt:null}]))};generatedOwner=owner();generatedBaseline=actualSignature();sampleClear.hidden=false;renderValues();window.dispatchEvent(new Event('mission-sample-change'));
+    preflight=MissionPreflightCore.create();generated=preflight.snapshot;generatedOwner=owner();generatedBaseline=actualSignature();sampleClear.hidden=false;renderValues();window.dispatchEvent(new Event('mission-sample-change'));
   }
   async function loadReadings(){
     if(sampleButton.disabled)return;sampleButton.disabled=true;clearSample();
@@ -27,6 +25,12 @@
   sampleButton.addEventListener('click',()=>void loadReadings());exampleButton.addEventListener('click',()=>{fillSample();if(typeof journalApi==='function')void journalApi('/api/preflight',{method:'POST',body:JSON.stringify({confirm:true,snapshot:sampleBase()})}).then(()=>{exampleButton.title='Preflight records saved in your archive';}).catch(()=>{exampleButton.title='Preflight readings are shown; archive save unavailable. Press again to retry.';});});sampleClear.addEventListener('click',clearSample);
   function setSource(key,label,url){const note=cards.get(key)?.querySelector(':scope > small');if(!note)return;note.replaceChildren();if(url){const link=make('a','home-instrument',label);link.href=url;link.target='_blank';link.rel='noopener';note.append(link);}else note.textContent=label;}
   function sampleBase(){return sampleActive()?JSON.parse(JSON.stringify(generated)):null;}
+  function preflightData(now=Date.now()){
+    if(!sampleActive())return null;const data=JSON.parse(JSON.stringify(preflight)),shift=now-Date.parse(data.snapshot.capturedAt);
+    for(const item of data.records)item.snapshot.capturedAt=new Date(Date.parse(item.snapshot.capturedAt)+shift).toISOString();
+    for(const item of data.media)item.createdAt=new Date(Date.parse(item.createdAt)+shift).toISOString();
+    return data;
+  }
   function model(now=Date.now()){
     if(sampleActive())return window.MissionHomeTrendData?.sampleSnapshot?.(generated,now)||sampleBase();
     const stored=window.missionReadings?.current?.(),readings=Object.fromEntries(keys.map(key=>[key,stored?.readings?.[key]?{...stored.readings[key]}:null]));
@@ -37,7 +41,7 @@
     return {profileId:'personal',capturedAt:new Date().toISOString(),actiwatchImportId:imported?watch.id:null,readings};
   }
   function snapshot(){const value=model();if(value.actiwatchImportId)for(const key of ['sleep_hours','activity','light'])value.readings[key]=null;return value;}
-  const format=value=>new Intl.NumberFormat('en',{maximumFractionDigits:2,useGrouping:false}).format(value);
+  const format=(value,key)=>new Intl.NumberFormat('en',{minimumFractionDigits:['temp','bodyTemp'].includes(key)?2:0,maximumFractionDigits:2,useGrouping:false}).format(value);
   function sourceName(key,reading){
     if(reading.source==='demo')return 'Preflight data';
     if(reading.source==='import')return 'Actiwatch CSV / '+(window.missionActiwatch.current()?.filename||'saved import');
@@ -55,7 +59,7 @@
       if(key==='pressure'){card.dataset.diastolic=Number.isFinite(second?.value)?String(second.value):'';number.textContent=(valid?format(reading.value):'-')+'/'+(Number.isFinite(second?.value)?format(second.value):'-');if(!valid&&!second)number.textContent='-';}
       else if(['spo2','wellbeing','recovery','fatigue','stress'].includes(key))number.innerHTML=window.missionGauge.markup({value:valid?reading.value:null,label,unit:unit==='%'?'%':undefined,reverse:key==='fatigue'||key==='stress'});
       else if(key==='sleep'&&valid){const minutes=Math.round(reading.value*60);number.textContent=String(Math.floor(minutes/60));number.append(make('span','home-vital-unit','h '+minutes%60+' min'));}
-      else number.textContent=valid?format(reading.value):'-';
+      else number.textContent=valid?format(reading.value,key):'-';
       if((valid||Number.isFinite(second?.value))&&key!=='sleep'&&!['spo2','wellbeing','recovery','fatigue','stress'].includes(key))number.append(make('span','home-vital-unit',unit==='C'?'°C':unit));
       setSource(key,note);card.title=label+': '+note;
     }
@@ -67,5 +71,9 @@
     const chat=document.getElementById('nasagpt-sidebar');if(!isOverview&&!chat.hidden)window.missionChatComposer.stopWithin(chat);chat.hidden=!isOverview;if(chat.parentElement!==home.parentElement)home.before(chat);friendProfile.classList.toggle('friend-profile',true);renderValues();
     if(state.workspace==='crew'&&state.view==='health'&&state.visiting){document.getElementById('mission-heading-title').textContent='Visiting / '+crew[state.crew].name;document.getElementById('mission-heading-description').textContent='Friend profile readings';}
   }
-  window.missionHome={render,renderValues,setSource,model,snapshot,sampleActive,sampleBase};window.addEventListener('mission-profile-change',()=>{if(generated&&generatedOwner===null&&owner()){generatedOwner=owner();generatedBaseline=actualSignature();}else if(generatedOwner!==owner())clearSample();render();});for(const event of ['mission-wellbeing-change','mission-readings-change','mission-actiwatch-change'])window.addEventListener(event,()=>{if(event==='mission-wellbeing-change'&&sampleActive())return;if(generated&&generatedBaseline!==actualSignature())clearSample();else renderValues();});render();window.dispatchEvent(new Event('mission-home-ready'));
+  window.missionHome={render,renderValues,setSource,model,snapshot,sampleActive,sampleBase,preflight:preflightData};window.addEventListener('mission-profile-change',()=>{if(generated&&generatedOwner===null&&owner()){generatedOwner=owner();generatedBaseline=actualSignature();}else if(generatedOwner!==owner())clearSample();render();});for(const event of ['mission-wellbeing-change','mission-readings-change','mission-actiwatch-change'])window.addEventListener(event,()=>{if(event==='mission-wellbeing-change'&&sampleActive())return;if(generated&&generatedBaseline!==actualSignature())clearSample();else renderValues();});
+  const syncPreflight=()=>{for(const module of [window.missionAppearance,window.missionApparentAge,window.missionSkinSpots,window.missionVoiceAnalysis])module?.preflight?.(sampleActive());};
+  window.addEventListener('mission-sample-change',syncPreflight);window.addEventListener('mission-diary-open',()=>{if(sampleActive())syncPreflight();});
+  if(!Object.values(window.missionReadings?.current?.()?.readings||{}).some(value=>Number.isFinite(value?.value))&&!window.missionActiwatch?.current?.())fillSample();
+  render();window.dispatchEvent(new Event('mission-home-ready'));
 })();

@@ -14,7 +14,7 @@ import {createSessions} from '../server/session.mjs';
 const root=new URL('../',import.meta.url),publicOrigin='https://frontend.test',secret='synthetic-session-secret-with-at-least-32-bytes';
 const bundleDirectory=await mkdtemp(join(tmpdir(),'mission-worker-test-'));
 after(()=>rm(bundleDirectory,{recursive:true,force:true}));
-const modules=['public/story-tags-core.js','worker/story-tags.js','public/skin-spots-core.js','public/apparent-age-core.js','public/appearance-core.js','public/face-session-core.js','public/actiwatch-core.js','worker/actiwatch.js','worker/activity.js','worker/scheduler.js','public/health-rules-core.js','worker/health-analysis.js','worker/personal.js','worker/photos.js','worker/stories.js','worker/local-reply.js','worker/speech.js','worker/training.js','worker/book.js','worker/compose.js','worker/media-analysis.js','worker/index.js'];
+const modules=['public/analysis-samples.js','public/story-tags-core.js','worker/story-tags.js','public/skin-spots-core.js','public/apparent-age-core.js','public/appearance-core.js','public/face-session-core.js','public/actiwatch-core.js','worker/actiwatch.js','worker/activity.js','worker/scheduler.js','public/health-rules-core.js','worker/health-analysis.js','worker/personal.js','worker/photos.js','worker/stories.js','worker/local-reply.js','worker/speech.js','worker/training.js','worker/book.js','worker/compose.js','worker/media-analysis.js','worker/index.js'];
 await writeFile(join(bundleDirectory,'worker.mjs'),'const assets={};\n'+(await Promise.all(modules.map(path=>readFile(new URL(path,root),'utf8')))).join('\n'));
 const actualWorker=(await import(pathToFileURL(join(bundleDirectory,'worker.mjs')))).default;
 async function fixture(t,options={}){

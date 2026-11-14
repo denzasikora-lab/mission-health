@@ -32,14 +32,14 @@
   function render(){
     const current=snapshot(),saved=pending&&pending.id!==latest?.id?null:latest,value=pending?.snapshot||saved?.snapshot||current,snapshotRules=rulesFor(value),expired=Boolean(saved&&snapshotRules?.stale?.length),rules=expired?rulesFor(current):saved?.rules||snapshotRules,result=saved?.result;
     const status=statusFor(!expired&&result?.agentAvailable?result.status:rules?.status,rules),example=rules?.isDemo===true;scheduleStaleness(expired?current:value);
-    scopeBadge.textContent=example?'Example':'Provided readings';statusBadge.textContent=status||'Incomplete';statusBadge.dataset.level=status?status.toLowerCase():'incomplete';
+    scopeBadge.textContent=example?'Preflight':'Provided readings';statusBadge.textContent=status||'Incomplete';statusBadge.dataset.level=status?status.toLowerCase():'incomplete';
     panel.setAttribute('aria-busy',String(busy));button.disabled=busy||!scope||!window.MissionHealthRules;button.textContent=busy?'Analyzing...':pending?'Retry analysis':'Analyze';newSnapshot.hidden=!pending||signature(pending.snapshot)===signature(current);newSnapshot.disabled=busy;
 
     summary.textContent=result?(expired?'Saved analysis: ':'')+String(result.summary||'Rule results are shown below.').replace(/\*\*/g,'').replace(/No signal/gi,'Awaiting reading'):!rules?'Health checks are temporarily unavailable.':'Review available readings with the prototype rules.';
-    fullSummary.textContent=summary.textContent;
+    fullSummary.textContent='Next steps: keep regular check-ins, compare changes in MARS Health Report, and record voice and face observations under consistent conditions.';
     alerts.replaceChildren();for(const text of (result?.alerts||[]).map(alertText).filter(text=>text&&!/No signal|Check the (?:missing )?sensor/i.test(text)))alerts.append(make('li','',text));alerts.hidden=!alerts.children.length;
     const parts=[];
-    if(example)parts.push('Includes example values, not live sensor readings.');
+    if(example)parts.push('Synthetic preflight rehearsal.');
     if(rules?.flags?.length)parts.push('Rule flags: '+rules.flags.map(key=>labels[key]||key).join(', ')+'.');
     details.textContent=parts.join(' ');details.hidden=!parts.length;
     const stamp=time(saved?.createdAt||value.capturedAt);

@@ -24,3 +24,5 @@ html[data-theme=light] .health-analysis-status[data-level=critical]{color:#97362
 .health-analysis button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .health-analysis [hidden]{display:none!important}
 @container mission (max-width:420px){.health-analysis{padding:11px 12px}.health-analysis-header{align-items:flex-start}.health-analysis-meta{flex-basis:100%}}
+
+.health-analysis:has(.health-analysis-disclosure[open]) .health-analysis-summary{display:block;-webkit-line-clamp:unset;line-clamp:unset}

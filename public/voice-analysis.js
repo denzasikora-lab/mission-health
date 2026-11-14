@@ -73,5 +73,12 @@
     }finally{panel.analyzing=false;}
   }
   function transcript(kind,text){const panel=panels.get(kind);panel.transcript.textContent=text||'No intelligible speech detected.';}
-  window.missionVoiceAnalysis={analyze,transcript,restore};
+  function preflight(enabled){
+    if(!globalThis.MissionPreflightCore)return;
+    for(const [kind,panel]of panels){if(panel.analyzing)continue;
+      if(enabled){const latest=panel.latest;show(kind,{createdAt:new Date().toISOString(),transcript:MissionPreflightCore.transcript,features:{acoustic:{seconds:9.2035,level:-15.806,quiet:.086022,clipping:0}}},'preflight');panel.latest=latest;value(kind,'tone','Clear synthesized speech');panel.status.textContent='Preflight data / synthetic';panel.model.textContent='Acoustic measurements / synthetic check-in';panel.hint.textContent='Measured from the preflight voice file.';panel.summary.textContent='Preflight speech transcript';}
+      else if(panel.latest)show(kind,panel.latest,'saved');else unavailable(kind,'Record an audio check-in');
+    }
+  }
+  window.missionVoiceAnalysis={analyze,transcript,restore,preflight};preflight(true);
 })();

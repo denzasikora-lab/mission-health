@@ -62,9 +62,9 @@ function environment(storage=new Map(),samples=null){
   function collect(){for(let i=0;i<24;i++)sample();}
   return {api,node,workers,frames,timers,input,tick,sample,begin,collect,storage,setBitmap:p=>pendingBitmap=p,blockStorage:()=>blockStorage=true};
 }
-test('Personal appearance values stay empty until measured and saved results remain restorable',()=>{
+test('Preflight appearance is labeled and saved personal results remain restorable',()=>{
   const e=environment(new Map(),controlSamples),cards=e.node('appearance-metrics').children.slice(0,12);
-  assert.equal(cards.length,12);assert.ok(cards.every(card=>card.dataset.resultSource==='missing'&&card.children[1].textContent==='No comparison'));assert.doesNotMatch(e.node('appearance-status').textContent,/Reference sample/);assert.equal(e.node('appearance-reset').disabled,true);e.api.stop();assert.equal(e.storage.size,0);
+  assert.equal(cards.length,12);assert.ok(cards.every(card=>card.dataset.resultSource==='preflight'&&card.children[1].textContent.length>0));assert.match(e.node('appearance-status').textContent,/Preflight data/);assert.equal(e.node('appearance-reset').disabled,true);e.api.stop();assert.equal(e.storage.size,0);e.api.setIdentity({storageScope:'owner-a',name:'Cdr. Sara Khan'});assert.equal(e.node('appearance-metrics').children.at(-1).dataset.resultSource,'preflight');
   e.begin();assert.ok(cards.every(card=>card.dataset.resultSource!=='sample'));e.collect();for(let i=0;i<5;i++)e.sample();assert.ok(cards.every(card=>card.dataset.resultSource==='live'));e.api.stop();
   const next=environment(e.storage,controlSamples);next.api.setIdentity({storageScope:'owner-a',name:'Egor Fedosov'});assert.ok(next.node('appearance-metrics').children.slice(0,12).every(card=>card.dataset.resultSource==='saved'));assert.doesNotMatch(next.node('appearance-status').textContent,/Reference sample/);
 });

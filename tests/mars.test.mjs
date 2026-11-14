@@ -40,3 +40,10 @@ test('Reports follow the selected period and expose observed changes',()=>{
 test('A crew score requires two distinct shared member scores and a separate optional interaction rating',()=>{
   const a={id:'one',shared:true,score:20,coverage:50},b={id:'two',shared:true,score:40,coverage:50};assert.equal(core.crewScore([a,{...b,shared:false}]),null);assert.equal(core.crewScore([a,a]),null);assert.equal(core.crewScore([a,b]).score,30);assert.equal(core.crewScore([a,b],80).score,40);assert.equal(core.crewScore([a,b],80).interactionIncluded,true);
 });
+test('Preflight fills all four MARS groups and every visual feature with explicitly synthetic inputs',async()=>{
+  const scenarioScope={};vm.runInNewContext(await readFile(new URL('../public/analysis-samples.js',import.meta.url),'utf8'),scenarioScope);
+  const scenario=scenarioScope.MissionPreflightCore.create(now),score=core.calculate(scenario,now,60000);
+  assert.equal(score.coverage,100);assert.ok(Number.isFinite(score.score)&&score.score>0&&score.score<50);assert.ok(Object.values(score.groups).every(group=>group.coverage===1&&group.score!==null));
+  assert.equal(Object.keys(scenario.visual.deltas).length,12);assert.ok(Object.values(scenario.snapshot.readings).every(reading=>reading.source==='demo'));assert.ok(scenario.media.every(item=>item.synthetic&&item.source==='preflight'));
+  const actual=core.calculate({...scenario,snapshot:snapshot({heart_rate:[76,'bpm']})},now,60000);assert.equal(actual.groups.A.score,null);assert.equal(actual.groups.S.score,null);assert.equal(actual.mediaCount,0);
+});

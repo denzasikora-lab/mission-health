@@ -44,3 +44,7 @@ test('Current visual readings do not duplicate identical statuses',()=>{
 test('NASA the poster belongs only to preloaded video, personal recordings receive no unrelated image',()=>{
   const api=helper();assert.equal(api.presentation({...item('sample'),archiveSample:true}).media.poster,'/assets/stories/iss075e0003980.jpg');assert.equal(api.presentation(item()).media.poster,undefined);assert.equal(api.presentation({...item('audio',observation('audio')),archiveSample:true}).media.poster,undefined);
 });
+
+test('Synthetic preflight visual values cannot be captured as personal measurements',()=>{
+ const api=helper(),cards=api.visualTitles.map(title=>({dataset:{resultSource:'preflight'},querySelector(selector){return {textContent:selector==='.appearance-metric-title'?title:'999'};},closest(){return null;}}));assert.ok(api.captureVisual({querySelectorAll:()=>cards},[]).every(item=>item.value==='No comparison'&&item.source==='missing'));
+});

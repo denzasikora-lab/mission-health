@@ -220,12 +220,13 @@ async function preflightRoute(request,env,user,ctx){
   if(request.method!=='POST')fail('method_not_allowed',405);
   const input=await personalInput(request);if(input?.confirm!==true)fail('invalid_input',400);
   const snapshot=input.snapshot?globalThis.MissionHealthRules.normalize(input.snapshot):null,now=new Date(),day=now.toISOString().slice(0,10),db=database(env);
-  const audio={"duration":9.2035,"features":{"acoustic":{"seconds":9.2035,"level":-15.806,"quiet":0.086022,"clipping":0.0}},"transcript":"Hello crew. I can hear you clearly. How are you feeling today? I slept well and I am ready for our next check in. This is a simulated preflight rehearsal.","provenance":"Synthetic voice / Samantha / preflight rehearsal"};
+  const scenario=globalThis.MissionPreflightCore.create(now.valueOf()),audio={"duration":9.2035,"features":{"acoustic":{"seconds":9.2035,"level":-15.806,"quiet":0.086022,"clipping":0.0}},"transcript":scenario.transcript,"provenance":"Synthetic voice / Samantha / preflight rehearsal"};
   const records=[
     {title:'Preflight / readings',text:'Synthetic preflight rehearsal. The following provided snapshot retains its source labels and is not asserted to be live sensor telemetry.\n'+JSON.stringify(snapshot?.readings||{})},
     {title:'Preflight / crew check-in',text:'Simulated crew conversation. Sara: Hello crew, how are you feeling today? Crew rehearsal reply: I can hear you clearly. Ready for the next check-in. This dialogue tests archive retrieval; no real message was sent to another astronaut.'},
     {title:'Preflight / voice check-in',text:'Synthetic voice rehearsal. Recognized text: '+audio.transcript+' Acoustics were measured from the generated audio file, rather than a person. This recording is used to test playback and archive retrieval.',observation:{kind:'audio',duration:audio.duration,features:audio.features,transcript:audio.transcript,analysis:'Synthetic voice rehearsal. Speech and pauses were measured from the file. No human emotions or medical condition were inferred.',status:'measured',mediaUrl:'/assets/archive/preflight-checkin.mp3'}},
-    {title:'Preflight / recovery log',text:'Synthetic recovery rehearsal. The fictional participant reports a restful night, a planned break and a friendly conversation with the crew. This text tests personal search and adapter training, not medical prediction.'}
+    {title:'Preflight / recovery log',text:'Synthetic recovery rehearsal. The fictional participant reports a restful night, a planned break and a friendly conversation with the crew. This text tests personal search and adapter training, not medical prediction.'},
+    {title:'Preflight / visual and social observations',text:'Synthetic comparison baseline and current observation for the complete MARS rehearsal. These are fictional face and crew observations, separate from your recordings.\n'+JSON.stringify({visual:scenario.visual,social:scenario.social,faceComparison:scenario.media.at(-1).features.faceComparison})}
   ];
   let inserted=0;
   for(let i=0;i<records.length;i++){

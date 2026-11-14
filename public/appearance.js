@@ -24,15 +24,16 @@
   function displayValue(card,metric,item){card.value.textContent=(item.delta>0?'+':'')+item.delta.toLocaleString('en-GB',{maximumFractionDigits:1,minimumFractionDigits:1})+' '+metric.unit;card.bar.style.setProperty('--signal',Math.min(item.z/4,1));}
   function neutral(reason){
     for(const metric of core.metrics){
-      const card=cards.get(metric.key),saved=lastResult?.values[metric.key],sample=!saved&&sampleAllowed&&Number.isFinite(sampleVisual?.deltas[metric.key]);card.node.dataset.level='neutral';card.node.dataset.resultSource=saved?'saved':sample?'sample':'missing';
+      const card=cards.get(metric.key),saved=lastResult?.values[metric.key],sample=!saved&&sampleAllowed&&Number.isFinite(sampleVisual?.deltas[metric.key]);card.node.dataset.level='neutral';card.node.dataset.resultSource=saved?'saved':sample?'preflight':'missing';
       if(saved)displayValue(card,metric,saved);else if(sample)displayValue(card,metric,{delta:sampleVisual.deltas[metric.key],z:0});else{card.value.textContent='No comparison';card.bar.style.setProperty('--signal',0);}
-      card.label.textContent=sample?'Reference sample / not a personal measurement':(saved?'Latest / ':'')+(reason||labels.neutral);card.node.setAttribute('aria-label',metric.title+': '+(sample?card.value.textContent+'. Reference sample, not a user measurement':(saved?card.value.textContent+'. Latest result from '+new Date(saved.at).toLocaleString('en-GB')+'. ':'')+(reason||labels.neutral)));
+      card.label.textContent=sample?'Preflight data / synthetic':(saved?'Latest / ':'')+(reason||labels.neutral);card.node.setAttribute('aria-label',metric.title+': '+(sample?card.value.textContent+'. Synthetic preflight':(saved?card.value.textContent+'. Latest result from '+new Date(saved.at).toLocaleString('en-GB')+'. ':'')+(reason||labels.neutral)));
     }
     streaks={};
   }
   function sampleSummary(){
     if(!sampleVisual||!sampleAllowed||lastResult)return;
-    mark('Reference sample');hint.textContent='Illustrative image changes / no personal data measured.';referenceLabel.textContent='Reference sample / no personal baseline';progress.textContent='Sample';resetButton.disabled=true;
+    mark('Preflight data');hint.textContent='Synthetic face comparison / rehearsal';referenceLabel.textContent='Preflight baseline / 24 simulated frames';progress.textContent='Trial';resetButton.disabled=true;
+    ctx.clearRect(0,0,preview.width,preview.height);ctx.strokeStyle='#7eb69b';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(preview.width/2,preview.height*.43,preview.height*.2,preview.height*.27,0,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(preview.width*.28,preview.height*.92);ctx.quadraticCurveTo(preview.width*.5,preview.height*.55,preview.width*.72,preview.height*.92);ctx.stroke();
   }
   for(const metric of core.metrics){
     const node=document.createElement('article');node.className='appearance-metric';node.dataset.level='neutral';node.dataset.resultSource='missing';
@@ -65,7 +66,7 @@
     if(next&&identity?.storageScope===next.storageScope&&identity?.name===next.name)return;
     const wasActive=active||Boolean(video?.srcObject),input=video,device=cameraKey;stop();identity=next;savedSession=null;faceCard.dataset.resultSource='missing';faceValue.textContent='Recording required';faceState.textContent='Compared automatically with your previous recording';sampleAllowed=true;scope=next?key():'';reference=null;ageFrames=[];ageSession++;window.missionApparentAge?.setIdentity(next);restoreResult();neutral('Camera is off');
     if(lastResult){mark('Latest comparison / '+new Date(lastResult.at).toLocaleString('en-GB',{dateStyle:'short',timeStyle:'short'}),'recorded');hint.textContent='Latest result. Enable the camera for a new comparison.';referenceLabel.textContent='Baseline / '+new Date(lastResult.referenceAt).toLocaleString('en-GB',{dateStyle:'short',timeStyle:'short'});}
-    else{mark('Waiting for camera');hint.textContent='Enable the camera and collect your personal comparison baseline.';referenceLabel.textContent='Baseline / 24 frames';sampleSummary();}
+    else{mark('Waiting for camera');hint.textContent='Enable the camera and collect your personal comparison baseline.';referenceLabel.textContent='Baseline / 24 frames';sampleSummary();if(sampleVisual)preflight(true);}
     if(wasActive&&next)start(input,{key:device});
   }
   function start(input,device={}){
@@ -182,5 +183,13 @@
     for(const metric of core.metrics){const card=cards.get(metric.key),v=compared.values[metric.key];card.node.dataset.resultSource='saved';card.node.dataset.level=v?.valid&&v.z>=2?'amber':'neutral';if(v?.valid){displayValue(card,metric,v);card.label.textContent='vs previous recording';}else{card.value.textContent=compared.status==='first_session'?'Baseline saved':'Match conditions';card.label.textContent=messages[compared.status];card.bar.style.setProperty('--signal',0);}card.node.setAttribute('aria-label',metric.title+': '+card.value.textContent+'. '+card.label.textContent);}
     window.missionApparentAge?.restoreSession?.(compared.apparentAge,compared,item.createdAt);return true;
   }
-  window.missionAppearance={start,stop,setIdentity,ageContext,ageSnapshot,ownerContext,restoreSession};
+  function preflight(enabled){
+    if(active||!sampleVisual)return;
+    if(!enabled){neutral('Camera is off');if(savedSession)restoreSession(savedSession,ownerContext());return;}
+    sampleAllowed=true;
+    for(const metric of core.metrics){const card=cards.get(metric.key);card.node.dataset.resultSource='preflight';card.node.dataset.level='neutral';displayValue(card,metric,{delta:sampleVisual.deltas[metric.key],z:Math.abs(sampleVisual.deltas[metric.key])*.8});card.label.textContent='Preflight data / synthetic';}
+    faceCard.dataset.resultSource='preflight';faceValue.textContent=sampleVisual.cosine.toFixed(3);faceState.textContent='Preflight data / synthetic face comparison';
+    const saved=lastResult;lastResult=null;sampleSummary();lastResult=saved;
+  }
+  window.missionAppearance={start,stop,setIdentity,ageContext,ageSnapshot,ownerContext,restoreSession,preflight};preflight(true);
 })();

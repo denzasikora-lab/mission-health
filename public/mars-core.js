@@ -14,7 +14,7 @@
   function calculate(input={},now=Date.now(),periodMs=86400000){
     if(!Number.isFinite(now)||!Number.isFinite(periodMs)||periodMs<=0)throw Error('invalid_mars_period');
     const start=now-periodMs,demo=Object.values(input.snapshot?.readings||{}).some(reading=>reading?.source==='demo'),series={},observations={};
-    const snapshots=demo?[input.snapshot]:[...(input.records||[]).map(item=>item.snapshot),input.snapshot].filter(Boolean);
+    const snapshots=[...(input.records||[]).map(item=>item.snapshot),input.snapshot].filter(Boolean);
     for(const snapshot of snapshots){
       if(snapshot.profileId!=='personal')continue;
       for(const [key,reading]of Object.entries(snapshot.readings||{})){
@@ -33,7 +33,8 @@
     }
     for(const [key,convert]of [['fatigue_index',value=>value],['stress_index',value=>value],['recovery',value=>100-value],['sleep_hours',value=>clamp(Math.abs(8-value)/4*100)]])if(Number.isFinite(latest(key)))R.push({key,score:convert(latest(key))});
     if(Number.isFinite(latest('wellbeing')))S.push({key:'self_reported_wellbeing',score:100-latest('wellbeing')});
-    const media=demo?[]:(input.media||[]).filter(item=>['audio','video'].includes(item.kind)&&Number.isFinite(Date.parse(item.createdAt))&&Date.parse(item.createdAt)>=start&&Date.parse(item.createdAt)<=now).sort((a,b)=>Date.parse(a.createdAt)-Date.parse(b.createdAt));
+    if(demo&&input.social?.synthetic===true&&input.social.source==='preflight')for(const key of ['support','interaction'])if(Number.isFinite(input.social[key])&&input.social[key]>=0&&input.social[key]<=100)S.push({key:'preflight_'+key,score:100-input.social[key]});
+    const media=(input.media||[]).filter(item=>(demo?item.synthetic===true&&item.source==='preflight':item.synthetic!==true)&&['audio','video'].includes(item.kind)&&Number.isFinite(Date.parse(item.createdAt))&&Date.parse(item.createdAt)>=start&&Date.parse(item.createdAt)<=now).sort((a,b)=>Date.parse(a.createdAt)-Date.parse(b.createdAt));
     const videos=media.filter(item=>item.kind==='video'),face=videos.at(-1)?.features?.faceComparison;
     if(face?.status==='compared')for(const [key,value]of Object.entries(face.values||{}))if(value?.valid===true&&Number.isFinite(value.z)&&value.z>=0)visual.push({key,score:clamp(value.z*25)});
     const sounds=media.filter(item=>{const a=item.features?.acoustic;return a&&Number.isFinite(a.seconds)&&a.seconds>=3&&Number.isFinite(a.clipping)&&a.clipping>=0&&a.clipping<=.01&&Number.isFinite(a.level)&&a.level>=-120&&a.level<=1&&Number.isFinite(a.quiet)&&a.quiet>=0&&a.quiet<=1;});

@@ -6,6 +6,7 @@ import {webcrypto} from 'node:crypto';
 
 const root=new URL('../',import.meta.url),homeSource=await readFile(new URL('public/home.js',root),'utf8'),uiSource=await readFile(new URL('public/health-context.js',root),'utf8'),coreSource=await readFile(new URL('public/health-rules-core.js',root),'utf8'),personalSource=await readFile(new URL('public/personal-space.js',root),'utf8');
 const clone=value=>JSON.parse(JSON.stringify(value)),now=Date.parse('2026-11-14T10:00:00Z'),importId='a7337ee1-9cf8-42cf-b0d5-75d90258835c';
+const preflightSource=await readFile(new URL('public/analysis-samples.js',root),'utf8');
 const trendSource=await readFile(new URL('public/home-trends.js',root),'utf8');
 class Clock extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
 class Node{
@@ -15,6 +16,7 @@ class Node{
   set innerHTML(value){this.htmlWrites++;this._html=value;this.children=[];if(value.includes('home-body-panel')){const panel=new Node('section'),header=new Node('header'),vitals=new Node('div'),checkin=new Node('section');panel.className='home-body-panel panel glass';vitals.className='home-vitals';checkin.className='home-checkin';panel.append(header,vitals);this.append(panel,checkin);}}
   get innerHTML(){return this._html||'';}
   append(...nodes){for(const node of nodes){node.remove();node.parentElement=this;this.children.push(node);}}
+  prepend(...nodes){for(const node of [...nodes].reverse()){node.remove();node.parentElement=this;this.children.unshift(node);}}
   remove(){if(this.parentElement){const siblings=this.parentElement.children,index=siblings.indexOf(this);if(index>=0)siblings.splice(index,1);this.parentElement=null;}}
   before(...nodes){const parent=this.parentElement;if(!parent)return;for(const node of nodes){node.remove();node.parentElement=parent;parent.children.splice(parent.children.indexOf(this),0,node);}}
   after(...nodes){const parent=this.parentElement;if(!parent)return;let index=parent.children.indexOf(this)+1;for(const node of nodes){node.remove();node.parentElement=parent;parent.children.splice(index++,0,node);}}
@@ -28,11 +30,11 @@ class Node{
 }
 function events(target={}){const handlers={};target.addEventListener=(type,callback)=>(handlers[type]||=[]).push(callback);target.dispatchEvent=event=>{for(const callback of handlers[event.type]||[])callback(event);};return target;}
 const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
-function homeFixture(){
+function homeFixture({preflight=false}={}){
   const body=new Node('body'),main=new Node(),heading=new Node(),friend=new Node(),metrics=new Node(),button=new Node('button'),chat=new Node();main.append(heading,metrics,chat);body.append(main);let report=null,selected=null,watch=null,stored=null;
   const document={body,createElement:tag=>new Node(tag),querySelector:selector=>({'.mission-heading':heading,'.mission-rail>.profile':friend})[selector]||null,querySelectorAll:()=>[],getElementById:id=>({metrics,'mission-home-button':button,'nasagpt-sidebar':chat})[id]||null};
   const scope=events({document,Date:Clock,Intl,Event,console,state:{workspace:'crew',view:'health',visiting:false,crew:0},crew:[{name:'Another astronaut',metrics:{hr:199}}]});scope.window=scope;scope.missionCheckin={widget:()=>new Node(),current:()=>report,selection:()=>selected};scope.missionReadings={current:()=>stored,records:()=>[]};scope.missionActiwatch={current:()=>watch};scope.missionGauge={markup:({value})=>'<span>'+value+'</span>'};scope.missionChatComposer={stopWithin(){}};
-  vm.runInNewContext(homeSource,scope);
+  vm.runInNewContext(preflightSource,scope);vm.runInNewContext(homeSource,scope);if(!preflight)main.children.find(node=>node.id==='mission-home').querySelector('.home-sample-clear').emit('click');
   return {scope,document,home:main.children.find(node=>node.id==='mission-home'),api:scope.missionHome,report(value,at=now){report=value;selected=value?{...value,at}:null;},watch(value){watch=value;},readings(value){stored=clone(value);scope.dispatchEvent(new Event('mission-readings-change'));}};
 }
 function demoSnapshot(){const read=(value,unit)=>({value,unit,source:'demo',observedAt:null});return {profileId:'personal',capturedAt:new Clock().toISOString(),actiwatchImportId:null,readings:{heart_rate:read(72,'bpm'),spo2:read(98,'%'),body_temperature:null,bp_systolic:read(118,'mmHg'),bp_diastolic:read(76,'mmHg'),respiratory_rate:read(14,'/min'),fatigue_index:null,stress_index:null,skin_temperature:read(36.7,'C'),wellbeing:null,recovery:read(86,'/100'),sleep_hours:read(7+40/60,'h'),hrv:read(46,'ms'),steps:read(6240,'steps'),activity:read(66218,'counts'),light:read(187.3,'lx')}};}
@@ -101,9 +103,9 @@ test('Cards, analysis snapshots and sample chart endpoints use one time-dependen
   assert.deepEqual(clone(f.api.sampleBase()),base);f.api.sampleBase().readings.heart_rate.value=999;assert.deepEqual(clone(f.api.sampleBase()),base);assert.ok(Object.values(snapshot.readings).every(value=>value.source==='demo'&&value.observedAt===null));f.home.querySelector('.home-sample-clear').emit('click');assert.equal(f.api.sampleBase(),null);assert.deepEqual(clone(f.api.snapshot()).readings,original.readings);
 });
 
-test('Repeated generation changes the sample while unchanged polling and layout updates preserve it',()=>{
+test('Repeated preflight runs use a reproducible scenario and unchanged polling preserves it',()=>{
   const f=homeFixture(),actual=manualSnapshot();f.scope.missionProfileName={identity:{storageScope:'owner-a'}};f.readings(actual);f.scope.Math=Object.create(Math);f.scope.Math.random=()=>0;f.home.querySelector('.home-example-button').emit('click');const first=clone(f.api.snapshot());
-  f.scope.Math.random=()=>1;f.home.querySelector('.home-example-button').emit('click');const second=clone(f.api.snapshot());assert.notDeepEqual(second.readings,first.readings);
+  f.scope.Math.random=()=>1;f.home.querySelector('.home-example-button').emit('click');const second=clone(f.api.snapshot());assert.deepEqual(second.readings,first.readings);
   f.readings(actual);for(const type of ['mission-wellbeing-change','mission-actiwatch-change','mission-profile-change'])f.scope.dispatchEvent(new Event(type));assert.deepEqual(clone(f.api.snapshot()),second);assert.equal(f.api.sampleActive(),true);
   actual.readings.heart_rate.value=101;f.readings(actual);assert.equal(f.api.sampleActive(),false);assert.equal(f.api.snapshot().readings.heart_rate.value,101);
   f.home.querySelector('.home-example-button').emit('click');f.scope.missionProfileName.identity={storageScope:'owner-b'};assert.equal(f.api.sampleActive(),false);f.scope.dispatchEvent(new Event('mission-profile-change'));assert.equal(f.home.querySelector('.home-sample-clear').hidden,true);
@@ -170,7 +172,7 @@ test('A failed saved-result request shows only local rules and no invented AI as
 
 test('Full summaries and alerts remain safely accessible inside a collapsed details block',async()=>{
   const f=uiFixture();await flush();const text='<img src=x onerror=alert(1)> '+('Long explanation. '.repeat(80)),alerts=Array.from({length:16},(_,i)=>'Flag '+i);
-  f.handler(call=>f.analysis(call.body,{summary:text,alerts,status:null}));await f.api.analyze();const details=f.get('health-analysis-disclosure');assert.equal(details.open,false);assert.equal(details.querySelector('summary').textContent,'Analysis details');assert.equal(f.get('health-analysis-full-summary').textContent,text);assert.equal(f.get('health-analysis-alerts').children.length,16);assert.equal(f.get('health-analysis-alerts').parentElement,details);assert.equal(f.get('health-analysis-details').parentElement,details);assert.equal(f.panel.querySelectorAll('img').length,0);assert.equal(f.get('health-analysis-full-summary').htmlWrites,0);
+  f.handler(call=>f.analysis(call.body,{summary:text,alerts,status:null}));await f.api.analyze();const details=f.get('health-analysis-disclosure');assert.equal(details.open,false);assert.equal(details.querySelector('summary').textContent,'Analysis details');assert.notEqual(f.get('health-analysis-full-summary').textContent,text);assert.match(f.get('health-analysis-full-summary').textContent,/Next steps:/);assert.equal(f.get('health-analysis-alerts').children.length,16);assert.equal(f.get('health-analysis-alerts').parentElement,details);assert.equal(f.get('health-analysis-details').parentElement,details);assert.equal(f.panel.querySelectorAll('img').length,0);assert.equal(f.get('health-analysis-full-summary').htmlWrites,0);
   const css=await readFile(new URL('public/health-context.css',root),'utf8');assert.match(css,/-webkit-line-clamp:3/);assert.match(css,/font:600 14px/);assert.match(css,/flex-wrap:wrap/);assert.match(css,/var\(--field/);assert.match(css,/data-theme=light/);
 });
 
@@ -254,8 +256,8 @@ test('Legacy example analyses stay in history and cannot become the current pers
 });
 
 test('An explicitly generated sample can be analyzed with its fictional provenance intact',async()=>{
-  const home=homeFixture();home.home.querySelector('.home-example-button').emit('click');const f=uiFixture();await flush();f.scope.missionHome.sampleActive=()=>true;f.setSnapshot(home.api.snapshot());f.scope.dispatchEvent(new Event('mission-sample-change'));assert.equal(f.get('health-analysis-scope').textContent,'Example');assert.equal(f.calls.filter(call=>call.method==='POST').length,0);
-  f.handler(call=>f.analysis(call.body,{status:'NORMAL',summary:'Generated sample result'}));await f.api.analyze();const sent=f.calls.at(-1).body;assert.equal(Object.keys(sent.snapshot.readings).length,16);assert.ok(Object.values(sent.snapshot.readings).every(reading=>reading.source==='demo'&&reading.observedAt===null));assert.equal(f.get('health-analysis-summary').textContent,'Generated sample result');assert.equal(f.get('health-analysis-scope').textContent,'Example');assert.equal(f.get('health-analysis-button').textContent,'Analyze');assert.match(f.get('health-analysis-meta').textContent,/AI \+ rules/);
+  const home=homeFixture();home.home.querySelector('.home-example-button').emit('click');const f=uiFixture();await flush();f.scope.missionHome.sampleActive=()=>true;f.setSnapshot(home.api.snapshot());f.scope.dispatchEvent(new Event('mission-sample-change'));assert.equal(f.get('health-analysis-scope').textContent,'Preflight');assert.equal(f.calls.filter(call=>call.method==='POST').length,0);
+  f.handler(call=>f.analysis(call.body,{status:'NORMAL',summary:'Generated sample result'}));await f.api.analyze();const sent=f.calls.at(-1).body;assert.equal(Object.keys(sent.snapshot.readings).length,16);assert.ok(Object.values(sent.snapshot.readings).every(reading=>reading.source==='demo'&&reading.observedAt===null));assert.equal(f.get('health-analysis-summary').textContent,'Generated sample result');assert.equal(f.get('health-analysis-scope').textContent,'Preflight');assert.equal(f.get('health-analysis-button').textContent,'Analyze');assert.match(f.get('health-analysis-meta').textContent,/AI \+ rules/);
 });
 
 test('Unrequested legacy samples cannot be analyzed or loaded over an active generated sample',async()=>{
@@ -297,9 +299,13 @@ test('Load readings refreshes real stores without generating replacement values'
 
 test('MARS is mounted below readings and excludes late media from a previous owner',async()=>{
   const f=homeFixture(),footer=new Node(),originalQuery=f.document.querySelector,originalId=f.document.getElementById,pending=[];f.document.getElementById=id=>id==='mission-home'?f.home:originalId(id);f.document.querySelector=selector=>selector==='.site-footer'?footer:originalQuery(selector);
-  f.scope.missionProfileName={identity:{storageScope:'owner-a'}};f.scope.AbortSignal=AbortSignal;f.scope.journalApi=()=>new Promise(resolve=>pending.push(resolve));f.readings(manualSnapshot());
+  f.scope.missionProfileName={identity:{storageScope:'owner-a'}};f.scope.AbortSignal=AbortSignal;f.scope.location={hash:'',pathname:'/',search:''};f.scope.journalApi=()=>new Promise(resolve=>pending.push(resolve));f.readings(manualSnapshot());
   vm.runInNewContext(await readFile(new URL('public/mars-core.js',root),'utf8'),f.scope);vm.runInNewContext(await readFile(new URL('public/mars.js',root),'utf8'),f.scope);
-  assert.equal(f.home.querySelector('.mars-definition-link').href,'#mars-definition');assert.ok(f.home.querySelector('.mars-individual').textContent.startsWith('Individual Score: '));assert.ok(f.scope.missionMARS.current().coverage>0);
+  assert.equal(f.home.querySelector('.mars-definition-link').href,'#mars-definition');assert.ok(f.home.querySelector('.mars-individual').textContent.startsWith('= '));assert.ok(f.scope.missionMARS.current().coverage>0);
   f.scope.missionProfileName.identity.storageScope='owner-b';f.scope.dispatchEvent(new Event('mission-profile-change'));pending[0]({items:[{kind:'audio',createdAt:new Clock().toISOString(),features:{acoustic:{seconds:5,level:-24,quiet:.2,clipping:0}}}]});await flush();assert.equal(f.scope.missionMARS.current().mediaCount,0);pending[1]({items:[]});await flush();assert.equal(f.scope.missionMARS.current().mediaCount,0);
-  const report=f.home.querySelector('.mars-report');report.open=true;report.emit('toggle');assert.equal(report.querySelector('.mars-groups').children.length,5);assert.ok(footer.children.some(node=>node.id==='mars-definition'));
+  const report=f.home.querySelector('.mars-report');report.open=true;report.emit('toggle');assert.equal(report.querySelector('.mars-groups').children.length,5);assert.ok(report.querySelector('.mars-definition'));const retained=report.querySelector('.mars-groups');f.report({score:75,wellbeingScale:100});f.scope.dispatchEvent(new Event('mission-wellbeing-change'));assert.equal(report.querySelector('.mars-groups'),retained);assert.equal(footer.children.length,0);
+});
+
+test('A fresh profile starts with a complete labeled preflight, without writing personal measurements',()=>{
+  const f=homeFixture({preflight:true});assert.equal(f.api.sampleActive(),true);assert.equal(f.scope.missionReadings.current(),null);assert.ok(Object.values(f.api.snapshot().readings).every(item=>Number.isFinite(item.value)&&item.source==='demo'));assert.equal(f.api.preflight().media.length,5);
 });

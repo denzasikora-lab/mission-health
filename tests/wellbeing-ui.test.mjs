@@ -29,7 +29,7 @@ function fixture(storage=new Map()){
   vm.runInNewContext(gaugeSource,sandbox);
   // Separate panel initialization from actual storage, sending and rendering functions.
   const setup=source.slice(0,source.indexOf('  const checkin=create('));
-  vm.runInNewContext(setup+'window.test={choose,restoreScore,selection,currentReport,badge,canonicalReport,label,hue,store,send,retryChat,panel,setKind,slider,setIdentity:value=>identity=value,addWidget:value=>sliders.push(value)};})();',sandbox);
+  vm.runInNewContext(setup+'window.test={choose,restoreScore,selection,currentReport,badge,canonicalReport,label,hue,store,messageNode,send,retryChat,panel,setKind,slider,setIdentity:value=>identity=value,addWidget:value=>sliders.push(value)};})();',sandbox);
   window.test.setIdentity({storageScope:'owner'});
   return {api:window.test,window,document,storage,calls,events,activity};
 }
@@ -63,15 +63,14 @@ test('The slider shows the current score, color and accessible label out of 100'
   f.api.choose(77);assert.notEqual(widget.mouth.attributes.d,'M7 14 Q12 20 17 14');assert.match(widget.value.innerHTML,/aria-valuenow="77"/);
 });
 test('Dragging previews the score without saving, dispatching dashboard updates or sending activity until change',()=>{
-  const f=fixture(),root=f.api.slider(),input=root.querySelector('input');input.events.pointerdown();assert.deepEqual(clone(input.focusOptions),{preventScroll:true});
+  const f=fixture(),root=f.api.slider(),input=root.querySelector('input');assert.equal(input.events.pointerdown,undefined);assert.equal(input.events.pointercancel,undefined);
   for(const score of [61,72,83]){input.value=String(score);input.events.input();assert.match(root.querySelector('strong').innerHTML,new RegExp('aria-valuenow="'+score+'"'));}
-  assert.equal(input.focused,true);assert.equal(f.api.currentReport(),null);assert.equal(f.storage.size,0);assert.equal(f.events.length,0);assert.equal(f.activity.length,0);
+  assert.equal(input.focused,undefined);assert.equal(f.api.currentReport(),null);assert.equal(f.storage.size,0);assert.equal(f.events.length,0);assert.equal(f.activity.length,0);
   input.events.change();assert.equal(f.api.currentReport().score,83);assert.equal(JSON.parse(f.storage.get(key)).score,83);assert.deepEqual(f.events,['mission-wellbeing-change']);assert.equal(f.activity.length,1);
   input.events.blur();assert.equal(f.activity.length,1);assert.equal(f.events.length,1);
 });
-test('Cancelling a drag restores the saved score and an account change cannot commit an old preview',()=>{
+test('An account change cannot commit an old preview',()=>{
   const f=fixture();f.api.choose(54);const root=f.api.slider(),input=root.querySelector('input');
-  input.value='91';input.events.input();input.events.pointercancel();assert.equal(input.value,54);assert.equal(f.api.currentReport().score,54);assert.equal(f.activity.length,1);
   input.value='88';input.events.input();f.api.setIdentity({storageScope:'other-owner'});input.events.change();assert.equal(f.api.currentReport(),null);assert.equal(f.activity.length,1);
 });
 test('Old badges retain scale10, new badges use scale100',()=>{
@@ -119,4 +118,8 @@ test('A gauge updates the existing SVG and text nodes throughout a drag',()=>{
   const host={firstElementChild:meter,querySelector:()=>meter,set innerHTML(value){assert.fail('A mounted gauge must retain its DOM nodes');}};
   for(const value of [20,90,5,null,77])scope.window.missionGauge.update(host,{value,label:'Wellbeing',compact:true});
   assert.equal(host.firstElementChild,meter);assert.equal(attrs['aria-valuenow'],'77');assert.equal(attrs['stroke-dashoffset'],'23.000');assert.equal(number.textContent,'77');assert.equal(suffix.textContent,'/ 100');assert.equal(classes.has('metric-gauge-empty'),false);
+});
+
+test('NasaGPT messages never show a wellbeing badge, including historical non-reminders',()=>{
+ const f=fixture();for(const reminder of [false,true]){const card=f.api.messageNode({id:'old',role:'user',content:'Please remind me',createdAt:new Date().toISOString(),wellbeing:{score:90,wellbeingScale:100},reminder},'chat','personal');assert.ok(card.children.every(node=>node.className!=='wellbeing-badge'));}
 });
