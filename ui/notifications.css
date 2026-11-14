@@ -1,0 +1,6 @@
+@import 'tailwindcss';
+@import 'konsta/react/theme.css';
+@source './notifications.jsx';
+:host{font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#171717}
+:host([hidden]){display:none}
+.k-notifications{position:fixed}

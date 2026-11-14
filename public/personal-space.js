@@ -126,7 +126,7 @@
   function messageNode(entry,kind,id){
     const item=create('article','personal-message '+(kind==='team'&&!entry.isOwn||entry.role==='assistant'?'assistant':'user'));
     const header=create('header'),name=create('span','',kind==='team'?((entry.isOwn?'Cdr. Sara Khan':entry.authorName)+(entry.isOwn?' / you':'')):kind==='diary'?'Your entry':entry.role==='assistant'?'NasaGPT':(window.missionProfileName?.name||'Cdr. Sara Khan'));header.append(name,create('time','',stamp(entry.createdAt)));if(kind!=='team')header.append(star(entry,kind,id));
-    item.append(header);if(entry.content)item.append(create('p','',entry.content));if(kind!=='team'&&entry.wellbeing)item.append(badge(entry.wellbeing));for(const file of entry.attachments||[]){const link=create('a','chat-file-link',file.name+' / '+Math.max(1,Math.ceil(file.bytes/1024))+' KB');link.href=file.url;link.download=file.name;item.append(link);}
+    item.append(header);if(entry.content)item.append(create('p','',entry.role==='assistant'?entry.content.replace(/\*\*([^*]+)\*\*/g,'$1'):entry.content));if(kind!=='team'&&entry.wellbeing)item.append(badge(entry.wellbeing));for(const file of entry.attachments||[]){const link=create('a','chat-file-link',file.name+' / '+Math.max(1,Math.ceil(file.bytes/1024))+' KB');link.href=file.url;link.download=file.name;item.append(link);}
     if(entry.pending&&kind==='chat'){const retry=create('button','personal-retry','Retry request answer');retry.type='button';retry.disabled=store('chat').busy;retry.addEventListener('click',()=>void retryChat(entry));item.append(retry);}
     return item;
   }
@@ -141,7 +141,7 @@
       if(kind==='team'&&window.missionAstronautChat)window.missionAstronautChat.render(view.list,items,entry=>messageNode(entry,'team',s.profile));
       else for(const entry of items){
         if(kind==='favorites'){
-          const card=create('article','personal-favorite'),header=create('header');header.append(create('span','',entry.sourceType==='diary'?'Archive':'NasaGPT'),create('time','',stamp(entry.createdAt)),star({...entry,id:entry.sourceId},entry.sourceType,entry.profile));card.append(header,create('p','',entry.content));if(entry.wellbeing)card.append(badge(entry.wellbeing));view.list.append(card);
+          const card=create('article','personal-favorite'),header=create('header');header.append(create('span','',entry.sourceType==='diary'?'Archive':'NasaGPT'),create('time','',stamp(entry.createdAt)),star({...entry,id:entry.sourceId},entry.sourceType,entry.profile));card.append(header,create('p','',entry.content.replace(/\*\*([^*]+)\*\*/g,'$1')));if(entry.wellbeing)card.append(badge(entry.wellbeing));view.list.append(card);
         }else view.list.append(messageNode(entry,kind,s.profile));
       }
       view.list.scrollTop=atBottom?view.list.scrollHeight:scrollTop;

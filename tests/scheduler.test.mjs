@@ -105,18 +105,24 @@ class SchedulerNode{
   setCustomValidity(value){this.validationMessage=value;}
   reportValidity(){return !this.validationMessage;}
 }
-function schedulerUiFixture(initial){
-  const host=new SchedulerNode('div'),handlers=new Map(),calls=[];let rows=structuredClone(initial),fail=false,loseNextCreate=false,ui;
-  const window={addEventListener(name,callback){handlers.set(name,callback);},dispatchEvent(event){if(event.type==='mission-tasks-change')ui?.render(host);},missionActivity:{refresh:async()=>{}}};
+function schedulerUiFixture(initial,{at=Date.now(),storage=new Map()}={}){
+  const host=new SchedulerNode('div'),handlers=new Map(),calls=[],timers=new Map();let rows=structuredClone(initial),fail=false,loseNextCreate=false,ui,now=at,seq=0,notification=null;
+  class Clock extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
+  const window={addEventListener(name,callback){handlers.set(name,callback);},dispatchEvent(event){if(event.type==='mission-tasks-change')ui?.render(host);},missionActivity:{refresh:async()=>{}},missionProfileName:{identity:{storageScope:'owner-a'}},sessionStorage:{getItem:key=>storage.get(key),setItem:(key,value)=>storage.set(key,value)},missionNotifications:{show(items,onClose){notification={items,onClose};},hide(){notification=null;}}};
   const document={createElement:tag=>new SchedulerNode(tag),getElementById:()=>null,addEventListener(){},hidden:false};
   const journalApi=async(path,options={})=>{calls.push({path,...options});if(!options.method)return {tasks:structuredClone(rows.filter(task=>task.status!=='cancelled'))};if(fail)throw new Error('offline');
     if(options.method==='POST'){const input=JSON.parse(options.body);let task=rows.find(row=>row.id===input.id);if(!task){task={...input,status:'planned',dueAt:input.dueTime?input.dueDate+'T'+input.dueTime+':00.000Z':null};rows.push(task);}if(loseNextCreate){loseNextCreate=false;throw new Error('response_lost');}return {task:structuredClone(task)};}
     const id=path.split('/').at(-1),task=rows.find(row=>row.id===id);if(options.method==='DELETE')task.status='cancelled';else{const patch=JSON.parse(options.body);Object.assign(task,patch);if(Object.hasOwn(patch,'dueTime'))task.dueAt=patch.dueTime?patch.dueDate+'T'+patch.dueTime+':00.000Z':null;}return {task:structuredClone(task)};};
-  vm.runInNewContext(schedulerUiSource,{window,document,journalApi,Intl,Date,Event,crypto:webcrypto,setTimeout:()=>0,setInterval:()=>0,clearInterval(){}});ui=window.missionScheduler;
+  vm.runInNewContext(schedulerUiSource,{window,document,journalApi,Intl,Date:Clock,Event,crypto:webcrypto,setTimeout:(callback,delay)=>{timers.set(++seq,{callback,at:now+delay});return seq;},clearTimeout:id=>timers.delete(id),setInterval:()=>0,clearInterval(){}});ui=window.missionScheduler;
   const all=()=>{const result=[];const visit=node=>{result.push(node);node.children.forEach(visit);};visit(host);return result;};
-  return {ui,host,calls,all,byLabel:prefix=>all().find(node=>node.attributes['aria-label']?.startsWith(prefix)),field:key=>all().find(node=>node.dataset.taskField===key),button:text=>all().find(node=>node.tagName==='button'&&node.textContent===text),fail:()=>{fail=true;},recover:()=>{fail=false;},loseCreateResponse:()=>{loseNextCreate=true;},get rows(){return rows;}};
+  return {ui,host,calls,all,storage,handlers,timers,get notification(){return notification;},advance(ms){const end=now+ms;let loops=0;while(true){const next=[...timers].filter(([,timer])=>timer.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];if(!next)break;if(loops++>100)throw Error('timer loop');now=next[1].at;timers.delete(next[0]);next[1].callback();}now=end;},byLabel:prefix=>all().find(node=>node.attributes['aria-label']?.startsWith(prefix)),field:key=>all().find(node=>node.dataset.taskField===key),button:text=>all().find(node=>node.tagName==='button'&&node.textContent===text),fail:()=>{fail=true;},recover:()=>{fail=false;},loseCreateResponse:()=>{loseNextCreate=true;},get rows(){return rows;}};
 }
 const uiTask={id:'task-1',title:'Check pulse',dueDate:'2026-11-06',dueAt:'2026-11-06T10:00:00.000Z',timeZone:'UTC',status:'planned'};
+test('Minute reminders fire at their deadline and dismissal survives refresh without cancelling the task',async()=>{
+  const at=Date.parse('2026-11-06T09:59:00Z'),f=schedulerUiFixture([uiTask],{at});await f.ui.refresh();f.advance(0);await new Promise(setImmediate);assert.equal(f.notification,null);f.advance(59999);assert.equal(f.notification,null);f.advance(20);assert.equal(f.notification.items[0].id,uiTask.id);f.notification.onClose();assert.equal(f.notification,null);assert.equal(f.rows[0].status,'planned');await f.ui.refresh();assert.equal(f.notification,null);
+  const reloaded=schedulerUiFixture([uiTask],{at:at+70000,storage:f.storage});await reloaded.ui.refresh();assert.equal(reloaded.notification,null);assert.equal(reloaded.calls.filter(call=>call.method).length,0);
+  f.rows[0].dueAt='2026-11-06T10:01:00.000Z';await f.ui.refresh();f.advance(60000);assert.equal(f.notification.items[0].id,uiTask.id);f.handlers.get('pagehide')({persisted:true});assert.equal(f.timers.size,0);
+});
 test('The editor preserves entered fields during task refresh and sends local time',async()=>{
   const f=schedulerUiFixture([uiTask]);await f.ui.refresh();await f.byLabel('Edit task:').trigger('click');
   for(const [key,value] of [['title','Check watch'],['date','2026-11-07'],['time','09:30']]){const field=f.field(key);field.value=value;await field.trigger('input');}

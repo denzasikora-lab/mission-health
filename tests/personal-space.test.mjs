@@ -34,6 +34,12 @@ test('Azure chat saves readable health output with the same owner and reply iden
   const result=await f.run('/api/chat',{method:'POST',environment,body:{id,content:'Synthetic sample',attachments:[]}});assert.equal(result.status,201);assert.equal(result.body.reply.content,'Review the synthetic sample.\n\nStatus: ATTENTION\nAlerts:\n- Synthetic heart-rate flag');assert.equal(result.body.reply.replyTo,id);assert.equal(f.out.length,1);assert.equal(f.out[0].body.input[0].role,'system');assert.ok(f.out[0].body.input[0].content.includes('ordinary conversation'));assert.equal(f.sql.prepare('SELECT owner_id FROM general_chat_messages WHERE reply_to=?').get(id).owner_id,'owner-a');
   const retry=await f.run('/api/chat',{method:'POST',environment,body:{id,content:'Synthetic sample',attachments:[]}});assert.equal(retry.body.reply.id,result.body.reply.id);assert.equal(f.out.length,1);assert.equal((await f.run('/api/chat',{owner:'owner-b',environment})).body.messages.length,0);f.sql.close();
 });
+test('A saved minute reminder receives a factual confirmation even when the language provider is unavailable',async()=>{
+  const f=fixture(),body={id:webcrypto.randomUUID(),content:'Remind me in 1 minute to test temperature.',timeZone:'Europe/Istanbul'};f.provider(503,'I cannot create reminders.');
+  const result=await f.run('/api/chat',{method:'POST',body});assert.equal(result.status,201);assert.equal(result.body.tasks.length,1);assert.equal(result.body.tasks[0].title,'Test temperature');assert.equal(Date.parse(result.body.tasks[0].dueAt)-Date.parse(result.body.message.createdAt),60000);assert.match(result.body.reply.content,/Reminder saved: Test temperature/);assert.doesNotMatch(result.body.reply.content,/cannot|can.t create|\*\*/i);assert.equal(result.body.replyError,null);assert.equal(f.out.length,0);
+  const retry=await f.run('/api/chat',{method:'POST',body});assert.equal(retry.body.reply.id,result.body.reply.id);assert.equal(retry.body.tasks[0].id,result.body.tasks[0].id);assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM personal_tasks').get().n,1);assert.equal((await f.run('/api/chat',{owner:'owner-b'})).body.messages.length,0);f.sql.close();
+});
+
 test('New visitors receive the Sara Khan demo persona without account name or email',async()=>{
   const f=fixture();
   for(const headers of [{},{name:'crown-bobby'},{email:'crown-bobby@example.test'},{name:'%D0%95%D0%B3%D0%BE%D1%80',nameEncoding:'percent-encoded-utf-8',email:'private@example.test'}]){

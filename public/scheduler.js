@@ -1,5 +1,5 @@
 (() => {
-  let tasks=[],loading=false,loaded=false,error='',changing=new Set(),banner,editing=null,removed=null,version=0;
+  let tasks=[],loading=false,loaded=false,error='',changing=new Set(),editing=null,removed=null,version=0,dueTimer=0,dismissedScope=null,dismissed=new Set();
   const create=(tag,cls,text)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;};
   const today=zone=>{const parts=new Intl.DateTimeFormat('en',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()),part=type=>parts.find(value=>value.type===type).value;return part('year')+'-'+part('month')+'-'+part('day');};
   const due=task=>task.status==='planned'&&(task.dueAt?Date.parse(task.dueAt)<=Date.now():task.dueDate<=today(task.timeZone));
@@ -11,9 +11,14 @@
   }
   function announce(){
     window.dispatchEvent(new Event('mission-tasks-change'));
-    const host=document.getElementById('nasagpt-sidebar');if(!host)return;
-    if(!banner){banner=create('button','scheduler-reminder');banner.type='button';banner.setAttribute('role','status');banner.addEventListener('click',()=>window.dispatchEvent(new Event('mission-tasks-open')));host.prepend(banner);}
-    const ready=tasks.filter(due);banner.hidden=!ready.length;banner.textContent=ready.length?'Due: '+ready[0].title+(ready.length>1?' / more '+(ready.length-1):''):'';
+    const scope=window.missionProfileName?.identity?.storageScope||'guest',key='mission-health-dismissed-reminders:'+scope,token=task=>task.id+':'+(task.dueAt||task.dueDate);
+    if(dismissedScope!==scope){dismissedScope=scope;try{const saved=JSON.parse(window.sessionStorage?.getItem(key)||'[]');dismissed=new Set(Array.isArray(saved)?saved.filter(value=>typeof value==='string').slice(-200):[]);}catch{dismissed=new Set();}}
+    const ready=tasks.filter(task=>due(task)&&!dismissed.has(token(task)));
+    if(ready.length)window.missionNotifications?.show(ready,()=>{for(const task of ready)dismissed.add(token(task));try{window.sessionStorage?.setItem(key,JSON.stringify([...dismissed].slice(-200)));}catch{}announce();});
+    else window.missionNotifications?.hide();
+    if(dueTimer)clearTimeout(dueTimer);dueTimer=0;
+    const next=tasks.filter(task=>task.status==='planned'&&task.dueAt&&Date.parse(task.dueAt)>Date.now()).map(task=>Date.parse(task.dueAt)).sort((a,b)=>a-b)[0];
+    if(next)dueTimer=setTimeout(()=>{dueTimer=0;announce();},Math.min(2147483000,Math.max(1,next-Date.now()+10)));
   }
   async function refresh(){
     if(loading||changing.size)return;const snapshot=version;loading=true;error='';announce();
@@ -83,5 +88,6 @@
   setTimeout(()=>void refresh(),0);
   const interval=setInterval(()=>{if(!document.hidden)void refresh();},60000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refresh();});
-  window.addEventListener('pagehide',event=>{if(!event.persisted)clearInterval(interval);});
+  window.addEventListener('pagehide',event=>{if(dueTimer)clearTimeout(dueTimer);dueTimer=0;if(!event.persisted)clearInterval(interval);});
+  window.addEventListener('pageshow',announce);
 })();

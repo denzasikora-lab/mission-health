@@ -26,12 +26,20 @@ function plannedFromText(content,createdAt,timeZone){
     if(!date||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+'T12:00:00Z'))||new Date(date+'T12:00:00Z').toISOString().slice(0,10)!==date)continue;
     if(hour!==null){dueAt=taskZonedInstant(date,hour,minute,zone);if(!dueAt)continue;}
     let title=normalized;for(const phrase of temporal.sort((a,b)=>b.length-a.length)){const at=title.toLocaleLowerCase('en').indexOf(phrase);if(at>=0)title=title.slice(0,at)+' '+title.slice(at+phrase.length);}
-    title=title.replace(/\b(?:remind me(?: to)?|remind|schedule|(?:i\s+)?need to|(?:i\s+)?have to)\b/giu,' ').replace(/\s+/g,' ').replace(/^[\s,.:\-]+|[\s,.:\-]+$/g,'').trim();if(!title)continue;
+    title=title.replace(/\b(?:remind me(?: to)?|remind|schedule|(?:i\s+)?need to|(?:i\s+)?have to)\b/giu,' ').replace(/\s+/g,' ').replace(/^[\s,.:\-]+|[\s,.:\-]+$/g,'').trim().replace(/^to\s+/iu,'');if(!title)continue;
     result.push({title:(title[0].toUpperCase()+title.slice(1)).slice(0,200),dueDate:date,dueAt,timeZone:zone});if(result.length>=10)break;
   }
   return result;
 }
 function plannedTask(row){return{id:row.id,title:row.title,dueDate:row.due_date,dueAt:row.due_at,timeZone:row.time_zone,status:row.status,sourceMessageId:row.source_message_id,createdAt:row.created_at};}
+function plannedChatConfirmation(tasks,language='en'){
+  const urdu=language==='ur';
+  return tasks.map(task=>{
+    const title=task.status==='done'?(urdu?'یاد دہانی مکمل ہو چکی ہے':'Reminder completed'):task.status==='cancelled'?(urdu?'یاد دہانی منسوخ ہے':'Reminder cancelled'):(urdu?'یاد دہانی محفوظ ہوگئی':'Reminder saved');
+    const time=task.dueAt?new Intl.DateTimeFormat(urdu?'ur':'en-GB',{dateStyle:'medium',timeStyle:'medium',timeZone:task.timeZone}).format(new Date(task.dueAt)):task.dueDate;
+    return title+': '+task.title+'\n'+time+' / '+task.timeZone;
+  }).join('\n\n')+'\n\n'+(urdu?'یاد دہانیاں اس وقت ظاہر ہوتی ہیں جب Mission Health کھلا ہو۔':'Reminders appear while Mission Health is open.');
+}
 async function planChatTasks(env,user,row,zone){
   const db=database(env),existing=await db.prepare('SELECT * FROM personal_tasks WHERE owner_id=? AND source_message_id=? ORDER BY ordinal').bind(user,row.id).all();if(existing.results.length)return existing.results.map(plannedTask);
   const tasks=plannedFromText(row.content,row.created_at,zone),created=new Date().toISOString();

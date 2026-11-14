@@ -1,6 +1,8 @@
 import { readdir,readFile,mkdir,writeFile,rm,cp } from 'node:fs/promises';
 import { extname } from 'node:path';
 import { gzipSync } from 'node:zlib';
+import {fileURLToPath} from 'node:url';
+import {buildWidgets} from './build-widgets.mjs';
 import {readWorkerSource} from './worker-sources.mjs';
 const mime={'.html':'text/html; charset=utf-8','.json':'application/json; charset=utf-8','.csv':'text/csv; charset=utf-8','.txt':'text/plain; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.wasm':'application/wasm','.jpg':'image/jpeg','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2','.mp4':'video/mp4','.mp3':'audio/mpeg','.m4a':'audio/mp4','.wav':'audio/wav','.webm':'video/webm'};
 const assets={};
@@ -18,6 +20,7 @@ await rm('public/vendor',{recursive:true,force:true});
 await mkdir('public/vendor',{recursive:true});
 await cp('node_modules/@huggingface/transformers/dist/transformers.min.js','public/vendor/transformers-4.3.1.bundle.min.js');
 await cp('node_modules/@huggingface/transformers/LICENSE','public/vendor/transformers-LICENSE.txt');
+await buildWidgets(fileURLToPath(new URL('../',import.meta.url)));
 await collect('public');
 await rm('dist',{recursive:true,force:true});
 await mkdir('dist/server',{recursive:true});
