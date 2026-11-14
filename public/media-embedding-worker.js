@@ -1,6 +1,8 @@
 import {AutoConfig,AutoModel,AutoProcessor,RawImage,env} from './vendor/transformers-4.3.1.bundle.min.js';
 import './apparent-age-core.js';
 import './skin-spots-core.js';
+import './appearance-core.js';
+import './face-session-core.js';
 const modelId='onnx-community/embeddinggemma-2-ONNX',revision='daa72c51243991dfcaf9f9137d2c573d8f7790c0';
 // The tokenizer loader reads the service configuration without revision; pin paths for all model files.
 env.remotePathTemplate='{model}/resolve/'+revision+'/';
@@ -29,6 +31,7 @@ self.onmessage=async event=>{
           self.postMessage({id,type:'age_encoding'});
           const vectors=[];processor.image_processor.max_soft_tokens=140;
           for(const blob of ageFrames){const face=await RawImage.fromBlob(blob),output=await model(await processor(null,[face]));vectors.push(Array.from(output.sentence_embedding.data));}
+          result.faceVector=globalThis.MissionFaceSessionCore.average(vectors);
           const textOutput=await model(await processor(core.prompts.map(text=>'task: classification | query: '+text))),data=textOutput.sentence_embedding.data;
           const textVectors=core.prompts.map((_,i)=>Array.from(data.slice(i*768,(i+1)*768)));
           result.apparentAge=core.estimate(vectors,textVectors);

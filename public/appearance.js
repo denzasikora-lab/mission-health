@@ -63,7 +63,7 @@
   function setIdentity(value){
     const next=value?.storageScope&&value.name?.trim()?{storageScope:value.storageScope,name:value.name.trim()}:null;
     if(next&&identity?.storageScope===next.storageScope&&identity?.name===next.name)return;
-    const wasActive=active||Boolean(video?.srcObject),input=video,device=cameraKey;stop();identity=next;sampleAllowed=true;scope=next?key():'';reference=null;ageFrames=[];ageSession++;window.missionApparentAge?.setIdentity(next);restoreResult();neutral('Camera is off');
+    const wasActive=active||Boolean(video?.srcObject),input=video,device=cameraKey;stop();identity=next;savedSession=null;faceCard.dataset.resultSource='missing';faceValue.textContent='Recording required';faceState.textContent='Compared automatically with your previous recording';sampleAllowed=true;scope=next?key():'';reference=null;ageFrames=[];ageSession++;window.missionApparentAge?.setIdentity(next);restoreResult();neutral('Camera is off');
     if(lastResult){mark('Latest comparison / '+new Date(lastResult.at).toLocaleString('en-GB',{dateStyle:'short',timeStyle:'short'}),'recorded');hint.textContent='Latest result. Enable the camera for a new comparison.';referenceLabel.textContent='Baseline / '+new Date(lastResult.referenceAt).toLocaleString('en-GB',{dateStyle:'short',timeStyle:'short'});}
     else{mark('Waiting for camera');hint.textContent='Enable the camera and collect your personal comparison baseline.';referenceLabel.textContent='Baseline / 24 frames';sampleSummary();}
     if(wasActive&&next)start(input,{key:device});
@@ -88,7 +88,7 @@
       else if(data.type==='measurement'){
         busy=false;clearTimeout(frameTimer);lastMeasurement=performance.now();
         try{
-          if(data.measurement.valid&&data.ageFrame){ageFrames.push({blob:data.ageFrame,time:data.timestamp,light:data.measurement.light.l,distance:data.measurement.distance});if(ageFrames.length>3)ageFrames.shift();}
+          if(data.measurement.valid&&data.ageFrame){ageFrames.push({blob:data.ageFrame,time:data.timestamp,light:data.measurement.light.l,distance:data.measurement.distance,measurement:{metrics:{...data.measurement.metrics},light:{...data.measurement.light},pose:{...data.measurement.pose},distance:data.measurement.distance}});if(ageFrames.length>3)ageFrames.shift();}
           consume(data.measurement,data.timestamp);if(data.skinSnapshot)window.missionSkinSpots?.observe(data.skinSnapshot,data.timestamp);
         }catch{failed();}
       }else if(data.type==='error')failed();
@@ -158,6 +158,7 @@
     epoch++;active=false;ready=busy=false;window.missionSkinSpots?.pause();clearTimeout(timer);clearTimeout(frameTimer);cancelAnimationFrame(frame);frame=0;
     engine?.terminate();engine=null;samples=[];recent=[];streaks={};lastValid=0;resetButton.disabled=true;
     persistResult();neutral('Camera is off');mark(lastResult?'Latest comparison / '+new Date(lastResult.at).toLocaleString('en-GB',{dateStyle:'short',timeStyle:'short'}):'Waiting for camera',lastResult?'recorded':'idle');progress.textContent=lastResult?resultStorageOk?'Saved':'Session':'No frame';progress.style.setProperty('--capture',0);ctx.clearRect(0,0,preview.width,preview.height);sampleSummary();
+    if(savedSession)restoreSession(savedSession,ownerContext());
   }
   resetButton.addEventListener('click',()=>{if(active&&ready)resetCapture();});
   document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
@@ -166,7 +167,20 @@
     if(!context||context.scope!==scope||context.session!==ageSession)return null;
     const selected=ageFrames.filter(item=>item.time>=context.since);
     const valid=selected.length>0&&selected.every(item=>Math.abs(item.light-selected[0].light)<=8&&Math.abs(item.distance/selected[0].distance-1)<=.2);
-    return{skin:window.missionSkinSpots?.snapshot(context),context:{...context},frames:valid?selected.map(item=>item.blob):[],conditions:valid?{light:selected.reduce((s,v)=>s+v.light,0)/selected.length,distance:selected.reduce((s,v)=>s+v.distance,0)/selected.length}:null};
+    return{skin:window.missionSkinSpots?.snapshot(context),context:{...context},frames:valid?selected.map(item=>item.blob):[],faceSamples:valid?selected.map(item=>item.measurement):[],cameraKey,conditions:valid?{light:selected.reduce((s,v)=>s+v.light,0)/selected.length,distance:selected.reduce((s,v)=>s+v.distance,0)/selected.length}:null};
   }
-  window.missionAppearance={start,stop,setIdentity,ageContext,ageSnapshot};
+  let savedSession=null;
+  const faceCard=document.createElement('article');faceCard.className='appearance-metric appearance-metric-extra';faceCard.dataset.visualExtra='face-similarity';faceCard.dataset.level='neutral';
+  const faceTitle=document.createElement('span'),faceValue=document.createElement('strong'),faceState=document.createElement('small');faceTitle.className='appearance-metric-title';faceTitle.textContent='Face similarity';faceValue.textContent='Recording required';faceState.textContent='Compared automatically with your previous recording';faceCard.append(faceTitle,faceValue,faceState);document.getElementById('appearance-metrics').append(faceCard);
+  function ownerContext(){return identity?JSON.stringify([identity.storageScope,identity.name]):null;}
+  function restoreSession(item,context){
+    if(!identity||!context||typeof context==='string'&&context!==ownerContext()||typeof context==='object'&&(context.scope!==scope||context.session!==ageSession)||active)return false;
+    const compared=globalThis.MissionFaceSessionCore?.snapshot(item?.features?.faceComparison);if(!compared||!Number.isFinite(Date.parse(item.createdAt))||savedSession&&Date.parse(savedSession.createdAt)>Date.parse(item.createdAt))return false;
+    savedSession=item;sampleAllowed=false;faceCard.dataset.resultSource='saved';faceValue.textContent=compared.cosine===null?compared.status==='first_session'?'Baseline saved':'Match conditions':compared.cosine.toFixed(3);
+    const messages={first_session:'First face recording saved / comparison starts next session',compared:'Cosine similarity / previous recording',lighting_changed:'Match previous lighting and white balance',camera_changed:'Camera changed / comparison paused',conditions_changed:'Match previous angle and face scale'};
+    faceState.textContent=messages[compared.status];mark('Saved session comparison','recorded');hint.textContent=messages[compared.status];referenceLabel.textContent=compared.reference?'Previous recording / '+new Date(compared.reference.at).toLocaleString('en-GB',{dateStyle:'short',timeStyle:'short'}):'First recording / '+new Date(item.createdAt).toLocaleString('en-GB',{dateStyle:'short',timeStyle:'short'});progress.textContent='Saved';
+    for(const metric of core.metrics){const card=cards.get(metric.key),v=compared.values[metric.key];card.node.dataset.resultSource='saved';card.node.dataset.level=v?.valid&&v.z>=2?'amber':'neutral';if(v?.valid){displayValue(card,metric,v);card.label.textContent='vs previous recording';}else{card.value.textContent=compared.status==='first_session'?'Baseline saved':'Match conditions';card.label.textContent=messages[compared.status];card.bar.style.setProperty('--signal',0);}card.node.setAttribute('aria-label',metric.title+': '+card.value.textContent+'. '+card.label.textContent);}
+    window.missionApparentAge?.restoreSession?.(compared.apparentAge,compared,item.createdAt);return true;
+  }
+  window.missionAppearance={start,stop,setIdentity,ageContext,ageSnapshot,ownerContext,restoreSession};
 })();

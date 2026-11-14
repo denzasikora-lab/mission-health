@@ -20,7 +20,7 @@
   }
   function acoustic(audio){let energy=0,clipped=0,quiet=0,blocks=0;for(let at=0;at<audio.length;at+=320){let power=0,n=Math.min(320,audio.length-at);for(let i=at;i<at+n;i++){const x=audio[i];power+=x*x;if(Math.abs(x)>=.99)clipped++;}energy+=power;blocks++;if(Math.sqrt(power/n)<.01)quiet++;}return{level:Math.max(-120,20*Math.log10(Math.max(1e-6,Math.sqrt(energy/audio.length)))),quiet:quiet/blocks,clipping:clipped/audio.length,seconds:audio.length/16000};}
   async function embedding(kind,audio,frames,ageFrames=[],skin=null){
-    const panel=panels.get(kind),worker=new Worker('/media-embedding-worker.js?v=20261105-spots1',{type:'module'}),id=crypto.randomUUID();
+    const panel=panels.get(kind),worker=new Worker('/media-embedding-worker.js?v=20261114-face1',{type:'module'}),id=crypto.randomUUID();
     try{return await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(new Error('model_timeout')),240000);worker.onerror=()=>{clearTimeout(timeout);reject(new Error('model_unavailable'));};worker.onmessage=event=>{const message=event.data;if(message.id!==id)return;if(message.type==='progress'){panel.model.textContent='EmbeddingGemma 2 / downloading '+Math.round(message.loaded/1048576)+' MB'+(message.total?' from '+Math.round(message.total/1048576):'');}else if(message.type==='encoding'){panel.model.textContent='EmbeddingGemma 2 / sound '+message.part+' of '+message.parts;}else if(message.type==='age_encoding'){panel.model.textContent='EmbeddingGemma 2 / comparing face frames with age descriptions';}else if(message.type==='skin_encoding'){panel.model.textContent='EmbeddingGemma 2 / skin region vectorization';}else if(message.type==='result'){clearTimeout(timeout);resolve(message.result);}else if(message.type==='error'){clearTimeout(timeout);reject(new Error(message.reason));}};worker.postMessage({id,audio,frames,ageFrames,skin});});}finally{worker.terminate();}
   }
   function recordedAt(value){const time=Date.parse(value);return Number.isFinite(time)?new Intl.DateTimeFormat('en-GB',{dateStyle:'short',timeStyle:'short'}).format(new Date(time)):'latest saved recording';}
@@ -56,6 +56,11 @@
       if(metrics&&metrics.level<-60){show(kind,{createdAt,features:{acoustic:metrics}});panel.status.textContent='Recording too quiet / '+recordedAt(createdAt);panel.model.textContent='EmbeddingGemma 2 / not enough audio';if(!frames.length)return{acoustic:metrics};audio=null;}
       try{
         const result=await embedding(kind,audio,frames,ageInput?.frames||[],kind==='video'?ageInput?.skin:null);
+        if(kind==='video'&&result.faceVector&&ageInput?.cameraKey){
+          const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(ageInput.cameraKey)),cameraKey=Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,'0')).join('');
+          const descriptor=MissionFaceSessionCore.descriptor(ageInput.faceSamples,cameraKey),face=descriptor&&MissionFaceSessionCore.validate({...descriptor,vector:result.faceVector});if(face)result.face=face;
+        }
+        delete result.faceVector;
         if(kind==='video')result.apparentAge=window.missionApparentAge?.finish(result.apparentAge||MissionApparentAgeCore.unavailable(),ageInput)||result.apparentAge;
         const features={acoustic:metrics,...result};if(!show(kind,{createdAt,features}))unavailable(kind,'No audio measurements in the new recording');
         if(kind==='video'&&result.skin)window.missionSkinSpots?.encoded(result.skin);return features;

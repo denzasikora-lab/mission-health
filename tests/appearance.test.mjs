@@ -9,6 +9,7 @@ const controller=await readFile(new URL('../public/appearance.js',import.meta.ur
 const server=await readFile(new URL('../worker/index.js',import.meta.url),'utf8');
 const sampleScope={window:{},fetch:async()=>({ok:true,json:async()=>({items:[]})})};vm.runInNewContext(await readFile(new URL('../public/analysis-samples.js',import.meta.url),'utf8'),sampleScope);const controlSamples=sampleScope.window.missionAnalysisSamples;
 const sandbox={};vm.runInNewContext(coreSource,sandbox);const core=sandbox.MissionAppearanceCore;
+vm.runInNewContext(await readFile(new URL('../public/face-session-core.js',import.meta.url),'utf8'),sandbox);const faceCore=sandbox.MissionFaceSessionCore;
 const clone=value=>JSON.parse(JSON.stringify(value));
 function fixture(scale=1){
   const width=Math.round(960*scale),height=Math.round(720*scale),data=new Uint8ClampedArray(width*height*4);
@@ -52,7 +53,7 @@ function environment(storage=new Map(),samples=null){
   class Worker{constructor(url){this.url=url;this.closed=false;this.sent=[];workers.push(this);}postMessage(v){this.sent.push(v);}terminate(){this.closed=true;}emit(data){this.onmessage({data});}}
   const window={Worker,OffscreenCanvas:class{},createImageBitmap(){},missionAnalysisSamples:samples};
   const localStorage={getItem:k=>{if(blockStorage)throw new Error();return storage.get(k)||null;},setItem:(k,v)=>{if(blockStorage)throw new Error();storage.set(k,v);}};
-  vm.runInNewContext(controller,{MissionAppearanceCore:core,window,document,Worker,localStorage,performance:{now:()=>now},Date,Math,JSON,setTimeout:(fn,delay)=>{timers.set(++seq,{fn,delay});return seq;},clearTimeout:id=>timers.delete(id),requestAnimationFrame:fn=>{frames.set(++seq,fn);return seq;},cancelAnimationFrame:id=>frames.delete(id),createImageBitmap:async()=>pendingBitmap?await pendingBitmap:{close(){}}});
+  vm.runInNewContext(controller,{MissionAppearanceCore:core,MissionFaceSessionCore:faceCore,window,document,Worker,localStorage,performance:{now:()=>now},Date,Math,JSON,setTimeout:(fn,delay)=>{timers.set(++seq,{fn,delay});return seq;},clearTimeout:id=>timers.delete(id),requestAnimationFrame:fn=>{frames.set(++seq,fn);return seq;},cancelAnimationFrame:id=>frames.delete(id),createImageBitmap:async()=>pendingBitmap?await pendingBitmap:{close(){}}});
   const input={videoWidth:1280,videoHeight:720,readyState:2,srcObject:{}};
   const tick=async(time)=>{now=time;const callbacks=[...frames.values()];frames.clear();for(const cb of callbacks)cb(time);await Promise.resolve();};
   const api=window.missionAppearance;
@@ -62,10 +63,10 @@ function environment(storage=new Map(),samples=null){
   return {api,node,workers,frames,timers,input,tick,sample,begin,collect,storage,setBitmap:p=>pendingBitmap=p,blockStorage:()=>blockStorage=true};
 }
 test('Personal appearance values stay empty until measured and saved results remain restorable',()=>{
-  const e=environment(new Map(),controlSamples),cards=e.node('appearance-metrics').children;
+  const e=environment(new Map(),controlSamples),cards=e.node('appearance-metrics').children.slice(0,12);
   assert.equal(cards.length,12);assert.ok(cards.every(card=>card.dataset.resultSource==='missing'&&card.children[1].textContent==='No comparison'));assert.doesNotMatch(e.node('appearance-status').textContent,/Reference sample/);assert.equal(e.node('appearance-reset').disabled,true);e.api.stop();assert.equal(e.storage.size,0);
   e.begin();assert.ok(cards.every(card=>card.dataset.resultSource!=='sample'));e.collect();for(let i=0;i<5;i++)e.sample();assert.ok(cards.every(card=>card.dataset.resultSource==='live'));e.api.stop();
-  const next=environment(e.storage,controlSamples);next.api.setIdentity({storageScope:'owner-a',name:'Egor Fedosov'});assert.ok(next.node('appearance-metrics').children.every(card=>card.dataset.resultSource==='saved'));assert.doesNotMatch(next.node('appearance-status').textContent,/Reference sample/);
+  const next=environment(e.storage,controlSamples);next.api.setIdentity({storageScope:'owner-a',name:'Egor Fedosov'});assert.ok(next.node('appearance-metrics').children.slice(0,12).every(card=>card.dataset.resultSource==='saved'));assert.doesNotMatch(next.node('appearance-status').textContent,/Reference sample/);
 });
 test('First startup collects a real baseline and restarting restores it',()=>{const e=environment();e.begin();e.collect();assert.equal(e.storage.size,1);for(let i=0;i<5;i++)e.sample();assert.equal(e.node('appearance-metrics').children[0].dataset.level,'green');e.api.stop();const next=environment(e.storage);next.begin();assert.match(next.node('appearance-reference').textContent,/Baseline/);for(let i=0;i<5;i++)next.sample();assert.equal([...next.storage.keys()].filter(key=>key.startsWith('mission-appearance-v2:')).length,1);assert.equal(next.node('appearance-metrics').children[0].dataset.level,'green');});
 test('An unsuitable frame resets baseline collection, instead of entering the baseline',()=>{const e=environment();e.begin();for(let i=0;i<20;i++)e.sample();e.sample({valid:false,reason:'Low light'});for(let i=0;i<10;i++)e.sample();assert.equal(e.storage.size,0);assert.equal(e.node('appearance-progress').textContent,'10/24');});
@@ -93,3 +94,13 @@ test('Unsuitable faces and incomparable lighting are excluded from age estimatio
 test('Stopping preserves actual values as past results and reopening restores them without a camera',()=>{const e=environment();e.begin();e.collect();for(let i=0;i<5;i++)e.sample();const before=e.node('appearance-metrics').children[0].children[1].textContent;e.api.stop();const card=e.node('appearance-metrics').children[0];assert.equal(card.children[1].textContent,before);assert.equal(card.dataset.resultSource,'saved');assert.equal(card.dataset.level,'neutral');assert.match(card.children[3].textContent,/Latest/);const next=environment(e.storage);next.api.setIdentity({storageScope:'owner-a',name:'Egor Fedosov'});assert.equal(next.node('appearance-metrics').children[0].children[1].textContent,before);assert.match(next.node('appearance-status').textContent,/Latest comparison/);});
 test('Past values do not transfer to another owner, name or camera',()=>{const e=environment();e.begin();e.collect();for(let i=0;i<5;i++)e.sample();e.api.stop();for(const [owner,name,device]of [['owner-b','Egor Fedosov','camera-a'],['owner-a','Other Person','camera-a'],['owner-a','Egor Fedosov','camera-b']]){const next=environment(e.storage);next.begin(owner,name,device);assert.equal(next.node('appearance-metrics').children[0].dataset.resultSource,'missing');assert.equal(next.node('appearance-metrics').children[0].children[1].textContent,'No comparison');}});
 test('Unavailable storage does not promise persistent results',()=>{const e=environment();e.blockStorage();e.begin();e.collect();for(let i=0;i<5;i++)e.sample();e.api.stop();assert.equal(e.storage.size,0);assert.equal(e.node('appearance-progress').textContent,'Session');assert.equal(e.node('appearance-metrics').children[0].dataset.resultSource,'saved');});
+
+test('Saved session comparison restores inside the visual grid and survives pausing',()=>{
+  const e=environment();e.begin();const context=e.api.ageContext(),s=measured(),descriptor=faceCore.descriptor([s,s],'a'.repeat(64)),first=faceCore.validate({...descriptor,vector:Array.from({length:768},(_,i)=>i===0?1:0)}),second=clone(first);second.metrics.underEye.center+=3;
+  const comparison=faceCore.compare(second,first,{id:'a7337ee1-9cf8-42cf-b0d5-75d90258835c',at:'2026-11-14T00:00:00.000Z'}),item={createdAt:'2026-11-14T01:00:00.000Z',features:{faceComparison:comparison}};
+  e.api.stop();assert.equal(e.api.restoreSession(item,context),true);const cards=e.node('appearance-metrics').children;assert.match(cards[2].children[1].textContent,/\+3.0 L\*/);assert.equal(cards.at(-1).children[1].textContent,'1.000');assert.match(e.node('appearance-reference').textContent,/Previous recording/);e.api.stop();assert.equal(cards.at(-1).children[1].textContent,'1.000');assert.match(cards[2].children[3].textContent,/vs previous recording/);
+  e.begin('owner-b');e.api.stop();assert.equal(e.api.restoreSession(item,context),false);assert.equal(cards.at(-1).children[1].textContent,'Recording required');
+});
+test('Late saved results cannot replace a newer recording or a live camera session',()=>{
+  const e=environment();e.begin();const context=e.api.ageContext(),report=faceCore.compare(null,null),item={createdAt:'2026-11-14T01:00:00.000Z',features:{faceComparison:report}};assert.equal(e.api.restoreSession(item,context),false);e.api.stop();assert.equal(e.api.restoreSession(item,context),true);assert.equal(e.api.restoreSession({...item,createdAt:'2026-11-13T01:00:00.000Z'},context),false);e.begin();e.api.stop();assert.equal(e.api.restoreSession(item,context),false);
+});

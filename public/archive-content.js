@@ -1,7 +1,7 @@
 (() => {
   const tones={neutral:'Neutral',happy:'Happy',sad:'Sad',angry:'Irritated',tense:'Tense'};
   const reasons={need_frames:'Insufficient frames',need_camera:'Camera recording required',model_unavailable:'Model unavailable',unstable:'Frames produced an unstable result',conditions_changed:'Capture conditions changed',no_reference:'No baseline selected',need_closeup:'A sharp close-up frame is required',not_enough_detail:'Insufficient detail',collecting:'Collecting baseline',compared:'Comparison complete',estimated:'Range determined',uncertain:'Unstable result',unavailable:'No result',pending:'Awaiting analysis',measured:'Signal properties measured',analyzed:'Analysis complete'};
-  const visualTitles=['Face contour','Contour symmetry','Under-eye area','Cheek tone','Face height','Jawline','Lower face','Eye opening','Eye symmetry','Lip width','Cheek tone difference','Under-eye tone','Apparent age','New skin areas','Pigmentation changes'];
+  const visualTitles=['Face contour','Contour symmetry','Under-eye area','Cheek tone','Face height','Jawline','Lower face','Eye opening','Eye symmetry','Lip width','Cheek tone difference','Under-eye tone','Apparent age','New skin areas','Pigmentation changes','Face similarity'];
   const number=(value,digits=1)=>new Intl.NumberFormat('en-GB',{maximumFractionDigits:digits}).format(value);
   const finite=value=>typeof value==='number'&&Number.isFinite(value);
   const plain=value=>String(value||'').replace(/[\u2013\u2014]/g,'-').trim();
@@ -72,7 +72,7 @@
     if(!compact)blocks.push('Voice tone\n'+toneLines(value.features).join('\n'));
     blocks.push('Recognized speech\n'+(readableText(value.transcript)||'No intelligible speech detected.'));
     blocks.push((compact?'Recording review':'Recording analysis')+'\n'+(readableText(value.analysis)||reason(value.status)));
-    if(value.kind==='video'&&!compact){blocks.push('Apparent age\n'+ageLines(value.features?.apparentAge).join('\n'));blocks.push('Spots and pigmentation\n'+skinLines(value.features?.skin).join('\n'));}
+    if(value.kind==='video'&&!compact){blocks.push('Apparent age\n'+ageLines(value.features?.apparentAge).join('\n'));blocks.push('Spots and pigmentation\n'+skinLines(value.features?.skin).join('\n'));const face=value.features?.faceComparison;if(face?.method==='face-session-v1')blocks.push('Face comparison\n'+(finite(face.cosine)?'Cosine similarity: '+number(face.cosine,3):face.status==='first_session'?'First face recording saved':'Capture conditions need matching')+(face.reference?'\nPrevious recording: '+stamp(face.reference.at):'')+(face.values?.underEye?.valid?'\nUnder-eye contrast change: '+number(face.values.underEye.delta)+' L*':''));}
     return blocks.join('\n\n');
   }
   function latest(entries){const result={};for(const entry of [...entries].filter(item=>!item.archiveSample&&!item.archiveCurrent).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)))){const value=observation(entry);if(value&&!result[value.kind])result[value.kind]={entry,value};}return result;}
@@ -83,6 +83,7 @@
       const candidate=nodes.find(item=>plain(item.querySelector('.appearance-metric-title')?.textContent)===title),node=candidate?.dataset?.resultSource==='sample'||candidate?.dataset?.source==='sample'||candidate?.closest?.('[data-result-source="sample"],[data-source="sample"]')?null:candidate,result={title,value:plain(node?.querySelector('strong')?.textContent)||'No comparison',status:plain(node?.querySelector('.appearance-metric-status')?.textContent||node?.querySelector('small')?.textContent)||'No comparison',source:node?.dataset?.resultSource||'missing'};
       if(missing(result.value)&&title==='Apparent age'&&saved.apparentAge?.status==='estimated'&&range(saved.apparentAge.range)){result.value=range(saved.apparentAge.range);result.status='Latest saved analysis';result.source='saved';}
       if(missing(result.value)&&saved.skin?.status==='compared'&&['New skin areas','Pigmentation changes'].includes(title)){const count=title==='New skin areas'?saved.skin.newCount:saved.skin.changedCount;if(finite(count)){result.value=number(count,0);result.status='Latest baseline comparison';result.source='saved';}}
+      if(title==='Face similarity'&&finite(saved.faceComparison?.cosine)&&missing(result.value)){result.value=number(saved.faceComparison.cosine,3);result.status='Cosine / previous recording';result.source='saved';}
       return result;
     });
   }

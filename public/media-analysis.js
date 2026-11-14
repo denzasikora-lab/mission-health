@@ -5,13 +5,14 @@
   }
   async function restore(){
     if(restoring)return restoring;
+    const owner=window.missionAppearance?.ownerContext?.();
     restoring=(async()=>{
       try{
         const response=await fetch('/api/media-analysis',{cache:'no-store',signal:AbortSignal.timeout(15000)}),result=await response.json();if(!response.ok||!Array.isArray(result.items))return;
         for(const item of result.items){
           const state=states.get(item.kind);if(!state)continue;
           window.missionVoiceAnalysis?.restore?.(item.kind,item);
-
+          if(item.kind==='video')window.missionAppearance?.restoreSession?.(item,owner);
         }
       }catch{}
     })();
@@ -57,6 +58,7 @@
       if(item.report)form.set('wellbeing',JSON.stringify(item.report));
       job.status.textContent='NasaGPT is analyzing the recording...';
       const response=await fetch('/api/media-analysis',{method:'POST',headers:{'x-mission-language':typeof state!=='undefined'&&state.language==='ur'?'ur':'en'},body:form,signal:AbortSignal.timeout(150000)}),result=await response.json();
+      if(item.kind==='video'&&result.saved&&result.faceComparison)window.missionAppearance?.restoreSession?.({createdAt:item.createdAt,features:{faceComparison:result.faceComparison}},item.ageInput?.context);
       if(!response.ok||result.status!=='analyzed')throw Object.assign(new Error(result.error||'media_analysis_unavailable'),{saved:result.saved});
       if(item.kind==='video'&&item.features?.skin)window.missionSkinSpots?.matches(result.skinMatches||[],item.features.skin.trackingKey);job.phase='complete';job.root.remove();const panel=states.get(item.kind).root;panel.hidden=!panel.children.length;window.missionVoiceAnalysis?.transcript(item.kind,result.transcript||item.transcript);job.payload=null;
       void window.missionBook?.refresh();void window.missionActivity?.refresh();
