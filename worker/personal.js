@@ -80,9 +80,9 @@ async function generalChatRoute(request,env,user,url){
   if(!existing&&healthContext)row.health_context_json=JSON.stringify(healthContext);
   if(!existing){if(healthContext)await db.prepare('INSERT INTO general_chat_messages (id,owner_id,role,content,created_at,wellbeing_json,attachments_json,health_context_json) VALUES (?,?,?,?,?,?,?,?)').bind(row.id,user,row.role,row.content,row.created_at,row.wellbeing_json,row.attachments_json,row.health_context_json).run();else await db.prepare('INSERT INTO general_chat_messages (id,owner_id,role,content,created_at,wellbeing_json,attachments_json) VALUES (?,?,?,?,?,?,?)').bind(row.id,user,row.role,row.content,row.created_at,row.wellbeing_json,row.attachments_json).run();}
   if(!existing&&typeof activityWrite==='function')await activityWrite(env,user,'chat_sent','Sent message NasaGPT / '+row.content.slice(0,90),'chat:'+row.id);
-  const tasks=await planChatTasks(env,user,row,input.timeZone);
+  const tasks=await planChatTasks(env,user,row,input.timeZone,responseLanguage(request));
   let reply=await db.prepare('SELECT * FROM general_chat_messages WHERE owner_id=? AND reply_to=?').bind(user,row.id).first(),replyError=null;
-  if(!reply&&tasks.length&&/^(?:please\s+)?remind\s+me\b/iu.test(row.content.trim())){
+  if(!reply&&tasks.length){
     const content=plannedChatConfirmation(tasks,responseLanguage(request));
     await db.prepare('INSERT INTO general_chat_messages (id,owner_id,role,content,created_at,reply_to) SELECT ?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM general_chat_messages WHERE owner_id=? AND reply_to=?)').bind(crypto.randomUUID(),user,'assistant',content,new Date(Math.max(Date.now(),Date.parse(row.created_at)+1)).toISOString(),row.id,user,row.id).run();
     reply=await db.prepare('SELECT * FROM general_chat_messages WHERE owner_id=? AND reply_to=?').bind(user,row.id).first();

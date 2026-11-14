@@ -12,12 +12,12 @@ const model='embeddinggemma-2:daa72c51243991dfcaf9f9137d2c573d8f7790c0:q4:text:2
 function fixture(options={}){
   const sql=new DatabaseSync(':memory:');for(const migration of options.beforeHundred?migrations.slice(0,10):migrations)sql.exec(migration);
   const objects=new Map(),PHOTOS={put:async(key,bytes)=>{objects.set(key,bytes);},get:async key=>objects.has(key)?{body:objects.get(key)}:null,delete:async key=>objects.delete(key)};
-  const out=[],DB={prepare(query){
+  const out=[],intentCalls=[],DB={prepare(query){
     const statement=sql.prepare(query);
     return {bind(...values){return {first:async()=>statement.get(...values)||null,all:async()=>({results:statement.all(...values)}),run:async()=>statement.run(...values)};}};
   }};
-  let status=200,answer='Test response based on supplied context.';
-  const scope={URL,Request,Response,FormData,Blob,Uint8Array,TextEncoder,DataView,AbortSignal,crypto:webcrypto,atob,console:{warn(){},error(){}},fetch:async(url,options)=>{const body=JSON.parse(options.body);out.push({url,body});if(String(url).startsWith('http://trainer.internal/'))return Response.json({id:body.id});return status===200?Response.json(body.input?{status:'completed',output:[{type:'message',role:'assistant',content:[{type:'output_text',text:answer}]}]}:{choices:[{message:{content:answer}}]}):new Response('unavailable',{status});}};
+  let status=200,answer='Test response based on supplied context.',intentStatus=200,intentAnswer=JSON.stringify({isScheduler:false,tasks:[]});
+  const scope={URL,Request,Response,FormData,Blob,Uint8Array,TextEncoder,DataView,AbortSignal,crypto:webcrypto,atob,console:{warn(){},error(){}},fetch:async(url,options)=>{const body=JSON.parse(options.body);if(body.messages?.[0]?.content?.startsWith('Mission Health scheduler intent.')){intentCalls.push({url,body});return intentStatus===200?Response.json({choices:[{message:{content:intentAnswer}}]}):new Response('unavailable',{status:intentStatus});}out.push({url,body});if(String(url).startsWith('http://trainer.internal/'))return Response.json({id:body.id});return status===200?Response.json(body.input?{status:'completed',output:[{type:'message',role:'assistant',content:[{type:'output_text',text:answer}]}]}:{choices:[{message:{content:answer}}]}):new Response('unavailable',{status});}};
   vm.runInNewContext(source,scope);
   const env={DB,PHOTOS,LLM_API_KEY:'test-key',LLM_BASE_URL:'https://model.test/v1',LLM_MODEL:'test-model'};
   const run=async(path,{owner='owner-a',method='GET',body,environment={},origin,name,email,nameEncoding,expectedScope}={})=>{
@@ -26,7 +26,7 @@ function fixture(options={}){
     return {status:response.status,headers:response.headers,body:response.headers.get('content-type')?.includes('application/json')?await response.json():await response.text()};
   };
   const note=async(score=70,profile='jessica-meir',owner='owner-a',content='Fatigue decreased after exercise.')=>run('/api/astronauts/'+profile+'/messages',{owner,method:'POST',body:{id:webcrypto.randomUUID(),content,language:'en',mode:'diary',attachments:[],wellbeing:score===null?null:{score,wellbeingScale:100}}});
-  return {sql,out,objects,run,note,migrateHundred:()=>{for(const migration of migrations.slice(10).filter(value=>value!==hostedMemoryMigration))sql.exec(migration);},validateHealth:scope.validatedStoryHealth,provider:(code,text)=>{status=code;if(text)answer=text;}};
+  return {sql,out,intentCalls,intentProvider:(code,value)=>{intentStatus=code;intentAnswer=value;},objects,run,note,migrateHundred:()=>{for(const migration of migrations.slice(10).filter(value=>value!==hostedMemoryMigration))sql.exec(migration);},validateHealth:scope.validatedStoryHealth,provider:(code,text)=>{status=code;if(text)answer=text;}};
 }
 test('Azure chat saves readable health output with the same owner and reply identity',async()=>{
   const f=fixture(),environment={LLM_PROVIDER:'azure_responses',AZURE_AGENT_ENDPOINT:'https://agent.test/agents/NASA-AI/endpoint/protocols/openai/responses?api-version=v1',AZURE_AGENT_API_KEY:'synthetic-key'},id=webcrypto.randomUUID();
@@ -35,9 +35,19 @@ test('Azure chat saves readable health output with the same owner and reply iden
   const retry=await f.run('/api/chat',{method:'POST',environment,body:{id,content:'Synthetic sample',attachments:[]}});assert.equal(retry.body.reply.id,result.body.reply.id);assert.equal(f.out.length,1);assert.equal((await f.run('/api/chat',{owner:'owner-b',environment})).body.messages.length,0);f.sql.close();
 });
 test('A saved minute reminder receives a factual confirmation even when the language provider is unavailable',async()=>{
-  const f=fixture(),body={id:webcrypto.randomUUID(),content:'Remind me in 1 minute to test temperature.',timeZone:'Europe/Istanbul'};f.provider(503,'I cannot create reminders.');
+  const f=fixture(),body={id:webcrypto.randomUUID(),content:'Remind me in 1 minute to test temperature.',timeZone:'Europe/Istanbul'};f.provider(503,'I cannot create reminders.');f.intentProvider(200,JSON.stringify({isScheduler:true,tasks:[{title:'Test temperature',delayMinutes:1}]}));
   const result=await f.run('/api/chat',{method:'POST',body});assert.equal(result.status,201);assert.equal(result.body.tasks.length,1);assert.equal(result.body.tasks[0].title,'Test temperature');assert.equal(Date.parse(result.body.tasks[0].dueAt)-Date.parse(result.body.message.createdAt),60000);assert.match(result.body.reply.content,/Reminder saved: Test temperature/);assert.doesNotMatch(result.body.reply.content,/cannot|can.t create|\*\*/i);assert.equal(result.body.replyError,null);assert.equal(f.out.length,0);
   const retry=await f.run('/api/chat',{method:'POST',body});assert.equal(retry.body.reply.id,result.body.reply.id);assert.equal(retry.body.tasks[0].id,result.body.tasks[0].id);assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM personal_tasks').get().n,1);assert.equal((await f.run('/api/chat',{owner:'owner-b'})).body.messages.length,0);f.sql.close();
+});
+
+test('ProxyAPI mini detects a natural scheduler request and freezes its result across retries',async()=>{
+  const f=fixture(),body={id:webcrypto.randomUUID(),content:'Please make sure I take my temperature a minute from now.',timeZone:'Europe/Istanbul'},environment={LLM_PROVIDER:'azure_responses',AZURE_AGENT_ENDPOINT:'https://agent.test/agents/NASA-AI/endpoint/protocols/openai/responses?api-version=v1',AZURE_AGENT_API_KEY:'synthetic-agent-key',LLM_BASE_URL:'https://api.proxyapi.ru/v1',LLM_MODEL:'openai/gpt-5-mini'};
+  f.intentProvider(200,JSON.stringify({isScheduler:true,tasks:[{title:'Take my temperature',delayMinutes:1}]}));const result=await f.run('/api/chat',{method:'POST',body,environment});assert.equal(result.body.tasks.length,1);assert.equal(result.body.tasks[0].title,'Take my temperature');assert.equal(Date.parse(result.body.tasks[0].dueAt)-Date.parse(result.body.message.createdAt),60000);assert.match(result.body.reply.content,/Reminder saved/);assert.equal(f.out.length,0);assert.equal(f.intentCalls.length,1);assert.equal(f.intentCalls[0].url,'https://api.proxyapi.ru/v1/chat/completions');assert.equal(f.intentCalls[0].body.model,'openai/gpt-5-mini');assert.equal(JSON.parse(f.intentCalls[0].body.messages[1].content).timeZone,'Europe/Istanbul');
+  f.intentProvider(200,JSON.stringify({isScheduler:true,tasks:[{title:'Changed output',delayMinutes:99}]}));const retry=await f.run('/api/chat',{method:'POST',body,environment});assert.equal(retry.body.tasks[0].id,result.body.tasks[0].id);assert.equal(retry.body.tasks[0].dueAt,result.body.tasks[0].dueAt);assert.equal(f.intentCalls.length,1);f.sql.close();
+});
+test('Negative intent does not schedule quoted text and invalid output falls back only to literal supported requests',async()=>{
+  const f=fixture();const quote=await f.run('/api/chat',{method:'POST',body:{id:webcrypto.randomUUID(),content:'The manual says "Remind me in 1 minute to test temperature".'}});assert.equal(quote.body.tasks.length,0);assert.equal(f.out.length,1);assert.equal(f.intentCalls.length,1);
+  f.intentProvider(200,JSON.stringify({isScheduler:true,tasks:[{title:'Untrusted output',dueDate:'2026-02-30',url:'https://example.test'}]}));const result=await f.run('/api/chat',{method:'POST',body:{id:webcrypto.randomUUID(),content:'Remind me in 1 minute to test temperature.',timeZone:'UTC'}});assert.equal(result.body.tasks[0].title,'Test temperature');assert.match(result.body.reply.content,/Reminder saved/);assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM personal_tasks').get().n,1);f.sql.close();
 });
 
 test('New visitors receive the Sara Khan demo persona without account name or email',async()=>{

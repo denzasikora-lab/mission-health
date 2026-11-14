@@ -17,11 +17,11 @@ const greeting='سلام، میری طبیعت کیسی ہے؟';
 
 function fixture(t){
   const sql=new DatabaseSync(':memory:');for(const migration of migrations)sql.exec(migration);t.after(()=>sql.close());
-  const objects=new Map(),outgoing=[];let answer=urdu;
+  const objects=new Map(),outgoing=[],intentCalls=[];let answer=urdu;
   const DB={prepare(query){const statement=sql.prepare(query);return {bind(...values){return {first:async()=>statement.get(...values)||null,all:async()=>({results:statement.all(...values)}),run:async()=>statement.run(...values)};}};}};
   const PHOTOS={put:async(key,bytes,options)=>objects.set(key,{bytes,body:bytes,customMetadata:options.customMetadata,httpMetadata:options.httpMetadata}),get:async key=>objects.get(key)||null,delete:async key=>objects.delete(key)};
   const scope={URL,Request,Response,FormData,Blob,Uint8Array,TextEncoder,TextDecoder,DataView,AbortSignal,crypto:webcrypto,atob,btoa,console:{warn(){},error(){}},fetch:async(url,options)=>{
-    const body=JSON.parse(options.body);outgoing.push({url,body});
+    const body=JSON.parse(options.body);if(body.messages?.[0]?.content?.startsWith('Mission Health scheduler intent.')){intentCalls.push({url,body});return Response.json({choices:[{message:{content:JSON.stringify({isScheduler:false,tasks:[]})}}]});}outgoing.push({url,body});
     const text=body.messages?JSON.stringify(JSON.parse(body.messages[1].content).map(()=>'An earlier diary entry.')):answer;
     return Response.json(body.input?{status:'completed',output:[{type:'message',role:'assistant',content:[{type:'output_text',text}]}]}:{choices:[{message:{content:text}}]});
   }};
@@ -36,7 +36,7 @@ function fixture(t){
     const bytes=new Uint8Array(64);bytes.set(new TextEncoder().encode('RIFF'));bytes.set(new TextEncoder().encode('WAVE'),8);
     const form=new FormData();form.set('id',id);form.set('kind','audio');form.set('duration','5');form.set('transcript',greeting);form.set('file',new Blob([bytes],{type:'audio/wav'}),'recording.wav');return form;
   }
-  return {sql,outgoing,run,mediaForm,setAnswer:value=>{answer=value;},language:language=>scope.responseLanguage(new Request('https://mission.test',{headers:language===undefined?{}:{'x-mission-language':language}})),display:body=>scope.englishDisplay(body,env,'owner-a')};
+  return {sql,outgoing,intentCalls,run,mediaForm,setAnswer:value=>{answer=value;},language:language=>scope.responseLanguage(new Request('https://mission.test',{headers:language===undefined?{}:{'x-mission-language':language}})),display:body=>scope.englishDisplay(body,env,'owner-a')};
 }
 
 test('Response language trusts only the exact Urdu header and defaults to English',t=>{
@@ -46,6 +46,7 @@ test('Response language trusts only the exact Urdu header and defaults to Englis
 test('Urdu chat uses an Urdu instruction and retains Urdu text in responses and storage',async t=>{
   const f=fixture(t),id=webcrypto.randomUUID(),saved=await f.run('/api/chat',{method:'POST',language:'ur',body:{id,content:greeting,attachments:[]}});
   assert.equal(saved.status,201);assert.equal(saved.body.message.content,greeting);assert.equal(saved.body.reply.content,urdu);assert.match(f.outgoing[0].body.input[0].content,/briefly in Urdu/);assert.equal(f.outgoing[0].body.input.at(-1).content,greeting);assert.equal(f.outgoing.length,1);
+  assert.equal(f.intentCalls.length,1);assert.match(f.intentCalls[0].body.messages[0].content,/Titles must be in Urdu/);assert.equal(JSON.parse(f.intentCalls[0].body.messages[1].content).message,greeting);assert.equal(saved.body.tasks.length,0);
   assert.equal(f.sql.prepare('SELECT content FROM general_chat_messages WHERE reply_to=?').get(id).content,urdu);
   const history=await f.run('/api/chat',{language:'ur'});assert.equal(history.body.messages.find(item=>item.id===id).content,greeting);assert.equal(history.body.messages.find(item=>item.replyTo===id).content,urdu);assert.equal(f.outgoing.length,1);
 });
