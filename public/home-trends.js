@@ -137,8 +137,8 @@
   }
   function syncMinuteClock(){if(periodId!=='1m'||!visible()||!owner()&&!window.missionHome?.sampleActive?.()){stopMinuteClock();return;}pollActual();if(!minuteTimer)minuteTimer=setTimeout(()=>{minuteTimer=0;if(visible()&&periodId==='1m')refresh();else stopMinuteClock();},1000-Date.now()%1000);}
   function schedule(){if(!visible()){stopMinuteClock();cancelAnimationFrame(scheduled);scheduled=0;return;}if(!scheduled)scheduled=requestAnimationFrame(()=>{scheduled=0;refresh();});}
-  listen(controls,'click',event=>{const button=event.target.closest('[data-trend-period]');if(button){periodId=button.dataset.trendPeriod;refresh();}});
+  listen(controls,'click',event=>{const button=event.target.closest('[data-trend-period]');if(button){periodId=button.dataset.trendPeriod;refresh();window.missionMARS?.periodChanged();}});
   const observer=new MutationObserver(schedule);for(const card of cards)observer.observe(card,{attributes:true,attributeFilter:['data-source','data-reading-value','data-observed-at']});const visibilityObserver=new MutationObserver(schedule);visibilityObserver.observe(home,{attributes:true,attributeFilter:['hidden']});visibilityObserver.observe(document.body,{attributes:true,attributeFilter:['data-home','data-overview','data-mission-workspace']});
   listen(document,'visibilitychange',schedule);for(const name of ['mission-wellbeing-change','mission-readings-change','mission-actiwatch-change','mission-profile-change','mission-sample-change'])listen(window,name,schedule);listen(window,'pageshow',()=>{suspended=false;schedule();});listen(window,'pagehide',event=>{suspended=true;stopMinuteClock();cancelAnimationFrame(scheduled);scheduled=0;if(!event.persisted){destroyed=true;observer.disconnect();visibilityObserver.disconnect();for(const [target,type,callback]of listeners)target.removeEventListener(type,callback);}});
-  window.missionHomeTrends=Object.freeze({refresh});refresh();
+  window.missionHomeTrends=Object.freeze({refresh,period:()=>periodId});refresh();
 })();

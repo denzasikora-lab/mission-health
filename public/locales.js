@@ -36,7 +36,7 @@ translations.ur={
   "findMaterial": "متعلقہ مواد تلاش کریں",
   "find": "تلاش",
   "placeholder": "مثلاً دل اور دوران خون",
-  "footer": "Mission Health کا تحقیقی نمونہ۔ براہ راست ٹیلی میٹری یا طبی فیصلوں کی سہولت نہیں۔",
+  "footer": "Mission Health / Bug Busters۔ MARS کا طریقہ اور ذرائع نیچے ہیں۔",
   "sourcesLabel": "ذرائع:",
   "sourceProgram": "NASA Human Research Program",
   "deepSpace": "نمونہ منظرنامہ",

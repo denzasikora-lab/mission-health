@@ -1,4 +1,4 @@
-"""Run local jobs LoRA without calling external services."""
+"""Выполнять локальные задания LoRA без внешней передачи записей."""
 
 import hashlib
 import hmac
@@ -21,10 +21,12 @@ PROCESSES = {}
 STATES = {}
 KEY = os.environ.get("TRAINING_KEY", "")
 STEPS = 200
+ENGINE = os.environ.get("TRAINING_ENGINE", "mlx")
+MINIMUM = 1 if ENGINE == "peft" else 20
 
 
 def save_state(folder, state):
-    """Atomically save job state in a private local directory."""
+    """Атомарно сохранить состояние задания в закрытом каталоге."""
     target = folder / "state.json"
     temporary = folder / "state.tmp"
     temporary.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
@@ -32,23 +34,27 @@ def save_state(folder, state):
 
 
 def ready():
-    """Check the local model and installed MLX without downloading weights."""
-    return (MODEL / "config.json").exists() and importlib.util.find_spec("mlx_lm") is not None
+    """Проверить локальную модель и библиотеки без загрузки весов."""
+    packages = ("torch", "peft", "transformers") if ENGINE == "peft" else ("mlx_lm",)
+    return (MODEL / "config.json").exists() and all(importlib.util.find_spec(name) is not None for name in packages)
 
 
 def training_command(folder):
-    """Return a fixed training command without interpreting user text.
+    """Сформировать команду обучения без исполнения пользовательского текста.
 
     Parameters
     ----------
     folder : Path
-        Separate job directory with prepared data.
+        Закрытый каталог задания с подготовленными данными.
 
     Returns
     -------
     list[str]
-        Process arguments MLX with local paths.
+        Аргументы процесса с локальными путями.
     """
+    if ENGINE == "peft":
+        return [sys.executable, "-u", str(ROOT / "local/train_peft.py"),
+                "--model", str(MODEL), "--job", str(folder)]
     return [sys.executable, "-u", "-m", "mlx_lm.lora", "--model", str(MODEL),
             "--data", str(folder / "data"), "--train", "--fine-tune-type", "lora",
             "--adapter-path", str(folder / "adapter"), "--iters", str(STEPS),
@@ -58,7 +64,7 @@ def training_command(folder):
 
 
 def execute(folder, state):
-    """Train the adapter and record actual process progress only."""
+    """Обучить адаптер и сохранить фактический прогресс процесса."""
     environment = dict(os.environ, HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1",
                        WANDB_MODE="disabled", HF_HUB_DISABLE_TELEMETRY="1",
                        PYTHONIOENCODING="utf-8")
@@ -84,7 +90,7 @@ def execute(folder, state):
         code = process.wait()
         with LOCK:
             if state["status"] != "cancelled":
-                complete = code == 0 and (folder / "adapter/adapters.safetensors").exists()
+                complete = code == 0 and (folder / ("adapter/adapter_model.safetensors" if ENGINE == "peft" else "adapter/adapters.safetensors")).exists()
                 state.update(status="completed" if complete else "failed", adapterReady=complete)
                 if complete:
                     state["step"] = STEPS
@@ -100,10 +106,10 @@ def execute(folder, state):
 
 
 class TrainingHandler(BaseHTTPRequestHandler):
-    """Accept local jobs without automatically activating completed adapters."""
+    """Принимать задания без автоматического подключения готовых адаптеров."""
 
     def reply(self, status, body):
-        """Return status without diary text or internal paths."""
+        """Вернуть состояние без текста записей и внутренних путей."""
         value = json.dumps(body, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -113,18 +119,18 @@ class TrainingHandler(BaseHTTPRequestHandler):
         self.wfile.write(value)
 
     def authorized(self):
-        """Check the private handler key."""
+        """Проверить секретный ключ обработчика."""
         if not KEY or not hmac.compare_digest(self.headers.get("Authorization", ""), "Bearer " + KEY):
             self.reply(401, {"error": "unauthorized"})
             return False
         return True
 
     def do_GET(self):
-        """Show readiness or saved state for one job."""
+        """Показать готовность или сохраненное состояние задания."""
         if not self.authorized():
             return
         if self.path == "/health":
-            self.reply(200, {"ready": ready(), "steps": STEPS})
+            self.reply(200, {"ready": ready(), "steps": STEPS, "minimum": MINIMUM, "model": "SmolLM2-135M / PEFT" if ENGINE == "peft" else "Qwen3 / MLX"})
             return
         match = re.fullmatch(r"/jobs/([a-f0-9-]{36})", self.path)
         if not match:
@@ -141,7 +147,7 @@ class TrainingHandler(BaseHTTPRequestHandler):
         self.reply(200, {key: value for key, value in state.items() if key != "owner"})
 
     def do_POST(self):
-        """Create a job on explicit request or stop an existing process."""
+        """Создать задание по запросу или остановить существующий процесс."""
         if not self.authorized():
             return
         length = int(self.headers.get("Content-Length", "0"))
@@ -179,7 +185,7 @@ class TrainingHandler(BaseHTTPRequestHandler):
             except (KeyError, ValueError, TypeError):
                 self.reply(400, {"error": "invalid_input"})
                 return
-            if self.path != "/jobs" or not isinstance(entries, list) or not 20 <= len(entries) <= 500 or any(not isinstance(x, str) or not 80 <= len(x) <= 6000 for x in entries):
+            if self.path != "/jobs" or not isinstance(entries, list) or not MINIMUM <= len(entries) <= 500 or any(not isinstance(x, str) or not 80 <= len(x) <= 6000 for x in entries):
                 self.reply(400, {"error": "invalid_input"})
                 return
             folder = JOBS / identifier
@@ -192,14 +198,27 @@ class TrainingHandler(BaseHTTPRequestHandler):
                 self.reply(503, {"error": "trainer_not_ready"})
                 return
             (folder / "data").mkdir(parents=True, mode=0o700)
-            samples = [{"messages": [{"role": "user", "content": "Write a personal observation in the diary author’s style."},
-                                     {"role": "assistant", "content": entry}]} for entry in entries]
-            split = max(2, len(samples) // 10)
+            samples = []
+            for index, entry in enumerate(entries):
+                earlier = "\n".join(text[-200:] for text in entries[max(0, index - 2):index])
+                prompt = "Earlier astronaut observations:\n" + (earlier or "Initial observation; no prior record.") + "\nModel the next recorded observation. This is longitudinal behavior research, not a medical prediction."
+                samples.append({"messages": [{"role": "user", "content": prompt},
+                                              {"role": "assistant", "content": entry}]})
+            split = max(1, len(samples) // 10) if len(samples) >= 10 else 0
             for name, rows in (("train", samples[split:]), ("valid", samples[:split])):
                 (folder / "data" / (name + ".jsonl")).write_text(
                     "\n".join(json.dumps(row, ensure_ascii=False) for row in rows) + "\n", encoding="utf-8")
-            state = {"id": identifier, "owner": owner, "status": "queued", "step": 0,
-                     "total": STEPS, "loss": None, "adapterReady": False}
+            prior = []
+            if ENGINE == "peft":
+                for saved in JOBS.glob("*/state.json"):
+                    try:
+                        old = json.loads(saved.read_text(encoding="utf-8"))
+                        if old.get("owner") == owner and old.get("adapterReady") and old.get("status") == "completed":
+                            prior.append((saved.stat().st_mtime, old["id"]))
+                    except (OSError, ValueError):
+                        continue
+            state = {"id": identifier, "owner": owner, "parentId": max(prior)[1] if prior else None, "objective": "observations-next-v1", "status": "queued", "step": 0,
+                     "total": STEPS, "loss": None, "adapterReady": False, "validation": "not evaluated" if ENGINE == "peft" else "held-out"}
             save_state(folder, state)
             PROCESSES[identifier] = None
             STATES[identifier] = state
@@ -207,7 +226,7 @@ class TrainingHandler(BaseHTTPRequestHandler):
             self.reply(202, {"id": identifier, "status": "queued"})
 
     def log_message(self, format, *args):
-        """Do not write requests containing diary data to the shared log."""
+        """Не записывать запросы с личными данными в общий журнал."""
         pass
 
 

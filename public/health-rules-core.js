@@ -117,6 +117,7 @@
     if(!plain(value)||Object.keys(value).length!==3||Object.keys(value).some(key=>!['status','alerts','summary'].includes(key))||!order.includes(value.status)||typeof value.summary!=='string'||!value.summary.trim()||value.summary.length>4000||!Array.isArray(value.alerts)||value.alerts.length>16)return null;
     const alerts=[];
     for(const alert of value.alerts){
+      if(typeof alert==='string'&&/^(?:mission[ _-]?time|provenance|is_demo|direct_sensor_connection)\s*:/i.test(alert.trim())||plain(alert)&&/^(?:mission[ _-]?time|provenance|is_demo|direct_sensor_connection)$/i.test(String(alert.parameter||'').trim()))continue;
       if(typeof alert==='string'){if(!alert.trim()||alert.length>2000)return null;alerts.push(alert.trim());continue;}
       if(!plain(alert)||Object.keys(alert).length!==5||Object.keys(alert).some(key=>!['parameter','value','severity','note','trend'].includes(key))||['parameter','severity','note','trend'].some(key=>typeof alert[key]!=='string'||!alert[key].trim()||alert[key].length>2000)||!['info','moderate','severe'].includes(alert.severity))return null;
       if(!(alert.value===null||typeof alert.value==='number'&&Number.isFinite(alert.value)||typeof alert.value==='string'&&alert.value.trim()&&alert.value.length<=2000))return null;

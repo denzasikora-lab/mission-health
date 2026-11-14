@@ -17,6 +17,7 @@ async function bookRoute(request,env,user,profile,action,url){
         const observation=await mediaBookObservation(env,user,row);
         if(observation){entry.observation=observation;entry.references=[{type:'media',id:row.id,kind:observation.kind,duration:observation.duration,createdAt:row.created_at}];}
       }
+      if(row.assistant_source==='preflight:v1'){entry.preflight=true;const ref=JSON.parse(row.references_json||'[]').find(item=>item.type==='preflight'&&item.synthetic===true);if(ref?.observation?.mediaUrl==='/assets/archive/preflight-checkin.mp3')entry.observation=ref.observation;}
       return entry;
     }));
     return json({entries,total:count.total,hasMore:results.length>24,cursor:last?JSON.stringify([last.created_at,last.id]):null});

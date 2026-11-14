@@ -127,7 +127,7 @@ async function languageModelAnswer(env,query){
   const answer=await completeLanguageMessages(env,messages);return {...answer,text:readableHealthAnswer(answer.text)};
 }
 function readableHealthAnswer(text){
-  let value;try{value=JSON.parse(text.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,''));}catch{return text;}
+  let value;try{value=JSON.parse(text.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,''));}catch{return text.replace(/\*\*/g,'');}
   if(!value||Array.isArray(value)||!['NORMAL','ATTENTION','CRITICAL'].includes(value.status)||typeof value.summary!=='string'||!value.summary.trim()||!Array.isArray(value.alerts)||Object.keys(value).some(key=>!['status','alerts','summary'].includes(key)))return text;
   const alerts=[];
   for(const alert of value.alerts){
@@ -136,7 +136,7 @@ function readableHealthAnswer(text){
     const displayValue=alert.value===null?'No signal':typeof alert.value==='number'?String(alert.value):alert.value;
     alerts.push([alert.parameter,displayValue,alert.severity,alert.note,alert.trend].filter(Boolean).join(' / '));
   }
-  return value.summary.trim()+'\n\nStatus: '+value.status+(alerts.length?'\nAlerts:\n'+alerts.map(alert=>'- '+alert).join('\n'):'');
+  return (value.summary.trim()+'\n\nStatus: '+value.status+(alerts.length?'\nAlerts:\n'+alerts.map(alert=>'- '+alert).join('\n'):'')).replace(/\*\*/g,'');
 }
 function responsesInput(messages){
   return messages.map(message=>{
@@ -245,7 +245,8 @@ const missionHandler={
       if(request.method!=='GET'&&((request.headers.get('origin')&&request.headers.get('origin')!==url.origin)||request.headers.get('sec-fetch-site')==='cross-site'))fail('forbidden',403);
       if(url.pathname==='/api/readings')return await readingsRoute(request,env,user);
       const healthMatch=url.pathname.match(/^\/api\/health-analysis(?:\/([a-f0-9-]{36}))?$/i);if(healthMatch)return await healthAnalysisRoute(request,env,user,healthMatch[1]);
-      if(url.pathname==='/api/media-analysis')return await mediaAnalysisRoute(request,env,user);
+      if(url.pathname==='/api/preflight')return await preflightRoute(request,env,user,ctx);
+      if(url.pathname==='/api/media-analysis'){const response=await mediaAnalysisRoute(request,env,user);if(request.method==='POST'&&(response.ok||response.status===503))ctx.waitUntil(syncPending(env,user,'personal'));return response;}
       const mediaFileMatch=url.pathname.match(/^\/api\/media-analysis\/([a-f0-9-]{36})\/media$/i);if(mediaFileMatch)return await mediaAnalysisFileRoute(request,env,user,mediaFileMatch[1]);
       if(url.pathname==='/api/transcriptions/config')return await speechRoute(request,env,true);
       if(url.pathname==='/api/transcriptions')return await speechRoute(request,env);

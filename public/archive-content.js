@@ -51,7 +51,7 @@
   function readableText(value){
     const text=plain(value);let result='',at=0;
     while(at<text.length){const char=text[at],parsed=(char==='{'||char==='[')&&jsonAt(text,at);if(parsed){result+=dataText(parsed.value);at=parsed.end;}else{result+=char;at++;}}
-    return result;
+    return result.replace(/\*\*/g,'').replace(/No signal/g,'Awaiting reading');
   }
   function legacy(entry){
     const text=String(entry?.content||'');if(!/^(Video|Audio)\s*(observation|recording)/.test(text))return null;
@@ -75,7 +75,7 @@
     if(value.kind==='video'&&!compact){blocks.push('Apparent age\n'+ageLines(value.features?.apparentAge).join('\n'));blocks.push('Spots and pigmentation\n'+skinLines(value.features?.skin).join('\n'));const face=value.features?.faceComparison;if(face?.method==='face-session-v1')blocks.push('Face comparison\n'+(finite(face.cosine)?'Cosine similarity: '+number(face.cosine,3):face.status==='first_session'?'First face recording saved':'Capture conditions need matching')+(face.reference?'\nPrevious recording: '+stamp(face.reference.at):'')+(face.values?.underEye?.valid?'\nUnder-eye contrast change: '+number(face.values.underEye.delta)+' L*':''));}
     return blocks.join('\n\n');
   }
-  function latest(entries){const result={};for(const entry of [...entries].filter(item=>!item.archiveSample&&!item.archiveCurrent).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)))){const value=observation(entry);if(value&&!result[value.kind])result[value.kind]={entry,value};}return result;}
+  function latest(entries){const result={};for(const entry of [...entries].filter(item=>!item.archiveSample&&!item.archiveCurrent&&!item.preflight).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)))){const value=observation(entry);if(value&&!result[value.kind])result[value.kind]={entry,value};}return result;}
   function missing(value){return !value||/^(?:-|No |Need|Insufficient|Undetermined)/.test(value);}
   function captureVisual(document,entries=[]){
     const saved=latest(entries).video?.value?.features||{},nodes=Array.from(document.querySelectorAll('#appearance-metrics .appearance-metric'));

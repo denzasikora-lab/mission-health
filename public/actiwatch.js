@@ -7,7 +7,7 @@
   const get=id=>document.getElementById(id),previewStatus=get('actiwatch-preview-status'),save=get('actiwatch-save');
   let latest=null,recording=null,draft=null,raw='',filename='',busy=false,loadVersion=0,fileVersion=0,importId=null,loading=false,refreshFailed=false,suspended=false,scopeVersion=0,loadController=null,saveController=null;
   const owner=()=>window.missionProfileName?.identity?.storageScope||null;let scope=owner();
-  const sourceStatus=make('p','actiwatch-source-note');sourceStatus.setAttribute('role','status');sourceStatus.style.fontSize='.65rem';sourceStatus.style.color='var(--muted)';bodyPanel.append(sourceStatus);
+  const sourceStatus=make('p','actiwatch-source-note');sourceStatus.setAttribute('role','status');sourceStatus.style.fontSize='.65rem';sourceStatus.style.color='var(--muted)';dialog.append(sourceStatus);
   const fmt=value=>value===null?'-':new Intl.NumberFormat('en',{maximumFractionDigits:1,useGrouping:false}).format(value);
   const duration=seconds=>{if(seconds===null)return '-';const minutes=Math.round(seconds/60);return Math.floor(minutes/60)+' h '+minutes%60+' min';};
   const date=value=>new Intl.DateTimeFormat('en',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'UTC'}).format(new Date(value))+' UTC';

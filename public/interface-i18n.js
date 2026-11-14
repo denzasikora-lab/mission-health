@@ -10,7 +10,7 @@
     'Refresh history':'گفتگو تازہ کریں','Message text':'پیغام کا متن','Message files':'پیغام کی فائلیں',
     'Earlier entries':'پرانے اندراجات','Retry request answer':'جواب کے لیے دوبارہ کوشش کریں',
     'Add to favorites':'پسندیدہ میں شامل کریں','Remove from favorites':'پسندیدہ سے نکالیں',
-    'My readings':'میری پیمائشیں','FILL SAMPLE':'نمونہ بھریں','Generate fictional sample readings':'نمونے کے فرضی اعداد بنائیں','Clear generated sample':'بنایا ہوا نمونہ ہٹائیں','Generated sample':'بنایا ہوا نمونہ','Pulse':'نبض','Skin temperature':'جلد کا درجہ حرارت','Wellbeing':'کیفیت','Sleep':'نیند',
+    'LOAD READINGS':'پیمائشیں لوڈ کریں','Load saved readings and imported device data':'محفوظ پیمائشیں اور آلے کا درآمد شدہ ڈیٹا لوڈ کریں','My readings':'میری پیمائشیں','PREFLIGHT RUN':'مثالی ڈیٹا','Load clearly labeled example readings':'واضح طور پر نشان زد مثالی پیمائشیں لوڈ کریں','Clear generated sample':'بنایا ہوا نمونہ ہٹائیں','Generated sample':'بنایا ہوا نمونہ','Preflight data':'ابتدائی آزمائشی ڈیٹا','Pulse':'نبض','Skin temperature':'جلد کا درجہ حرارت','Wellbeing':'کیفیت','Sleep':'نیند',
     'HRV':'دل کی دھڑکن کے وقفوں میں فرق','Respiration':'سانس کی رفتار','Blood pressure':'فشار خون','Recovery':'بحالی',
     'Steps':'قدم','Movement':'حرکت','Illuminance':'روشنی کی شدت','Calculated index':'حسابی اشاریہ',
     'Select a score below':'نیچے اسکور منتخب کریں','No measurements':'کوئی پیمائش موجود نہیں','Your self-report':'آپ کی بتائی گئی کیفیت','Wellbeing scale':'کیفیت کا پیمانہ',
@@ -53,7 +53,7 @@
   add('.brand',['Home / Mission Health'],'aria-label');
   add('#book-search-open',['Search archive']);
   add('.home-body-panel > header > h2',['My readings']);
-  add('.home-sample-button',['FILL SAMPLE']);add('.home-sample-button',['Generate fictional sample readings'],'title');
+  add('.home-example-button',['PREFLIGHT RUN']);add('.home-example-button',['Load clearly labeled example readings'],'title');add('.home-sample-button',['LOAD READINGS']);add('.home-sample-button',['Load saved readings and imported device data'],'title');
   add('.home-sample-clear',['Clear generated sample'],'aria-label');add('.home-sample-clear',['Clear generated sample'],'title');
   add('.home-vitals',['My readings'],'aria-label');
   add('.home-vital > span:first-child',['Pulse','Skin temperature','Wellbeing','Sleep','HRV','Respiration','Blood pressure','Recovery','Steps','Movement','Illuminance']);

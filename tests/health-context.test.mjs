@@ -9,7 +9,7 @@ const clone=value=>JSON.parse(JSON.stringify(value)),now=Date.parse('2026-11-14T
 const trendSource=await readFile(new URL('public/home-trends.js',root),'utf8');
 class Clock extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
 class Node{
-  constructor(tag='div'){this.tagName=tag;this.children=[];this.dataset={};this.attributes={};this.events={};this.className='';this.parentElement=null;this.hidden=false;this.disabled=false;this.open=false;this._text='';this.htmlWrites=0;this.classList={add:(...values)=>{this.className=[...new Set([...this.className.split(' ').filter(Boolean),...values])].join(' ');},toggle:(value,on)=>{const names=new Set(this.className.split(' ').filter(Boolean));if(on===undefined? !names.has(value):on)names.add(value);else names.delete(value);this.className=[...names].join(' ');}};}
+  constructor(tag='div'){this.tagName=tag;this.children=[];this.dataset={};this.attributes={};this.style={};this.events={};this.className='';this.parentElement=null;this.hidden=false;this.disabled=false;this.open=false;this._text='';this.htmlWrites=0;this.classList={add:(...values)=>{this.className=[...new Set([...this.className.split(' ').filter(Boolean),...values])].join(' ');},toggle:(value,on)=>{const names=new Set(this.className.split(' ').filter(Boolean));if(on===undefined? !names.has(value):on)names.add(value);else names.delete(value);this.className=[...names].join(' ');}};}
   set textContent(value){this._text=String(value);this.children=[];}
   get textContent(){return this._text+this.children.map(node=>node.textContent).join('');}
   set innerHTML(value){this.htmlWrites++;this._html=value;this.children=[];if(value.includes('home-body-panel')){const panel=new Node('section'),header=new Node('header'),vitals=new Node('div'),checkin=new Node('section');panel.className='home-body-panel panel glass';vitals.className='home-vitals';checkin.className='home-checkin';panel.append(header,vitals);this.append(panel,checkin);}}
@@ -82,9 +82,9 @@ test('Only actual watch imports are displayed and their ID resolves authoritativ
 
 test('Explicit sample generation fills every card with valid fictional values without changing saved readings',()=>{
   const f=homeFixture(),actual=manualSnapshot();f.readings(actual);f.report({score:83,wellbeingScale:100});f.watch({id:importId,source:'actiwatch',summary:{end:new Clock().toISOString(),latest24h:{sleepSeconds:28800,activityCounts:99999,meanLightLux:1000}}});
-  const original=clone(f.api.snapshot());f.scope.journalApi=()=>{throw new Error('Sample generation must stay local');};vm.runInNewContext(coreSource,f.scope);
+  const original=clone(f.api.snapshot());f.scope.journalApi=async path=>{assert.equal(path,'/api/preflight');return {saved:true};};vm.runInNewContext(coreSource,f.scope);
   for(const random of [0,.5,1]){
-    f.scope.Math=Object.create(Math);f.scope.Math.random=()=>random;f.home.querySelector('.home-sample-button').emit('click');const value=clone(f.api.snapshot()),normalized=f.scope.MissionHealthRules.normalize(value);
+    f.scope.Math=Object.create(Math);f.scope.Math.random=()=>random;f.home.querySelector('.home-example-button').emit('click');const value=clone(f.api.snapshot()),normalized=f.scope.MissionHealthRules.normalize(value);
     assert.equal(Object.keys(normalized.readings).length,16);assert.equal(value.actiwatchImportId,null);assert.equal(f.api.sampleActive(),true);assert.equal(f.scope.MissionHealthRules.evaluate(value).isDemo,true);
     for(const reading of Object.values(value.readings)){assert.ok(Number.isFinite(reading.value));assert.equal(reading.source,'demo');assert.equal(reading.observedAt,null);}
     assert.ok(value.readings.bp_systolic.value>value.readings.bp_diastolic.value);assert.ok(value.readings.skin_temperature.value<value.readings.body_temperature.value);assert.ok(value.readings.spo2.value>=95);assert.ok(value.readings.sleep_hours.value<=9);
@@ -94,7 +94,7 @@ test('Explicit sample generation fills every card with valid fictional values wi
 });
 
 test('Cards, analysis snapshots and sample chart endpoints use one time-dependent model without changing its anchor',()=>{
-  const f=homeFixture(),original=manualSnapshot(),trendScope={document:{getElementById:()=>null},Date:Clock};vm.runInNewContext(trendSource,trendScope);f.scope.MissionHomeTrendData=trendScope.MissionHomeTrendData;f.readings(original);f.home.querySelector('.home-sample-button').emit('click');const base=clone(f.api.sampleBase()),at=now+37000;
+  const f=homeFixture(),original=manualSnapshot(),trendScope={document:{getElementById:()=>null},Date:Clock};vm.runInNewContext(trendSource,trendScope);f.scope.MissionHomeTrendData=trendScope.MissionHomeTrendData;f.readings(original);f.home.querySelector('.home-example-button').emit('click');const base=clone(f.api.sampleBase()),at=now+37000;
   class LaterClock extends Date{constructor(...args){super(...(args.length?args:[at]));}static now(){return at;}}
   f.scope.Date=LaterClock;f.api.renderValues();const snapshot=clone(f.api.snapshot());assert.equal(snapshot.capturedAt,new LaterClock().toISOString());
   for(const [key,config]of Object.entries(trendScope.MissionHomeTrendData.metrics)){const value=snapshot.readings[config.reading].value;assert.equal(f.home.querySelector('[data-home-metric='+key+']').dataset.readingValue,String(value));for(const period of trendScope.MissionHomeTrendData.periods)assert.equal(trendScope.MissionHomeTrendData.sampleHistory(key,base,period,at).at(-1).value,value);}
@@ -102,23 +102,23 @@ test('Cards, analysis snapshots and sample chart endpoints use one time-dependen
 });
 
 test('Repeated generation changes the sample while unchanged polling and layout updates preserve it',()=>{
-  const f=homeFixture(),actual=manualSnapshot();f.scope.missionProfileName={identity:{storageScope:'owner-a'}};f.readings(actual);f.scope.Math=Object.create(Math);f.scope.Math.random=()=>0;f.home.querySelector('.home-sample-button').emit('click');const first=clone(f.api.snapshot());
-  f.scope.Math.random=()=>1;f.home.querySelector('.home-sample-button').emit('click');const second=clone(f.api.snapshot());assert.notDeepEqual(second.readings,first.readings);
+  const f=homeFixture(),actual=manualSnapshot();f.scope.missionProfileName={identity:{storageScope:'owner-a'}};f.readings(actual);f.scope.Math=Object.create(Math);f.scope.Math.random=()=>0;f.home.querySelector('.home-example-button').emit('click');const first=clone(f.api.snapshot());
+  f.scope.Math.random=()=>1;f.home.querySelector('.home-example-button').emit('click');const second=clone(f.api.snapshot());assert.notDeepEqual(second.readings,first.readings);
   f.readings(actual);for(const type of ['mission-wellbeing-change','mission-actiwatch-change','mission-profile-change'])f.scope.dispatchEvent(new Event(type));assert.deepEqual(clone(f.api.snapshot()),second);assert.equal(f.api.sampleActive(),true);
   actual.readings.heart_rate.value=101;f.readings(actual);assert.equal(f.api.sampleActive(),false);assert.equal(f.api.snapshot().readings.heart_rate.value,101);
-  f.home.querySelector('.home-sample-button').emit('click');f.scope.missionProfileName.identity={storageScope:'owner-b'};assert.equal(f.api.sampleActive(),false);f.scope.dispatchEvent(new Event('mission-profile-change'));assert.equal(f.home.querySelector('.home-sample-clear').hidden,true);
+  f.home.querySelector('.home-example-button').emit('click');f.scope.missionProfileName.identity={storageScope:'owner-b'};assert.equal(f.api.sampleActive(),false);f.scope.dispatchEvent(new Event('mission-profile-change'));assert.equal(f.home.querySelector('.home-sample-clear').hidden,true);
 });
 test('An initial profile connection keeps an already generated sample without moving the check-in',()=>{
-  const f=homeFixture(),checkin=f.home.querySelector('.home-checkin');f.home.querySelector('.home-sample-button').emit('click');const original=clone(f.api.sampleBase());f.scope.missionProfileName={identity:{storageScope:'owner-a'}};f.scope.dispatchEvent(new Event('mission-profile-change'));assert.equal(f.api.sampleActive(),true);assert.deepEqual(clone(f.api.sampleBase()),original);assert.equal(f.home.querySelector('.home-checkin'),checkin);
+  const f=homeFixture(),checkin=f.home.querySelector('.home-checkin');f.home.querySelector('.home-example-button').emit('click');const original=clone(f.api.sampleBase());f.scope.missionProfileName={identity:{storageScope:'owner-a'}};f.scope.dispatchEvent(new Event('mission-profile-change'));assert.equal(f.api.sampleActive(),true);assert.deepEqual(clone(f.api.sampleBase()),original);assert.equal(f.home.querySelector('.home-checkin'),checkin);
 });
 
 test('A check-in preserves the generated layout and actual watch imports restore measured values',()=>{
-  const f=homeFixture();f.home.querySelector('.home-sample-button').emit('click');f.report({score:81,wellbeingScale:100});const before=clone(f.api.snapshot());f.scope.dispatchEvent(new Event('mission-wellbeing-change'));assert.equal(f.api.sampleActive(),true);assert.deepEqual(clone(f.api.snapshot()),before);f.home.querySelector('.home-sample-clear').emit('click');assert.equal(f.api.snapshot().readings.wellbeing.value,81);assert.equal(f.api.snapshot().readings.wellbeing.source,'manual');
-  f.home.querySelector('.home-sample-button').emit('click');f.watch({id:importId,source:'actiwatch',summary:{end:new Clock().toISOString(),latest24h:{sleepSeconds:28800,activityCounts:99999,meanLightLux:1000}}});f.scope.dispatchEvent(new Event('mission-actiwatch-change'));assert.equal(f.api.sampleActive(),false);assert.equal(f.api.snapshot().actiwatchImportId,importId);assert.equal(f.api.model().readings.activity.value,99999);
+  const f=homeFixture();f.home.querySelector('.home-example-button').emit('click');f.report({score:81,wellbeingScale:100});const before=clone(f.api.snapshot());f.scope.dispatchEvent(new Event('mission-wellbeing-change'));assert.equal(f.api.sampleActive(),true);assert.deepEqual(clone(f.api.snapshot()),before);f.home.querySelector('.home-sample-clear').emit('click');assert.equal(f.api.snapshot().readings.wellbeing.value,81);assert.equal(f.api.snapshot().readings.wellbeing.source,'manual');
+  f.home.querySelector('.home-example-button').emit('click');f.watch({id:importId,source:'actiwatch',summary:{end:new Clock().toISOString(),latest24h:{sleepSeconds:28800,activityCounts:99999,meanLightLux:1000}}});f.scope.dispatchEvent(new Event('mission-actiwatch-change'));assert.equal(f.api.sampleActive(),false);assert.equal(f.api.snapshot().actiwatchImportId,importId);assert.equal(f.api.model().readings.activity.value,99999);
 });
 
 test('The initial UI shows provided readings and Incomplete, makes only a GET and never starts automatic AI analysis',async()=>{
-  const f=uiFixture();await flush();assert.equal(f.get('health-analysis-status').textContent,'Incomplete');assert.equal(f.get('health-analysis-scope').textContent,'Provided readings');assert.match(f.get('health-analysis-summary').textContent,/Skin temperature is kept separate/);assert.equal(f.calls.length,1);assert.equal(f.calls[0].method,undefined);assert.equal(f.calls[0].path,'/api/health-analysis');assert.equal(f.api.snapshot().readings.body_temperature,null);
+  const f=uiFixture();await flush();assert.equal(f.get('health-analysis-status').textContent,'Incomplete');assert.equal(f.get('health-analysis-scope').textContent,'Provided readings');assert.match(f.get('health-analysis-summary').textContent,/Review available readings/);assert.equal(f.calls.length,1);assert.equal(f.calls[0].method,undefined);assert.equal(f.calls[0].path,'/api/health-analysis');assert.equal(f.api.snapshot().readings.body_temperature,null);
   for(const type of ['mission-wellbeing-change','mission-readings-change','mission-actiwatch-change'])f.scope.dispatchEvent(new Event(type));await flush();assert.equal(f.calls.length,1);assert.match(f.get('health-analysis-meta').textContent,/no AI request/);
 });
 
@@ -229,7 +229,7 @@ test('A saved NORMAL analysis expires at the actual observation deadline without
 });
 test('Returning to a visible page recomputes stale local rules after suspended timers',async()=>{
   let time=now;class DynamicClock extends Date{constructor(...args){super(...(args.length?args:[time]));}static now(){return time;}}
-  const f=uiFixture(undefined,DynamicClock);await flush();const snapshot={profileId:'personal',capturedAt:new Clock().toISOString(),readings:{heart_rate:{value:72,unit:'bpm',source:'manual',observedAt:new Clock().toISOString()},spo2:{value:98,unit:'%',source:'manual',observedAt:new Clock().toISOString()},body_temperature:{value:36.8,unit:'C',source:'manual',observedAt:new Clock().toISOString()}}};f.setSnapshot(snapshot);f.scope.dispatchEvent(new Event('mission-readings-change'));assert.equal(f.get('health-analysis-status').textContent,'NORMAL');f.scope.dispatchEvent(new Event('pagehide'));assert.equal(f.timers.size,0);time=now+901000;f.document.hidden=false;f.document.dispatchEvent(new Event('visibilitychange'));assert.equal(f.get('health-analysis-status').textContent,'Incomplete');assert.match(f.get('health-analysis-details').textContent,/Older readings/);assert.equal(f.calls.filter(call=>call.method==='POST').length,0);
+  const f=uiFixture(undefined,DynamicClock);await flush();const snapshot={profileId:'personal',capturedAt:new Clock().toISOString(),readings:{heart_rate:{value:72,unit:'bpm',source:'manual',observedAt:new Clock().toISOString()},spo2:{value:98,unit:'%',source:'manual',observedAt:new Clock().toISOString()},body_temperature:{value:36.8,unit:'C',source:'manual',observedAt:new Clock().toISOString()}}};f.setSnapshot(snapshot);f.scope.dispatchEvent(new Event('mission-readings-change'));assert.equal(f.get('health-analysis-status').textContent,'NORMAL');f.scope.dispatchEvent(new Event('pagehide'));assert.equal(f.timers.size,0);time=now+901000;f.document.hidden=false;f.document.dispatchEvent(new Event('visibilitychange'));assert.equal(f.get('health-analysis-status').textContent,'Incomplete');assert.doesNotMatch(f.get('health-analysis-details').textContent,/Older readings|Missing:/);assert.equal(f.calls.filter(call=>call.method==='POST').length,0);
 });
 test('Changing owners clears score, pending chat and drafts before the new owner sends anything',async()=>{
   const f=chatFixture();f.api.choose(67);const old=f.api.store('chat');old.draft='Private owner A text';old.files=[{id:importId}];old.pending={id:importId,content:old.draft,wellbeing:{score:67,wellbeingScale:100}};f.scope.missionProfileName.identity={storageScope:'owner-b'};assert.equal(f.api.currentReport(),null);await f.api.send('chat');assert.equal(f.calls.length,0);f.api.profileChanged();const next=f.api.store('chat');assert.notEqual(next,old);assert.equal(next.draft,'');assert.equal(next.pending,null);assert.deepEqual(clone(next.files),[]);assert.equal(f.api.currentReport(),null);f.api.choose(22);next.draft='Owner B text';await f.api.send('chat');assert.deepEqual(clone(f.calls.at(-1).body.wellbeing),{score:22,wellbeingScale:100});assert.notEqual(f.calls.at(-1).body.id,importId);assert.equal(f.storage.has('mission-checkin:owner-a:personal'),true);assert.equal(f.storage.has('mission-checkin:owner-b:personal'),true);f.setOwner('owner-a');assert.deepEqual(clone(f.api.currentReport()),{score:67,wellbeingScale:100});
@@ -254,7 +254,7 @@ test('Legacy example analyses stay in history and cannot become the current pers
 });
 
 test('An explicitly generated sample can be analyzed with its fictional provenance intact',async()=>{
-  const home=homeFixture();home.home.querySelector('.home-sample-button').emit('click');const f=uiFixture();await flush();f.scope.missionHome.sampleActive=()=>true;f.setSnapshot(home.api.snapshot());f.scope.dispatchEvent(new Event('mission-sample-change'));assert.equal(f.get('health-analysis-scope').textContent,'Example');assert.equal(f.calls.filter(call=>call.method==='POST').length,0);
+  const home=homeFixture();home.home.querySelector('.home-example-button').emit('click');const f=uiFixture();await flush();f.scope.missionHome.sampleActive=()=>true;f.setSnapshot(home.api.snapshot());f.scope.dispatchEvent(new Event('mission-sample-change'));assert.equal(f.get('health-analysis-scope').textContent,'Example');assert.equal(f.calls.filter(call=>call.method==='POST').length,0);
   f.handler(call=>f.analysis(call.body,{status:'NORMAL',summary:'Generated sample result'}));await f.api.analyze();const sent=f.calls.at(-1).body;assert.equal(Object.keys(sent.snapshot.readings).length,16);assert.ok(Object.values(sent.snapshot.readings).every(reading=>reading.source==='demo'&&reading.observedAt===null));assert.equal(f.get('health-analysis-summary').textContent,'Generated sample result');assert.equal(f.get('health-analysis-scope').textContent,'Example');assert.equal(f.get('health-analysis-button').textContent,'Analyze');assert.match(f.get('health-analysis-meta').textContent,/AI \+ rules/);
 });
 
@@ -284,4 +284,22 @@ test('An identity mismatch cannot send or copy the previous owner draft while aw
 });
 test('Retrying an old chat answer without identity gives connection feedback instead of silently returning',async()=>{
   const f=chatFixture(null),view=f.addView();await f.api.retryChat({id:importId,content:'Saved request'});assert.equal(f.calls.length,0);assert.match(view.status.textContent,/Connection unavailable/);assert.match(view.status.textContent,/Retry beside your name/);
+});
+
+test('A personal check-in leaves every unchanged sensor card and its content attached',()=>{
+  const f=homeFixture();f.readings(manualSnapshot());const sensor=f.home.querySelector('[data-home-metric=hr]'),number=sensor.querySelector('strong'),unit=number.children[0];
+  f.report({score:77,wellbeingScale:100});f.scope.dispatchEvent(new Event('mission-wellbeing-change'));assert.equal(sensor.querySelector('strong'),number);assert.equal(number.children[0],unit);
+});
+test('Load readings refreshes real stores without generating replacement values',async()=>{
+  const f=homeFixture(),original=manualSnapshot();f.readings(original);const calls=[];f.scope.missionReadings.refresh=async()=>calls.push('readings');f.scope.missionActiwatch.refresh=async()=>calls.push('watch');
+  f.home.querySelector('.home-sample-button').emit('click');await flush();assert.deepEqual(calls,['readings','watch']);assert.equal(f.api.sampleActive(),false);assert.deepEqual(clone(f.api.snapshot()).readings,original.readings);assert.equal(f.home.querySelector('.home-sample-button').disabled,false);
+});
+
+test('MARS is mounted below readings and excludes late media from a previous owner',async()=>{
+  const f=homeFixture(),footer=new Node(),originalQuery=f.document.querySelector,originalId=f.document.getElementById,pending=[];f.document.getElementById=id=>id==='mission-home'?f.home:originalId(id);f.document.querySelector=selector=>selector==='.site-footer'?footer:originalQuery(selector);
+  f.scope.missionProfileName={identity:{storageScope:'owner-a'}};f.scope.AbortSignal=AbortSignal;f.scope.journalApi=()=>new Promise(resolve=>pending.push(resolve));f.readings(manualSnapshot());
+  vm.runInNewContext(await readFile(new URL('public/mars-core.js',root),'utf8'),f.scope);vm.runInNewContext(await readFile(new URL('public/mars.js',root),'utf8'),f.scope);
+  assert.equal(f.home.querySelector('.mars-definition-link').href,'#mars-definition');assert.ok(f.home.querySelector('.mars-individual').textContent.startsWith('Individual Score: '));assert.ok(f.scope.missionMARS.current().coverage>0);
+  f.scope.missionProfileName.identity.storageScope='owner-b';f.scope.dispatchEvent(new Event('mission-profile-change'));pending[0]({items:[{kind:'audio',createdAt:new Clock().toISOString(),features:{acoustic:{seconds:5,level:-24,quiet:.2,clipping:0}}}]});await flush();assert.equal(f.scope.missionMARS.current().mediaCount,0);pending[1]({items:[]});await flush();assert.equal(f.scope.missionMARS.current().mediaCount,0);
+  const report=f.home.querySelector('.mars-report');report.open=true;report.emit('toggle');assert.equal(report.querySelector('.mars-groups').children.length,5);assert.ok(footer.children.some(node=>node.id==='mars-definition'));
 });

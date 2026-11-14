@@ -36,7 +36,7 @@
     const article=create('article','book-page');
     const display=page?.presentation,extra=page?.entry.archiveSample||page?.entry.archiveCurrent;
     if(display?.structured)article.classList.add('book-page-structured');
-    article.append(create('div','book-page-running',page?.entry.archiveSample?'PRELOADED RECORDING / TECHNICAL SAMPLE':page?.entry.archiveCurrent?'MISSION HEALTH / CURRENT RESULTS':B.demo?'SAMPLE / FICTIONAL ENTRY':'MISSION HEALTH / PERSONAL ARCHIVE'));
+    article.append(create('div','book-page-running',page?.entry.preflight?'PREFLIGHT / SIMULATED RECORD':page?.entry.archiveSample?'PRELOADED RECORDING / TECHNICAL SAMPLE':page?.entry.archiveCurrent?'MISSION HEALTH / CURRENT RESULTS':B.demo?'SAMPLE / FICTIONAL ENTRY':'MISSION HEALTH / PERSONAL ARCHIVE'));
     if(page){
       const date=create('time','book-page-date',stamp(page.entry.createdAt));date.dateTime=page.entry.createdAt;article.append(date);
       const lines=page.content.split('\n'),hasHeading=!page.part&&lines.length>1&&lines[0].trim().length>0&&lines[0].length<=72;
@@ -51,7 +51,7 @@
       const body=hasHeading?lines.slice(1).join('\n').trim():page.content;
       const text=create('div','book-page-text');text.dir='auto';if(display?.structured&&window.missionArchiveContent)window.missionArchiveContent.renderText(text,body,create);else text.textContent=body;article.append(text);
       if(!page.part&&!display?.media)for(const media of page.entry.attachments||[]){const node=create(measuring?'div':media.kind==='video'?'video':'img','book-media');if(measuring)node.style.height='210px';else{node.src=media.url;if(media.kind==='video'){node.controls=true;node.playsInline=true;node.preload='metadata';if(media.posterUrl)node.poster=media.posterUrl}else{node.alt=media.region||'Photo from entry';node.loading='lazy'}}article.append(node);}
-      article.append(create('div','book-page-foot',page.entry.archiveSample?'Technical sample / not personal data':page.entry.archiveCurrent?'Personal results / without demonstration readings':'Personal entry / '+(page.part?'continued':'original text')));
+      article.append(create('div','book-page-foot',page.entry.preflight?'Preflight rehearsal / simulated data':page.entry.archiveSample?'Technical sample / not personal data':page.entry.archiveCurrent?'Personal results / without demonstration readings':'Personal entry / '+(page.part?'continued':'original text')));
     }else{
       article.classList.add('book-page-empty');article.append(create('span','book-empty-orbit','✧'),create('h3','',B.pages.length?'Room for a new story':'Your first chapter is ahead'),create('p','',B.pages.length?'Your next observation will appear here.':'Write down, how your day went. The book will preserve your words, and NasaGPT will help you return to them.'));
       const add=create('button','','Write a page');add.type='button';add.addEventListener('click',openEditor);article.append(add);
@@ -120,7 +120,7 @@
     try{
       const data=await journalApi('/api/astronauts/'+id+'/book'+(older?'?cursor='+encodeURIComponent(B.cursor):''));if(version!==B.version||B.demo)return;
       const current=B.pages[B.index],anchor=preferredAnchor||(current?{id:current.entry.id,offset:current.offset}:null),entries=older?[...B.entries,...data.entries.filter(item=>!B.entries.some(old=>old.id===item.id))]:data.entries,extras=await personalExtras(entries);if(version!==B.version||B.demo)return;
-      B.entries=entries;B.samples=extras.samples;B.snapshot=extras.snapshot;B.hasMore=data.hasMore;B.cursor=data.cursor;B.loaded=true;rebuild(older?anchor:null);note(data.total?'Saved personal entries: '+data.total:'Preloaded video and audio are available. No personal entries yet.');
+      B.entries=entries;B.samples=entries.length?[]:extras.samples;B.snapshot=extras.snapshot;B.hasMore=data.hasMore;B.cursor=data.cursor;B.loaded=true;rebuild(older?anchor:null);note(data.total?'Saved personal entries: '+data.total:'Preloaded video and audio are available. No personal entries yet.');
     }catch{if(version===B.version)note('History failed to load. Open the section «Archive» again, to retry.');}
     finally{if(version===B.version){B.loading=false;draw()}}
   }
@@ -166,7 +166,7 @@
     let answer;
     if(items.length&&!B.demo){answer=create('div','book-rag-answer','Building an answer from retrieved entries...');answer.setAttribute('role','status');list.append(answer);}
     for(const entry of items){const display=window.missionArchiveContent?.presentation(entry),content=display?.content||entry.content,card=create('button','book-result');card.type='button';card.append(create('time','',stamp(entry.createdAt)),create('strong','',display?.title||content.split('\n')[0].slice(0,90)),create('span','',content.slice(0,210)),create('small','','Open page ↗'));card.addEventListener('click',()=>void openResult(entry));list.append(card)}
-    if(answer)try{const data=await journalApi('/api/astronauts/'+id+'/book-answer',{method:'POST',signal:controller?.signal,body:JSON.stringify({query,ids:items.map(item=>item.id).slice(0,6)})});if(version===searchVersion&&id===B.profile)answer.textContent='NasaGPT\n\n'+data.answer;}catch{if(version===searchVersion&&id===B.profile)answer.textContent='Recordings found by meaning. Language service response is unavailable; you can open the original pages.';}
+    if(answer)try{const data=await journalApi('/api/astronauts/'+id+'/book-answer',{method:'POST',signal:controller?.signal,body:JSON.stringify({query,ids:items.map(item=>item.id).slice(0,6)})});if(version===searchVersion&&id===B.profile)answer.textContent='NasaGPT\n\n'+String(data.answer).replace(/\*\*/g,'');}catch{if(version===searchVersion&&id===B.profile)answer.textContent='Recordings found by meaning. Language service response is unavailable; you can open the original pages.';}
   }
   $b('book-search-form').addEventListener('submit',async event=>{
     event.preventDefault();if(searching)return;const query=$b('book-query').value.trim();if(!query)return;

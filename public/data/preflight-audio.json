@@ -1,0 +1,13 @@
+{
+  "duration": 9.2035,
+  "features": {
+    "acoustic": {
+      "seconds": 9.2035,
+      "level": -15.806,
+      "quiet": 0.086022,
+      "clipping": 0.0
+    }
+  },
+  "transcript": "Hello crew. I can hear you clearly. How are you feeling today? I slept well and I am ready for our next check in. This is a simulated preflight rehearsal.",
+  "provenance": "Synthetic voice / Samantha / preflight rehearsal"
+}

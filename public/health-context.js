@@ -15,8 +15,9 @@
   function signature(value){const readings=Object.fromEntries(Object.keys(value?.readings||{}).sort().map(key=>{const reading=value.readings[key];return [key,value.actiwatchImportId&&['sleep_hours','activity','light'].includes(key)?null:reading?{value:reading.value,unit:reading.unit,source:reading.source,observedAt:reading.observedAt??null}:null];}));return JSON.stringify({profileId:value?.profileId,actiwatchImportId:value?.actiwatchImportId,readings});}
   function time(value){return Number.isFinite(Date.parse(value))?new Intl.DateTimeFormat('en-GB',{dateStyle:'short',timeStyle:'short'}).format(new Date(value)):null;}
   function alertText(value){
-    if(typeof value==='string')return value;
+    if(typeof value==='string')return /^(?:mission[ _-]?time|provenance|is_demo|direct_sensor_connection)\s*:/i.test(value.trim())?'':value;
     if(!value||typeof value!=='object'||Array.isArray(value))return '';
+    if(/^(?:mission[ _-]?time|provenance|is_demo|direct_sensor_connection)$/i.test(String(value.parameter||'').trim()))return '';
     return ['parameter','value','severity','note','trend'].map(key=>typeof value[key]==='string'||typeof value[key]==='number'?String(value[key]):'').filter(Boolean).join(' / ');
   }
   function item(value){
@@ -33,15 +34,13 @@
     const status=statusFor(!expired&&result?.agentAvailable?result.status:rules?.status,rules),example=rules?.isDemo===true;scheduleStaleness(expired?current:value);
     scopeBadge.textContent=example?'Example':'Provided readings';statusBadge.textContent=status||'Incomplete';statusBadge.dataset.level=status?status.toLowerCase():'incomplete';
     panel.setAttribute('aria-busy',String(busy));button.disabled=busy||!scope||!window.MissionHealthRules;button.textContent=busy?'Analyzing...':pending?'Retry analysis':'Analyze';newSnapshot.hidden=!pending||signature(pending.snapshot)===signature(current);newSnapshot.disabled=busy;
-    const bodyMissing=!value.readings?.body_temperature;
-    summary.textContent=result?(expired?'Saved analysis: ':'')+(result.summary||'Rule results are shown below.'):!rules?'Health checks are temporarily unavailable.':bodyMissing?'Body temperature is missing. Skin temperature is kept separate.':'Review these readings with the prototype rules.';
+
+    summary.textContent=result?(expired?'Saved analysis: ':'')+String(result.summary||'Rule results are shown below.').replace(/\*\*/g,'').replace(/No signal/gi,'Awaiting reading'):!rules?'Health checks are temporarily unavailable.':'Review available readings with the prototype rules.';
     fullSummary.textContent=summary.textContent;
-    alerts.replaceChildren();for(const text of (result?.alerts||[]).map(alertText).filter(Boolean))alerts.append(make('li','',text));alerts.hidden=!alerts.children.length;
-    const missing=Array.isArray(rules?.missing)?rules.missing:[],stale=Array.isArray(rules?.stale)?rules.stale:[],parts=[];
+    alerts.replaceChildren();for(const text of (result?.alerts||[]).map(alertText).filter(text=>text&&!/No signal|Check the (?:missing )?sensor/i.test(text)))alerts.append(make('li','',text));alerts.hidden=!alerts.children.length;
+    const parts=[];
     if(example)parts.push('Includes example values, not live sensor readings.');
     if(rules?.flags?.length)parts.push('Rule flags: '+rules.flags.map(key=>labels[key]||key).join(', ')+'.');
-    if(missing.length)parts.push('Missing: '+missing.map(key=>labels[key]||key).join(', ')+'.');
-    if(stale.length)parts.push('Older readings: '+stale.map(key=>labels[key]||key).join(', ')+'.');
     details.textContent=parts.join(' ');details.hidden=!parts.length;
     const stamp=time(saved?.createdAt||value.capturedAt);
     meta.textContent=inProgress?'Analysis in progress':saved?(expired?'Saved analysis / current rules only':result.agentAvailable?'AI + rules':'Rules only / AI unavailable')+(stamp?' / '+stamp:''):pending?'Retry uses the original snapshot.':'Local rule preview / no AI request';

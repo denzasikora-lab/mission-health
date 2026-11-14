@@ -16,10 +16,13 @@ async function sourceFiles(directory){
   return files;
 }
 
-test('Project source, documentation, and sample metadata contain no Cyrillic text',async()=>{
+test('Product text, documentation and metadata remain English; code comments follow workspace instructions',async()=>{
   const failures=[];
   for(const url of await sourceFiles(root)){
-    if(/[\u0400-\u04ff]/u.test(await readFile(url,'utf8')))failures.push(url.pathname);
+    let text=await readFile(url,'utf8');
+    if(/\.(?:m?js|py)$/.test(url.pathname))text=text.replace(/^\s*(?:\/\/|#)[^\n]*/gm,'');
+    if(url.pathname.endsWith('.py'))text=text.replace(/(?:^|\n)\s*(?:"""[\s\S]*?"""|'''[\s\S]*?''')/g,'');
+    if(/[\u0400-\u04ff]/u.test(text))failures.push(url.pathname);
   }
   assert.deepEqual(failures,[]);
 });

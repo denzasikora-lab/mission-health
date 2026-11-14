@@ -27,11 +27,11 @@
     const reduced=matchMedia('(prefers-reduced-motion: reduce)');let previous=input.value,tags=[],typingTimer,finishTimer,active=false,queue=[],effectIndex=0,composing=false,deleted=false;
     const animations=new Set();
     const animate=(node,frames,options)=>{if(!node.animate||reduced.matches)return;const animation=node.animate(frames,options);animations.add(animation);animation.finished.then(()=>animations.delete(animation),()=>animations.delete(animation));return animation;};
-    function finish(){clearTimeout(finishTimer);for(const animation of animations)animation.cancel();animations.clear();fx.replaceChildren();active=false;delete section.dataset.effect;if(queue.length)play(queue.shift());}
-    function play(ghosts){
+    function finish(){clearTimeout(finishTimer);for(const animation of animations)animation.cancel();animations.clear();fx.replaceChildren();active=false;delete section.dataset.effect;if(queue.length)play(queue.shift());else if(!tags.length){section.hidden=true;zone.style.minHeight='';}}
+    function play(ghosts,clearing=false){
       if(reduced.matches||!ghosts.length)return;
       if(active){if(queue.length)queue[0]=[...queue[0],...ghosts].slice(-12);else queue.push(ghosts);return;}
-      active=true;const type=effectIndex++%2===0?'black-hole':'snap';section.dataset.effect=type;section.dataset.lastEffect=type;
+      active=true;const type=clearing||effectIndex++%2===0?'black-hole':'snap';section.dataset.effect=type;section.dataset.lastEffect=type;
       const bounds=zone.getBoundingClientRect(),center={x:bounds.width-68,y:Math.min(bounds.height/2,50)};
       const scene=document.createElement('div');scene.className='story-tag-scene';scene.style.left=(center.x-90+3)+'px';scene.style.top=(center.y-60+8)+'px';scene.innerHTML=type==='black-hole'?blackHole():gauntlet();fx.append(scene);
       animate(scene,[{opacity:0,transform:'scale(.35)'},{opacity:1,transform:'scale(1)',offset:.22},{opacity:1,transform:'scale(1)',offset:.8},{opacity:0,transform:'scale(.7)'}],{duration:1250,easing:'ease-out',fill:'forwards'});
@@ -55,8 +55,12 @@
     function update(suggested){
       syncClear();clearTimeout(typingTimer);if(composing)return;
       const next=Array.isArray(suggested)?suggested:generate(input.value),same=next.join('|')===tags.join('|'),wasDelete=deleted;deleted=false;
-      if(same){section.hidden=!next.length;return;}
-      if(!next.length){tags=[];list.replaceChildren();section.hidden=true;status.textContent='Hashtags cleared.';queue=[];finish();return;}
+      if(same){section.hidden=!next.length&&!active;return;}
+      if(!next.length){
+        const bounds=zone.getBoundingClientRect(),ghosts=[...list.children].map(node=>{const rect=node.getBoundingClientRect();return {tag:node.textContent,x:rect.left-bounds.left,y:rect.top-bounds.top,width:rect.width};});
+        queue=[];finish();tags=[];list.replaceChildren();status.textContent='Hashtags cleared.';
+        if(wasDelete&&ghosts.length&&!reduced.matches){section.hidden=false;zone.style.minHeight=bounds.height+'px';play(ghosts,true);}else{section.hidden=true;zone.style.minHeight='';}return;
+      }
       section.hidden=false;
       const zoneBox=zone.getBoundingClientRect(),oldNodes=new Map([...list.children].map(node=>[node.textContent,node])),oldBoxes=new Map([...oldNodes].map(([tag,node])=>[tag,node.getBoundingClientRect()]));
       const leaving=[...oldNodes].filter(([tag])=>!next.includes(tag));

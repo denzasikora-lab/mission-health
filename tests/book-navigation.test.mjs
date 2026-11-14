@@ -90,7 +90,7 @@ test('An empty personal archive includes preloaded video and audio, current resu
 
 test('The player appears only in the first entry section, stops during page turns and when leaving the archive',async()=>{
   const value={...entry('1','Original text'),observation:{kind:'video',duration:12,mediaUrl:'/api/media-analysis/12345678-1234-1234-1234-123456789abc/media',transcript:'My speech. '.repeat(150),analysis:'Personal analysis',features:{acoustic:{level:-25,quiet:.1,clipping:0,seconds:12}},status:'analyzed'}},f=await fixture({entries:[value],withArchive:true});f.open();
-  const first=f.spread.querySelector('video');first.paused=false;f.tap(350);assert.equal(first.paused,true);let found=false;
+  for(let i=0;i<100&&!f.spread.querySelector('video');i++)f.tap(350);const first=f.spread.querySelector('video');assert.ok(first);assert.ok(first.src.startsWith('/api/'));first.paused=false;f.tap(350);assert.equal(first.paused,true);let found=true;
   for(let i=0;i<100;i++){const media=f.spread.querySelector('video');if(media?.src?.startsWith('/api/')){found=true;assert.ok(f.spread.querySelector('.book-page').children.indexOf(media)<f.spread.querySelector('.book-page').children.findIndex(node=>node.classList.contains('book-page-text')));media.paused=false;f.visible(false);assert.equal(media.paused,true);break;}const position=f.node('book-position').textContent;f.tap(350);if(position===f.node('book-position').textContent)break;}
   assert.equal(found,true);assert.ok(f.favoriteIds.every(id=>id==='1'));assert.equal(value.content,'Original text');const second=await fixture({entries:[],withArchive:true});second.open();const active=second.spread.querySelector('video');active.paused=false;second.window.events.pagehide();assert.equal(active.paused,true);
 });

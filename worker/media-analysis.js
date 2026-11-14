@@ -121,12 +121,13 @@ async function mediaAnalysisFileRoute(request,env,user,id){
   const object=await env.PHOTOS.get(stored.key,range?{range}:undefined);if(!object)fail('not_found',404);
   return new Response(object.body,{status:range?206:200,headers});
 }
-async function latestMediaAnalysis(db,user){
+async function latestMediaAnalysis(db,user,featureHistory=false){
   const rows=(await db.prepare("SELECT id,content,created_at,references_json FROM journal_messages WHERE owner_id=? AND astronaut_id='personal' AND role='user' AND assistant_source='media-upload' ORDER BY created_at DESC,id DESC LIMIT 80").bind(user).all()).results,items=[];
   for(const row of rows){
     let reference;try{reference=JSON.parse(row.references_json)[0];}catch{continue;}
-    if(!['audio','video'].includes(reference?.kind)||items.some(item=>item.kind===reference.kind))continue;
+    if(!['audio','video'].includes(reference?.kind)||!featureHistory&&items.some(item=>item.kind===reference.kind))continue;
     const features=mediaPresentationFeatures(reference.features,reference.kind);if(!features&&reference.kind!=='video')continue;
+    if(featureHistory){if(features)items.push({id:row.id,kind:reference.kind,createdAt:row.created_at,features});continue;}
     const answer=await db.prepare("SELECT content FROM journal_messages WHERE owner_id=? AND astronaut_id='personal' AND reply_to=? AND assistant_source LIKE 'media-analysis:%' ORDER BY created_at DESC LIMIT 1").bind(user,row.id).first();
     if(!features&&!answer?.content?.trim())continue;
     const legacy=String(row.content||'').match(/Recognized speech: ([\s\S]*?)(?=\n(?:Self-reported wellbeing|Original audio features|Audio not decoded|EmbeddingGemma 2|Apparent age|Skin comparison)|$)/);
@@ -138,7 +139,7 @@ async function latestMediaAnalysis(db,user){
 }
 async function mediaAnalysisRoute(request,env,user){
   const db=database(env);
-  if(request.method==='GET')return latestMediaAnalysis(db,user);
+  if(request.method==='GET')return latestMediaAnalysis(db,user,new URL(request.url).searchParams.get('history')==='features');
   if(request.method!=='POST')fail('method_not_allowed',405);
   photoStore(env);
   if(!request.headers.get('content-type')?.startsWith('multipart/form-data;'))fail('invalid_input',400);

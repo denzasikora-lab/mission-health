@@ -143,3 +143,8 @@ test('Live Azure numeric and null alert values are normalized without making mis
   assert.equal(result.agentAvailable,true);assert.equal(result.agentStatus,'CRITICAL');assert.equal(result.status,'CRITICAL');assert.ok(result.alerts.some(value=>value.includes('spo2: 88 / severe')));assert.ok(result.alerts.some(value=>value.includes('bp: No signal / info')));
   const invalid=mergeAgent(rules,JSON.stringify({status:'CRITICAL',alerts:[{parameter:'spo2',value:{value:88},severity:'severe',note:'Invalid nested data.',trend:'unknown'}],summary:'Invalid fixture.'}));assert.equal(invalid.agentAvailable,false);assert.equal(invalid.status,'CRITICAL');
 });
+
+test('Metadata notes are not health alerts and do not suppress an actual oxygen flag',()=>{
+  const rules=evaluate(change('spo2',88),now),result=mergeAgent(rules,agent('CRITICAL',['mission_time: metadata only',{parameter:'provenance',value:'demo',severity:'info',note:'Source metadata',trend:'unknown'},{parameter:'spo2',value:88,severity:'severe',note:'Reduced oxygen',trend:'unknown'}]));
+  assert.equal(result.agentAvailable,true);assert.equal(result.status,'CRITICAL');assert.ok(result.alerts.some(value=>value.includes('spo2: 88')));assert.ok(result.alerts.every(value=>!value.startsWith('mission_time:')&&!value.startsWith('provenance:')));
+});

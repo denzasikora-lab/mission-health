@@ -20,3 +20,5 @@
 .story-caption-clear[hidden]{display:none!important}.story-caption-clear:disabled{opacity:.4;cursor:default}
 
 .story-tags[hidden]{display:none!important}
+
+.story-tags[data-effect] .story-tags-fx{overflow:visible;contain:layout}

@@ -61,7 +61,7 @@
       if(item.kind==='video'&&result.saved&&result.faceComparison)window.missionAppearance?.restoreSession?.({createdAt:item.createdAt,features:{faceComparison:result.faceComparison}},item.ageInput?.context);
       if(!response.ok||result.status!=='analyzed')throw Object.assign(new Error(result.error||'media_analysis_unavailable'),{saved:result.saved});
       if(item.kind==='video'&&item.features?.skin)window.missionSkinSpots?.matches(result.skinMatches||[],item.features.skin.trackingKey);job.phase='complete';job.root.remove();const panel=states.get(item.kind).root;panel.hidden=!panel.children.length;window.missionVoiceAnalysis?.transcript(item.kind,result.transcript||item.transcript);job.payload=null;
-      void window.missionBook?.refresh();void window.missionActivity?.refresh();
+      void window.missionBook?.refresh();void window.missionActivity?.refresh();void window.missionMARS?.refresh();
     }catch(error){job.phase='failed';job.status.textContent=error.saved?'Recording saved. Analysis currently unavailable.':'Could not send recording for analysis.';job.retry.hidden=false;}
   }
   function meter(prefix){

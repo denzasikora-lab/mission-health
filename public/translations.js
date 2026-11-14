@@ -37,7 +37,7 @@ const translations={
     "findMaterial": "Find background material",
     "find": "Find",
     "placeholder": "e.g. cardiovascular risk",
-    "footer": "Mission Health concept prototype. No live telemetry or clinical decision support.",
+    "footer": "Mission Health / Bug Busters. MARS method and sources below.",
     "sourcesLabel": "Sources:",
     "sourceProgram": "NASA Human Research Program",
     "deepSpace": "Demo scenario",

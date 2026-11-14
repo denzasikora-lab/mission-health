@@ -76,7 +76,7 @@ test('Cancelling a drag restores the saved score and an account change cannot co
 });
 test('Old badges retain scale10, new badges use scale100',()=>{
   const f=fixture(),old=f.api.badge({score:8,label:'Good'}),current=f.api.badge({score:80,label:'Good',wellbeingScale:100});
-  assert.match(old.innerHTML,/aria-valuemax="10" aria-valuenow="8"/);assert.match(current.innerHTML,/aria-valuemax="100" aria-valuenow="80"/);assert.match(old.innerHTML,/stroke-dashoffset="20.000"/);assert.match(current.innerHTML,/stroke-dashoffset="20.000"/);assert.equal(old.children[0].textContent,'Good');assert.equal(old.properties['--mood-hue'],current.properties['--mood-hue']);
+  assert.match(old.innerHTML,/aria-valuemax="10" aria-valuenow="8"/);assert.match(current.innerHTML,/aria-valuemax="100" aria-valuenow="80"/);assert.match(old.innerHTML,/stroke-dashoffset="20.000"/);assert.match(current.innerHTML,/stroke-dashoffset="20.000"/);assert.equal(old.children[0].textContent,'Wellbeing: Good');assert.equal(old.properties['--mood-hue'],current.properties['--mood-hue']);
 });
 test('Sending to diary and chat includes explicit scale100',async()=>{
   for(const kind of ['diary','chat']){
@@ -111,4 +111,12 @@ test('Favorites open inside chat and restore unsaved text without opening the bo
   assert.equal(view.kind,'favorites');assert.equal(shortcut.textContent,'Back to chat');assert.equal(view.form.hidden,true);
   shortcut.click();await new Promise(resolve=>setImmediate(resolve));assert.equal(view.kind,'chat');assert.equal(view.input.value,'Text stays in chat');assert.equal(view.form.hidden,false);
   assert.deepEqual(changes,['chat','favorites','chat']);assert.ok(f.calls.every(call=>!call.path.includes('/book')));
+});
+
+test('A gauge updates the existing SVG and text nodes throughout a drag',()=>{
+  const scope={window:{},Intl};vm.runInNewContext(gaugeSource,scope);
+  const attrs={},classes=new Set(),fill={setAttribute(key,value){attrs[key]=value;}},number={},suffix={},meter={classList:{toggle(key,on){if(on)classes.add(key);else classes.delete(key);}},style:{setProperty(){}},setAttribute(key,value){attrs[key]=value;},removeAttribute(key){delete attrs[key];},querySelector(selector){return selector==='b'?number:selector==='small'?suffix:fill;}};
+  const host={firstElementChild:meter,querySelector:()=>meter,set innerHTML(value){assert.fail('A mounted gauge must retain its DOM nodes');}};
+  for(const value of [20,90,5,null,77])scope.window.missionGauge.update(host,{value,label:'Wellbeing',compact:true});
+  assert.equal(host.firstElementChild,meter);assert.equal(attrs['aria-valuenow'],'77');assert.equal(attrs['stroke-dashoffset'],'23.000');assert.equal(number.textContent,'77');assert.equal(suffix.textContent,'/ 100');assert.equal(classes.has('metric-gauge-empty'),false);
 });

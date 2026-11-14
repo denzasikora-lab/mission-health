@@ -369,3 +369,15 @@ test('Empty messages, duplicate attachments and unknown files are not saved',asy
 test('Metadata write failure removes only the newly uploaded object',async()=>{
   const f=fixture();f.sql.exec('DROP TABLE chat_files');const result=await uploadChatFile(f);assert.equal(result.status,503);assert.equal(f.objects.size,0);
 });
+
+test('Reminder requests and their delivered messages carry no wellbeing rating',async()=>{
+  const f=fixture();f.intentProvider(503,'offline');const id=webcrypto.randomUUID(),result=await f.run('/api/chat',{method:'POST',body:{id,content:'Remind me in 1 minute to check my temperature',wellbeing:{score:90,wellbeingScale:100}}});
+  assert.equal(result.status,201);assert.equal(result.body.message.wellbeing,null);assert.equal(result.body.message.reminder,true);assert.equal(f.sql.prepare('SELECT wellbeing_json FROM general_chat_messages WHERE id=?').get(id).wellbeing_json,null);
+  const list=await f.run('/api/chat');assert.equal(list.body.messages.find(item=>item.id===id).wellbeing,null);assert.ok(list.body.messages.filter(item=>item.role==='assistant').every(item=>item.wellbeing===null));
+});
+test('Preflight creates private, labeled and idempotent archive records without inventing sensor connections',async()=>{
+  const f=fixture();assert.equal((await f.run('/api/preflight',{method:'POST',owner:null,body:{confirm:true}})).status,401);assert.equal((await f.run('/api/preflight',{method:'POST',body:{confirm:false}})).status,400);
+  const first=await f.run('/api/preflight',{method:'POST',body:{confirm:true}});assert.equal(first.status,201);assert.equal(first.body.inserted,4);assert.equal(first.body.synthetic,true);assert.equal((await f.run('/api/preflight',{method:'POST',body:{confirm:true}})).body.inserted,0);
+  const rows=f.sql.prepare("SELECT * FROM journal_messages WHERE owner_id='owner-a'").all();assert.equal(rows.length,4);assert.ok(rows.every(row=>row.assistant_source==='preflight:v1'&&row.content.includes('rehearsal')));assert.equal(f.sql.prepare("SELECT COUNT(*) n FROM journal_messages WHERE owner_id='owner-b'").get().n,0);
+  const book=await f.run('/api/astronauts/personal/book');assert.equal(book.body.entries.filter(item=>item.preflight).length,4);assert.equal(book.body.entries.find(item=>item.observation)?.observation.mediaUrl,'/assets/archive/preflight-checkin.mp3');
+});

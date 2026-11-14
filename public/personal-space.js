@@ -60,16 +60,14 @@
     try{if(identity)localStorage.setItem(storageKey(),JSON.stringify(value));}catch{}
     renderScores();scheduleExpiry();window.dispatchEvent(new Event('mission-wellbeing-change'));void window.missionActivity?.record('wellbeing',{score,wellbeingScale:100});
   }
-  function renderScores(){
-    const saved=selection();
-    for(const widget of sliders){
+  function renderScores(){const saved=selection();for(const widget of sliders)renderScore(widget,saved);}
+  function renderScore(widget,saved=selection()){
       if(widget.preview?.scope!==owner())widget.preview=null;
       const chosen=widget.preview||saved,score=chosen?.score||50;widget.input.disabled=!owner()||identity?.storageScope!==owner();if(String(widget.input.value)!==String(score))widget.input.value=score;widget.root.style.setProperty('--mood-hue',hue(score));widget.root.style.setProperty('--mood-value',(score-1)/99);widget.root.dataset.chosen=String(Boolean(chosen));
-      widget.value.innerHTML=window.missionGauge.markup({value:chosen?score:null,label:'Wellbeing',compact:true});widget.label.textContent=chosen?label(score):'Select how you feel';widget.input.setAttribute('aria-valuetext',chosen?score+' from 100 / '+label(score):'Wellbeing not selected yet');
+      window.missionGauge.update(widget.value,{value:chosen?score:null,label:'Wellbeing',compact:true});widget.label.textContent=chosen?label(score):'Select how you feel';widget.input.setAttribute('aria-valuetext',chosen?score+' from 100 / '+label(score):'Wellbeing not selected yet');
       widget.mouth.setAttribute('d','M7 14 Q12 '+(9+(score-1)/99*11).toFixed(2)+' 17 14');
       widget.time.textContent=chosen?'Your score / '+new Date(chosen.at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'Self-report, not a sensor reading';
       widget.reset.hidden=!chosen;
-    }
   }
   function slider(){
     const root=create('section','wellbeing-checkin');
@@ -78,12 +76,12 @@
     const reset=create('button','wellbeing-reset','Reset score');reset.type='button';reset.hidden=true;reset.addEventListener('click',()=>{if(!owner()||identity?.storageScope!==owner())return;selections.delete(selectionKey());try{if(identity)localStorage.removeItem(storageKey());}catch{}renderScores();scheduleExpiry();window.dispatchEvent(new Event('mission-wellbeing-change'));});root.append(reset);
     const widget={root,input,reset,value:root.querySelector('strong'),label:root.querySelector('.wellbeing-readout span'),mouth:root.querySelector('path'),time:root.querySelector('.wellbeing-time'),preview:null};
     input.addEventListener('pointerdown',()=>input.focus({preventScroll:true}));
-    input.addEventListener('input',()=>{const score=Number(input.value);if(input.disabled||!owner()||identity?.storageScope!==owner()||!Number.isInteger(score)||score<1||score>100)return;widget.preview={scope:owner(),score,at:Date.now()};renderScores();});
+    input.addEventListener('input',()=>{const score=Number(input.value);if(input.disabled||!owner()||identity?.storageScope!==owner()||!Number.isInteger(score)||score<1||score>100)return;widget.preview={scope:owner(),score,at:Date.now()};renderScore(widget);});
     const commit=()=>{const value=widget.preview;widget.preview=null;if(value&&value.scope===owner())choose(value.score);};
     input.addEventListener('change',commit);input.addEventListener('blur',commit);input.addEventListener('pointercancel',()=>{widget.preview=null;renderScores();});
     sliders.push(widget);renderScores();return root;
   }
-  function badge(report){const scale=report.wellbeingScale===100?100:10,score=canonicalReport(report).score;const node=create('span','wellbeing-badge');node.innerHTML=window.missionGauge.markup({value:report.score,max:scale,label:'Wellbeing',compact:true});node.append(create('span','',report.label||label(score)));node.style.setProperty('--mood-hue',hue(score));return node;}
+  function badge(report){const scale=report.wellbeingScale===100?100:10,score=canonicalReport(report).score;const node=create('span','wellbeing-badge');node.innerHTML=window.missionGauge.markup({value:report.score,max:scale,label:'Wellbeing',compact:true});node.title='Your wellbeing check-in / not an AI rating';node.append(create('span','','Wellbeing: '+(report.label||label(score))));node.style.setProperty('--mood-hue',hue(score));return node;}
   function store(kind){const key=(owner()||'unbound')+':'+(kind==='diary'?'diary:'+profile():kind);if(!cache.has(key))cache.set(key,{kind,profile:profile(),messages:[],loaded:false,loading:false,cursor:null,more:false,draft:'',files:[],pending:null,busy:false,notice:'',recoveredDraft:false,revision:0,generation:null,clearing:false});return cache.get(key);}
   function favoriteFor(type,id){return favoriteItems.find(item=>item.sourceType===type&&item.sourceId===id);}
   function star(entry,type='diary',id=profile()){
@@ -137,7 +135,7 @@
   function messageNode(entry,kind,id){
     const item=create('article','personal-message '+(kind==='team'&&!entry.isOwn||entry.role==='assistant'?'assistant':'user'));
     const header=create('header'),name=create('span','',kind==='team'?((entry.isOwn?'Cdr. Sara Khan':entry.authorName)+(entry.isOwn?' / you':'')):kind==='diary'?'Your entry':entry.role==='assistant'?'NasaGPT':(window.missionProfileName?.name||'Cdr. Sara Khan'));header.append(name,create('time','',stamp(entry.createdAt)));if(kind!=='team')header.append(star(entry,kind,id));
-    item.append(header);if(entry.content)item.append(create('p','',entry.role==='assistant'?entry.content.replace(/\*\*([^*]+)\*\*/g,'$1'):entry.content));if(kind!=='team'&&entry.wellbeing)item.append(badge(entry.wellbeing));for(const file of entry.attachments||[]){const link=create('a','chat-file-link',file.name+' / '+Math.max(1,Math.ceil(file.bytes/1024))+' KB');link.href=file.url;link.download=file.name;item.append(link);}
+    item.append(header);if(entry.content)item.append(create('p','',entry.role==='assistant'?entry.content.replace(/\*\*/g,''):entry.content));if(kind!=='team'&&!entry.reminder&&entry.wellbeing)item.append(badge(entry.wellbeing));for(const file of entry.attachments||[]){const link=create('a','chat-file-link',file.name+' / '+Math.max(1,Math.ceil(file.bytes/1024))+' KB');link.href=file.url;link.download=file.name;item.append(link);}
     if(entry.pending&&kind==='chat'){const retry=create('button','personal-retry','Retry request answer');retry.type='button';retry.disabled=store('chat').busy;retry.addEventListener('click',()=>void retryChat(entry));item.append(retry);}
     return item;
   }
@@ -152,7 +150,7 @@
       if(kind==='team'&&window.missionAstronautChat)window.missionAstronautChat.render(view.list,items,entry=>messageNode(entry,'team',s.profile));
       else for(const entry of items){
         if(kind==='favorites'){
-          const card=create('article','personal-favorite'),header=create('header');header.append(create('span','',entry.sourceType==='diary'?'Archive':'NasaGPT'),create('time','',stamp(entry.createdAt)),star({...entry,id:entry.sourceId},entry.sourceType,entry.profile));card.append(header,create('p','',entry.content.replace(/\*\*([^*]+)\*\*/g,'$1')));if(entry.wellbeing)card.append(badge(entry.wellbeing));view.list.append(card);
+          const card=create('article','personal-favorite'),header=create('header');header.append(create('span','',entry.sourceType==='diary'?'Archive':'NasaGPT'),create('time','',stamp(entry.createdAt)),star({...entry,id:entry.sourceId},entry.sourceType,entry.profile));card.append(header,create('p','',entry.content.replace(/\*\*/g,'')));if(entry.wellbeing)card.append(badge(entry.wellbeing));view.list.append(card);
         }else view.list.append(messageNode(entry,kind,s.profile));
       }
       view.list.scrollTop=atBottom?view.list.scrollHeight:scrollTop;

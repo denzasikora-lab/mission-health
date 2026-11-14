@@ -12,10 +12,12 @@ An astronaut health monitoring prototype by **Bug Busters / NASA Space Apps**.
 - Personal archive with search and answers based on saved records.
 - Reminders, scheduled tasks and an astronaut group chat.
 - NASA research data and ECG recordings.
+- MARS research index and period reports.
+- Versioned LoRA training for longitudinal behavior research.
 
 The app supports English and Urdu, light and dark themes, and mobile screens.
 
-Readings come from user entries and imports. Generated samples are labeled.
+Readings come from user entries and imports. Preflight rehearsal data are labeled and kept separate from measurements.
 
 ## For developers
 

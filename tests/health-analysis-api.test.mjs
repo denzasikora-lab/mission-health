@@ -246,3 +246,9 @@ test('Future client capture times cannot admit later measurement saves into an a
   }
   f.provider(200);assert.equal((await f.run('/api/health-analysis',{method:'POST',body})).status,201);assert.equal(f.payload().recent_trend.heart_rate,'unknown');
 });
+
+test('The agent receives a capture timestamp instead of missing mission time, with truthful sources',async t=>{
+  const f=fixture(t),input=snapshot();const result=await f.post(input);assert.equal(result.status,201);const payload=f.payload();
+  assert.equal(payload.mission_time,input.capturedAt);assert.match(payload.mission_time_basis,/not elapsed mission time/);assert.equal(payload.provenance.direct_sensor_connection,false);assert.equal(payload.provenance.is_demo,false);
+  assert.match(f.outgoing[0].body.input[0].content,/provenance are metadata/);
+});

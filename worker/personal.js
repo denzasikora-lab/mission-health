@@ -43,7 +43,7 @@ async function chatAttachmentIds(env,user,room,value){
   if(!Array.isArray(ids)||ids.length>4||new Set(ids).size!==ids.length||ids.some(id=>typeof id!=='string'||!/^[a-f0-9-]{36}$/i.test(id)))fail('invalid_input',400);
   for(const id of ids){const row=await database(env).prepare('SELECT owner_id,room FROM chat_files WHERE id=?').bind(id).first();if(!row||row.owner_id!==user||row.room!==room)fail('attachment_not_found',404);}return ids;
 }
-async function hydratedChatMessage(env,row){return {...chatMessage(row),attachments:await chatAttachments(env,JSON.parse(row.attachments_json||'[]'))};}
+async function hydratedChatMessage(env,row){const reminder=Boolean(await database(env).prepare('SELECT id FROM personal_tasks WHERE owner_id=? AND source_message_id=? LIMIT 1').bind(row.owner_id,row.id).first());return {...chatMessage(row),...(reminder?{wellbeing:null,reminder:true}:{}),attachments:await chatAttachments(env,JSON.parse(row.attachments_json||'[]'))};}
 async function teamChatRoute(request,env,user,url){
   const db=database(env);
   const view=async row=>({id:row.id,role:'user',content:row.content,authorName:row.owner_id===user?'Cdr. Sara Khan':row.author_name,isOwn:row.owner_id===user,createdAt:row.created_at,attachments:await chatAttachments(env,JSON.parse(row.attachments_json))});
@@ -167,6 +167,7 @@ async function generalChatRoute(request,env,user,url){
   if(!existing){row.language=responseLanguage(request);row.time_zone=taskTimeZone(input.timeZone);await db.prepare('UPDATE general_chat_messages SET language=?,time_zone=? WHERE owner_id=? AND id=?').bind(row.language,row.time_zone,user,row.id).run();}
   if(!existing&&typeof activityWrite==='function')await activityWrite(env,user,'chat_sent','Sent message NasaGPT / '+row.content.slice(0,90),'chat:'+row.id);
   const tasks=await planChatTasks(env,user,row,row.time_zone||input.timeZone,responseLanguage(request));
+  if(tasks.length&&row.wellbeing_json){await db.prepare('UPDATE general_chat_messages SET wellbeing_json=NULL WHERE owner_id=? AND id=?').bind(user,row.id).run();row.wellbeing_json=null;}
   await chatUnchanged(env,user,generation);
   let reply=await db.prepare('SELECT * FROM general_chat_messages WHERE owner_id=? AND reply_to=?').bind(user,row.id).first(),replyError=null;
   if(!reply&&tasks.length){
@@ -213,4 +214,24 @@ async function favoritesRoute(request,env,user,id,url){
   const favorite=await db.prepare('SELECT * FROM personal_favorites WHERE owner_id=? AND source_type=? AND source_id=?').bind(user,input.sourceType,input.sourceId).first();
   if(typeof activityWrite==='function')await activityWrite(env,user,'favorite_added','Added to favorites / '+favorite.content.slice(0,80),'favorite:'+favorite.id);
   return json({item:favoriteView(favorite)});
+}
+
+async function preflightRoute(request,env,user,ctx){
+  if(request.method!=='POST')fail('method_not_allowed',405);
+  const input=await personalInput(request);if(input?.confirm!==true)fail('invalid_input',400);
+  const snapshot=input.snapshot?globalThis.MissionHealthRules.normalize(input.snapshot):null,now=new Date(),day=now.toISOString().slice(0,10),db=database(env);
+  const audio={"duration":9.2035,"features":{"acoustic":{"seconds":9.2035,"level":-15.806,"quiet":0.086022,"clipping":0.0}},"transcript":"Hello crew. I can hear you clearly. How are you feeling today? I slept well and I am ready for our next check in. This is a simulated preflight rehearsal.","provenance":"Synthetic voice / Samantha / preflight rehearsal"};
+  const records=[
+    {title:'Preflight / readings',text:'Synthetic preflight rehearsal. The following provided snapshot retains its source labels and is not asserted to be live sensor telemetry.\n'+JSON.stringify(snapshot?.readings||{})},
+    {title:'Preflight / crew check-in',text:'Simulated crew conversation. Sara: Hello crew, how are you feeling today? Crew rehearsal reply: I can hear you clearly. Ready for the next check-in. This dialogue tests archive retrieval; no real message was sent to another astronaut.'},
+    {title:'Preflight / voice check-in',text:'Synthetic voice rehearsal. Recognized text: '+audio.transcript+' Acoustics were measured from the generated audio file, rather than a person. This recording is used to test playback and archive retrieval.',observation:{kind:'audio',duration:audio.duration,features:audio.features,transcript:audio.transcript,analysis:'Synthetic voice rehearsal. Speech and pauses were measured from the file. No human emotions or medical condition were inferred.',status:'measured',mediaUrl:'/assets/archive/preflight-checkin.mp3'}},
+    {title:'Preflight / recovery log',text:'Synthetic recovery rehearsal. The fictional participant reports a restful night, a planned break and a friendly conversation with the crew. This text tests personal search and adapter training, not medical prediction.'}
+  ];
+  let inserted=0;
+  for(let i=0;i<records.length;i++){
+    const record=records[i],hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('preflight:v1:'+user+':'+day+':'+i))),value=>value.toString(16).padStart(2,'0')).join(''),id=hash.slice(0,8)+'-'+hash.slice(8,12)+'-4'+hash.slice(13,16)+'-a'+hash.slice(17,20)+'-'+hash.slice(20,32);
+    const existing=await db.prepare('SELECT id FROM journal_messages WHERE id=? AND owner_id=?').bind(id,user).first();if(existing)continue;
+    await db.prepare('INSERT OR IGNORE INTO journal_messages (id,owner_id,astronaut_id,role,content,language,created_at,vector_status,references_json,attachments_json,assistant_source) VALUES (?,?,?,?,?,?,?,?,?,?,?)').bind(id,user,'personal','note',record.title+'\n'+record.text,'en',new Date(now.valueOf()+i).toISOString(),'pending',JSON.stringify([{type:'preflight',synthetic:true,...(record.observation?{observation:record.observation}:{})}]),'[]','preflight:v1').run();inserted++;
+  }
+  ctx.waitUntil(syncPending(env,user,'personal'));return json({saved:true,inserted,synthetic:true},201);
 }
