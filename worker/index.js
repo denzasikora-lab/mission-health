@@ -324,4 +324,4 @@ async function englishResponse(response,request,env){
   return new Response(JSON.stringify(body),{status:response.status,headers});
 }
 
-export default {async fetch(request,env,ctx){return englishResponse(await missionHandler.fetch(request,env,ctx),request,env);}};
+export default {scheduled:missionHandler.scheduled,async fetch(request,env,ctx){return englishResponse(await missionHandler.fetch(request,env,ctx),request,env);}};

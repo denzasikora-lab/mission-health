@@ -40,7 +40,7 @@
   }
   function attach(heading){
     if(!heading||heading.querySelector('.profile-name-form'))return;
-    const root=document.createElement('form'),input=document.createElement('input'),action=document.createElement('button'),status=document.createElement('small');root.className='profile-name-form';root.style.gridTemplateColumns='minmax(0,1fr) auto';root.style.alignItems='center';root.style.gap='6px';
+    const root=document.createElement('form'),input=document.createElement('input'),action=document.createElement('button'),status=document.createElement('small');root.className='profile-name-form';root.style.gridTemplateColumns='minmax(0,1fr) auto';root.style.alignItems='center';root.style.gap='8px';
     input.type='text';input.maxLength=100;input.autocomplete='name';input.placeholder='Full name';input.setAttribute('aria-label','Full name');input.title='Full name';action.type='button';action.style.fontSize='12px';action.style.padding='6px 9px';status.setAttribute('role','status');status.setAttribute('aria-live','polite');root.append(input,action,status);heading.insertBefore(root,heading.lastElementChild);heading.classList.add('has-profile-name');
     const view={root,input,action,status,dirty:false,draftScope:null,requiresReview:false,saving:false,timer:null,request:0,message:''};widgets.add(view);paint(view);
     async function commit(explicit=false){

@@ -108,6 +108,9 @@ test('Repeated generation changes the sample while unchanged polling and layout 
   actual.readings.heart_rate.value=101;f.readings(actual);assert.equal(f.api.sampleActive(),false);assert.equal(f.api.snapshot().readings.heart_rate.value,101);
   f.home.querySelector('.home-sample-button').emit('click');f.scope.missionProfileName.identity={storageScope:'owner-b'};assert.equal(f.api.sampleActive(),false);f.scope.dispatchEvent(new Event('mission-profile-change'));assert.equal(f.home.querySelector('.home-sample-clear').hidden,true);
 });
+test('An initial profile connection keeps an already generated sample without moving the check-in',()=>{
+  const f=homeFixture(),checkin=f.home.querySelector('.home-checkin');f.home.querySelector('.home-sample-button').emit('click');const original=clone(f.api.sampleBase());f.scope.missionProfileName={identity:{storageScope:'owner-a'}};f.scope.dispatchEvent(new Event('mission-profile-change'));assert.equal(f.api.sampleActive(),true);assert.deepEqual(clone(f.api.sampleBase()),original);assert.equal(f.home.querySelector('.home-checkin'),checkin);
+});
 
 test('A check-in preserves the generated layout and actual watch imports restore measured values',()=>{
   const f=homeFixture();f.home.querySelector('.home-sample-button').emit('click');f.report({score:81,wellbeingScale:100});const before=clone(f.api.snapshot());f.scope.dispatchEvent(new Event('mission-wellbeing-change'));assert.equal(f.api.sampleActive(),true);assert.deepEqual(clone(f.api.snapshot()),before);f.home.querySelector('.home-sample-clear').emit('click');assert.equal(f.api.snapshot().readings.wellbeing.value,81);assert.equal(f.api.snapshot().readings.wellbeing.source,'manual');

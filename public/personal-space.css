@@ -56,3 +56,10 @@
 @container mission (max-width:500px){.wellbeing-readout>span{max-inline-size:13ch}.wellbeing-readout{gap:7px}}
 
 .profile-name-form[hidden]{display:none}
+
+.personal-conversation-heading.has-profile-name{gap:8px}
+.personal-conversation-heading.has-profile-name .profile-name-form{gap:8px!important}
+.personal-conversation-heading.has-profile-name .profile-name-form input,.personal-conversation-heading.has-profile-name .profile-name-form button,.personal-conversation-heading.has-profile-name [data-personal-refresh]{box-sizing:border-box;height:32px;min-height:32px;margin:0;line-height:20px;border-radius:9px}
+.personal-conversation-heading.has-profile-name .profile-name-form input{padding:5px 10px;font-size:14px}
+.personal-conversation-heading.has-profile-name .profile-name-form button{padding:5px 10px!important;font-size:12px!important}
+.personal-conversation-heading.has-profile-name [data-personal-refresh]{width:32px;padding:0;font-size:15px}

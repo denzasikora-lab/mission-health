@@ -61,6 +61,13 @@ test('Actual diary, tasks and health analyses remain private and survive a serve
   const before=(await f.run('/api/me',{cookie:a})).body.storageScope;await f.restart();assert.equal((await f.run('/api/me',{cookie:a})).body.storageScope,before);assert.equal((await f.run('/api/tasks',{cookie:a})).body.tasks[0].id,taskId);assert.equal((await f.run('/api/health-analysis/'+analysis.id,{cookie:a})).body.item.id,analysis.id);
   assert.equal((await f.run('/api/tasks/'+taskId,{method:'PATCH',cookie:a,headers:origin,body:{title:'Edited synthetic task'}})).status,200);assert.equal((await f.run('/api/tasks/'+taskId,{method:'DELETE',cookie:a,headers:origin})).status,200);assert.equal((await f.run('/api/tasks',{cookie:a})).body.tasks.length,0);assert.equal(f.calls.length,0);
 });
+test('The exported API delivers due reminders without a browser request and does not duplicate them after restart',async t=>{
+  assert.equal(typeof actualWorker.scheduled,'function');const f=await fixture(t),cookie=await f.mint(),owner=f.owner(cookie),id=randomUUID(),at=new Date(),due=new Date(at.valueOf()+200).toISOString();
+  await f.storage.DB.prepare("INSERT INTO personal_tasks (id,owner_id,source_message_id,ordinal,title,due_date,due_at,time_zone,status,created_at,updated_at) VALUES (?,?,?,0,'Background timer verification',?,?,'UTC','planned',?,?)").bind(id,owner,'manual:'+id,due.slice(0,10),due,at.toISOString(),at.toISOString()).run();
+  assert.equal((await f.storage.DB.prepare('SELECT COUNT(*) n FROM general_chat_messages').first()).n,0);await new Promise(resolve=>setTimeout(resolve,2200));
+  const message=await f.storage.DB.prepare('SELECT * FROM general_chat_messages WHERE owner_id=?').bind(owner).first();assert.match(message.content,/Reminder: Background timer verification/);assert.ok(Date.parse(message.created_at)>=Date.parse(due));assert.equal((await f.storage.DB.prepare('SELECT COUNT(*) n FROM task_deliveries').first()).n,1);assert.equal(f.calls.length,0);
+  await f.restart();await new Promise(resolve=>setTimeout(resolve,1100));assert.equal((await f.storage.DB.prepare('SELECT COUNT(*) n FROM general_chat_messages WHERE owner_id=?').bind(owner).first()).n,1);assert.equal(f.calls.length,0);
+});
 test('Private multipart files and saved recordings retain byte ranges without exposing another guest data',async t=>{
   const f=await fixture(t),a=await f.mint(),b=await f.mint();
   async function multipart(path,form){const encoded=new Request('https://frontend.test',{method:'POST',body:form});return f.run(path,{method:'POST',cookie:a,headers:{...origin,'content-type':encoded.headers.get('content-type')},body:Buffer.from(await encoded.arrayBuffer())});}
