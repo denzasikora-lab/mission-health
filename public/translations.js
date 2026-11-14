@@ -1,8 +1,8 @@
 const translations={
   "en": {
     "locale": "en-GB",
-    "missionDay": "Mission day 142",
-    "simulated": "Simulated data",
+    "missionDay": "MISSION HEALTH",
+    "simulated": "Research prototype",
     "appearance": "Appearance",
     "lightTheme": "Light theme",
     "darkTheme": "Dark theme",
@@ -15,9 +15,9 @@ const translations={
     "crew": "Astronauts",
     "memberCount": "3 profiles",
     "missionContext": "Mission context",
-    "demoMission": "Demo mission, day 142",
-    "latestSample": "Latest crew sample: 08:42 UTC",
-    "fictional": "Real NASA profiles. All health readings and journal scenarios are simulated.",
+    "demoMission": "Research prototype",
+    "latestSample": "No shared measurement timestamp",
+    "fictional": "Public NASA profiles. No shared health measurements are available.",
     "dashboard": "Health dashboard",
     "measurements": "Current measurements",
     "trend": "Reading trend",
@@ -147,7 +147,7 @@ const translations={
       }
     ],
     "biography": "NASA biography",
-    "profileSimulation": "Simulated health readings",
+    "profileSimulation": "No shared measurements",
     "healthTab": "Health overview",
     "journalTab": "Chat & diary",
     "viewLabel": "Profile view",
@@ -321,6 +321,6 @@ const translations={
     "experimentalWarning": "Earlier experimental response. Check its claims against the original entries. This model is no longer used.",
     "workspaceLabel": "Application section",
     "crewHeadline": "Crew health overview",
-    "crewIntro": "Simulated health readings and personal diaries for the prototype profiles. Real research datasets are available in the Research data section."
+    "crewIntro": "Public astronaut profiles and your personal measurements. Original research records are available in Research."
   }
 };

@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import tempfile
 import urllib.request
+import urllib.error
 import uuid
 
 TARGET = Path("/etc/nginx/sites-enabled/app")
@@ -19,6 +20,25 @@ HOST_T213 = "users.fereyuserstopstrongcloudwinter.shop"
 PUBLIC_HOST = "mission-health-bug-busters.vercel.app"
 PREFIX = "/mission-health-api/"
 BACKUPS = Path("/var/backups/mission-health")
+MEMORY_PREFIX = "/mission-health-memory/"
+MEMORY_RUNTIME_T213 = Path("/home/t213/mission-health/backend/runtime.env")
+MEMORY_ROUTE = """
+    location ^~ /mission-health-memory/ {
+        if ($http_origin != "") { return 403; }
+        client_max_body_size 2m;
+        proxy_pass http://127.0.0.1:18091/;
+        proxy_http_version 1.1;
+        proxy_set_header Authorization $http_authorization;
+        proxy_set_header Connection "";
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 90s;
+        proxy_send_timeout 90s;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_next_upstream off;
+        add_header Cache-Control "private, no-store" always;
+    }
+"""
 ROUTE = """
     location ^~ /mission-health-api/ {
         client_max_body_size 20m;
@@ -52,9 +72,14 @@ def deployment_target(server="t4"):
     raise ValueError("Unsupported backend server")
 
 
-def candidate(source, server="t4"):
+def candidate(source, server="t4", with_memory=False):
     _, host = deployment_target(server)
-    if PREFIX.rstrip("/") in source:
+    if with_memory and server != "t213":
+        raise ValueError("The private memory tunnel route is supported only on t213")
+    if with_memory and MEMORY_PREFIX.rstrip("/") in source:
+        raise ValueError("The private memory route already exists; review instead of replacing it")
+    existing_api = PREFIX.rstrip("/") in source
+    if existing_api and (not with_memory or ROUTE not in source):
         raise ValueError("The backend route already exists; review instead of replacing it")
     masked = re.sub(r"#[^\n]*", lambda match: " " * len(match[0]), source)
     matches = []
@@ -74,7 +99,8 @@ def candidate(source, server="t4"):
     if len(matches) != 1:
         raise ValueError("Expected exactly one existing app HTTPS server")
     index = matches[0]
-    return source[:index] + ROUTE + source[index:]
+    routes = ("" if existing_api else ROUTE) + (MEMORY_ROUTE if with_memory else "")
+    return source[:index] + routes + source[index:]
 
 
 def replace_file(path, content, metadata):
@@ -98,6 +124,35 @@ def check_backend():
     with opener.open(request, timeout=10) as response:
         if response.status != 200 or json.load(response).get("ready") is not True:
             raise RuntimeError("The standalone API must be ready before HTTPS activation")
+
+
+def check_memory():
+    if MEMORY_RUNTIME_T213.is_symlink() or MEMORY_RUNTIME_T213.stat().st_mode & 0o077:
+        raise ValueError("The private runtime settings must remain restricted")
+    settings = {}
+    for line in MEMORY_RUNTIME_T213.read_text(encoding="utf-8").splitlines():
+        if not line or line.startswith("#"):
+            continue
+        key, separator, value = line.partition("=")
+        if not separator or key in settings:
+            raise ValueError("Invalid private runtime settings")
+        settings[key] = json.loads(value) if value.startswith('"') else value
+    key = settings.get("MEMORY_API_KEY", "")
+    if settings.get("MEMORY_URL") != "http://127.0.0.1:18091" or len(key) < 32:
+        raise ValueError("The verified private memory tunnel configuration is required")
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    url = "http://127.0.0.1:18091/health"
+    try:
+        with opener.open(url, timeout=10):
+            raise RuntimeError("Memory must reject requests without a credential")
+    except urllib.error.HTTPError as error:
+        if error.code != 401:
+            raise RuntimeError("Unexpected unauthenticated memory response") from error
+    request = urllib.request.Request(url, headers={"Authorization": "Bearer " + key})
+    with opener.open(request, timeout=15) as response:
+        health = json.load(response)
+        if response.status != 200 or health.get("semantic") is not True or health.get("dimensions") != 768:
+            raise RuntimeError("The authenticated embedder and Qdrant must be ready")
 
 
 def apply_locked(original, proposed, backup_dir, resolved_target, server="t4"):
@@ -125,7 +180,7 @@ def apply_locked(original, proposed, backup_dir, resolved_target, server="t4"):
     return backup
 
 
-def apply_change(original, proposed, server="t4"):
+def apply_change(original, proposed, server="t4", with_memory=False):
     target, _ = deployment_target(server)
     BACKUPS.mkdir(mode=0o700, parents=True, exist_ok=True)
     BACKUPS.chmod(0o700)
@@ -133,6 +188,8 @@ def apply_change(original, proposed, server="t4"):
     with os.fdopen(descriptor, "a", encoding="utf-8") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         check_backend()
+        if with_memory:
+            check_memory()
         return apply_locked(original, proposed, BACKUPS, target.resolve(strict=True), server)
 
 
@@ -141,16 +198,18 @@ def main():
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--expected-sha")
     parser.add_argument("--server", choices=("t4", "t213"), default="t4")
+    parser.add_argument("--with-memory", action="store_true")
     args = parser.parse_args()
     target, host = deployment_target(args.server)
     original = target.read_bytes()
     before = hashlib.sha256(original).hexdigest()
-    proposed = candidate(original.decode("utf-8"), args.server).encode("utf-8")
+    proposed = candidate(original.decode("utf-8"), args.server, args.with_memory).encode("utf-8")
     print(json.dumps({"server": args.server, "target": str(target), "beforeSha256": before,
                       "afterSha256": hashlib.sha256(proposed).hexdigest(),
                       "backendUrl": "https://" + host + PREFIX.rstrip("/"),
                       "publicOrigin": "https://" + PUBLIC_HOST,
-                      "change": "Add only the standalone API path; preserve existing applications and TLS",
+                      "memoryUrl": "https://" + host + MEMORY_PREFIX.rstrip("/") if args.with_memory else None,
+                      "change": "Add standalone API and authenticated private memory paths; preserve existing applications and TLS" if args.with_memory else "Add only the standalone API path; preserve existing applications and TLS",
                       "apply": args.apply}), flush=True)
     if not args.apply:
         return
@@ -159,7 +218,7 @@ def main():
     if args.expected_sha != before:
         raise SystemExit("Nginx configuration changed after review")
     check_backend()
-    backup = apply_change(original, proposed, args.server)
+    backup = apply_change(original, proposed, args.server, args.with_memory)
     print(json.dumps({"status": "activated", "server": args.server, "backup": str(backup),
                       "afterSha256": hashlib.sha256(proposed).hexdigest()}), flush=True)
 

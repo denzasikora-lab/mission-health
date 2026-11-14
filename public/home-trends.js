@@ -1,151 +1,120 @@
 (() => {
-  const periods=[
-    {id:'1m',label:'1 min',name:'1 minute',scale:.08,axis:['-60 s','-45 s','-30 s','-15 s','Now']},
-    {id:'1h',label:'1 h',name:'1 hour',scale:.25,axis:['-60 min','-45 min','-30 min','-15 min','Now']},
-    {id:'24h',label:'24 h',name:'24 hours',scale:1,axis:['-24 h','-18 h','-12 h','-6 h','Now']},
-    {id:'7d',label:'7 days',name:'7 days',scale:1.3,axis:['-7 d','-5 d','-3 d','-1 d','Now']},
-    {id:'1mo',label:'Month',name:'1 month',scale:1.8,axis:['-30 d','-23 d','-15 d','-8 d','Now']},
-    {id:'1y',label:'Year',name:'1 year',scale:2.2,axis:['-1 year','-9 mo','-6 mo','-3 mo','Now']}
-  ];
-  const metrics={
-    hr:{name:'Pulse',unit:'bpm',digits:1,spread:3,bounds:[35,190],offset:[.3,1.4,2.4,2,1.3,.8]},
-    spo2:{name:'SpO₂',unit:'%',deltaUnit:'pp',digits:1,spread:.35,bounds:[85,100],offset:[.4,.6,.8,1.6,2.3,1.2]},
-    temp:{name:'Skin temperature',unit:'°C',digits:2,spread:.13,bounds:[28,42],offset:[.6,1.1,1.2,2.7,3.4,2.2]},
-    wellbeing:{name:'Wellbeing',unit:'from 100',deltaUnit:'pp.',digits:1,spread:3,bounds:[1,100],offset:[-.3,-.7,-2.6,-1.9,-3.4,-2.2]},
-    sleep:{name:'Sleep',unit:'h',deltaUnit:'min',digits:1,spread:.45,bounds:[0,14],offset:[.3,.8,3.4,2.5,1.4,.8]},
-    hrv:{name:'HRV',unit:'ms',digits:1,spread:4,bounds:[5,180],offset:[.4,-1.2,-1.8,-2.4,-3.5,-1.7]},
-    respiration:{name:'Respiration',unit:'/min',digits:1,spread:1,bounds:[6,40],offset:[.5,.8,1.1,2.4,1.6,3.5]},
-    pressure:{name:'Blood pressure / systolic',unit:'mmHg. units.',digits:1,spread:3,bounds:[75,190],offset:[.6,1.3,3.3,2.6,1.5,.8]},
-    recovery:{name:'Recovery',unit:'from 100',deltaUnit:'pp.',digits:1,spread:3,bounds:[0,100],offset:[.6,.9,1.3,2.4,3.4,1.8]},
-    steps:{name:'Steps',unit:'per day',deltaUnit:'steps',digits:0,spread:300,bounds:[0,40000],offset:[.2,.8,2.8,1.4,3.4,2.1]},
-    activity:{name:'Movement',unit:'counts',digits:0,spread:2000,bounds:[0,300000],offset:[.2,1.1,1.7,3.3,2.4,.9]},
-    light:{name:'Illuminance',unit:'lx',digits:1,spread:40,bounds:[0,120000],offset:[.4,2.5,3.2,1.8,2.7,1.4]}
-  };
-  const levels={green:{name:'Green',description:'within two standard deviations'},amber:{name:'Amber',description:'between two and three standard deviations'},red:{name:'Red',description:'at least three standard deviations'},neutral:{name:'Gray',description:'no history for the selected period'}};
-  const minuteOrigin=Math.floor(Date.now()/1000);
-  function mean(values){return values.reduce((sum,value)=>sum+value,0)/values.length;}
+  const minute=60000,day=86400000;
+  const periods=[{id:'1m',label:'1 min',name:'1 minute',ms:minute},{id:'1h',label:'1 h',name:'1 hour',ms:60*minute},{id:'24h',label:'24 h',name:'24 hours',ms:day},{id:'7d',label:'7 days',name:'7 days',ms:7*day},{id:'1mo',label:'Month',name:'30 days',ms:30*day},{id:'1y',label:'Year',name:'365 days',ms:365*day}];
+  const metrics={hr:{reading:'heart_rate',name:'Pulse',unit:'bpm',digits:1},spo2:{reading:'spo2',name:'SpO₂',unit:'%',digits:1},temp:{reading:'skin_temperature',name:'Skin temperature',unit:'°C',digits:2},bodyTemp:{reading:'body_temperature',name:'Body temperature',unit:'°C',digits:2},wellbeing:{reading:'wellbeing',name:'Wellbeing',unit:'/100',digits:1},sleep:{reading:'sleep_hours',name:'Sleep in recorded 24 h',unit:'h',digits:2},hrv:{reading:'hrv',name:'HRV',unit:'ms',digits:1},respiration:{reading:'respiratory_rate',name:'Respiration',unit:'/min',digits:1},pressure:{reading:'bp_systolic',name:'Blood pressure / systolic',unit:'mmHg',digits:1},recovery:{reading:'recovery',name:'Reported recovery',unit:'/100',digits:1},fatigue:{reading:'fatigue_index',name:'Reported fatigue',unit:'/100',digits:1},stress:{reading:'stress_index',name:'Reported stress',unit:'/100',digits:1},steps:{reading:'steps',name:'Steps',unit:'steps',digits:0},activity:{reading:'activity',name:'Movement in recorded 24 h',unit:'counts',digits:0},light:{reading:'light',name:'Mean light in recorded 24 h',unit:'lx',digits:1}};
+  const sources=new Set(['manual','import','imported','actiwatch','device','sensor','self_report']);
+  const lowerBound=(values,target,end=values.length)=>{let start=0;while(start<end){const middle=(start+end)>>1;if(values[middle]<target)start=middle+1;else end=middle;}return start;};
+  function observation(reading,now,sourceName='Saved reading'){
+    const at=Date.parse(reading?.observedAt);
+    return Number.isFinite(reading?.value)&&sources.has(reading.source)&&Number.isFinite(at)&&at<=now?{at,value:reading.value,sourceName,sourceKey:reading.source+':'+sourceName}:null;
+  }
+  function watchSeries(input){
+    const result={sleep_hours:[],activity:[],light:[]};let recording;
+    try{recording=globalThis.MissionActiwatch.validate(input);}catch{return result;}
+    const rows=recording.rows,duration=recording.epochSeconds*1000,seconds=recording.epochSeconds,times=rows.map(row=>Date.parse(row.timestamp));
+    const sums=Object.fromEntries(['activity','activityEpochs','sleep','scored','light','lightSeconds'].map(key=>[key,new Float64Array(rows.length+1)]));
+    const usable=row=>!row.excluded&&row.offWrist!==true,activity=row=>usable(row)&&row.activity!==null,sleep=row=>activity(row)&&row.sleepState!=='unknown',light=row=>usable(row)&&row.lightLux!==null;
+    for(let index=0;index<rows.length;index++){
+      const row=rows[index],a=activity(row),s=sleep(row),l=light(row);
+      const increment={activity:a?row.activity:0,activityEpochs:a?1:0,sleep:s&&row.sleepState==='sleep'?seconds:0,scored:s?seconds:0,light:l?row.lightLux*seconds:0,lightSeconds:l?seconds:0};
+      for(const key of Object.keys(sums)){sums[key][index+1]=sums[key][index]+increment[key];if(!Number.isFinite(sums[key][index+1]))return {sleep_hours:[],activity:[],light:[]};}
+      const at=times[index]+duration,start=at-day,first=lowerBound(times,start,index+1),values=Object.fromEntries(Object.keys(sums).map(key=>[key,sums[key][index+1]-sums[key][first]]));
+      if(first>0){const prior=rows[first-1],overlap=Math.max(0,(times[first-1]+duration-start)/1000);if(overlap>0){if(sleep(prior)){values.scored+=overlap;if(prior.sleepState==='sleep')values.sleep+=overlap;}if(light(prior)){values.light+=prior.lightLux*overlap;values.lightSeconds+=overlap;}}}
+      const gap=index===0||times[index]>times[index-1]+duration;
+      for(const [key,value,valid,previousValid]of [['activity',values.activityEpochs?values.activity:null,a,index>0&&activity(rows[index-1])],['sleep_hours',values.scored?values.sleep/3600:null,s,index>0&&sleep(rows[index-1])],['light',values.lightSeconds?values.light/values.lightSeconds:null,l,index>0&&light(rows[index-1])]])result[key].push({at,value:valid?value:null,gapBefore:gap||!valid||!previousValid,maxGapMs:duration*1.5});
+    }
+    return result;
+  }
+  function history(key,{records=[],current=null,watch=null,recording=null,watchPoints=null,selfReports=[]}={},now=Date.now()){
+    const config=metrics[key];if(!config)return [];
+    const readingKey=config.reading,values=new Map(),imported=current?.source==='import'&&watch&&['sleep_hours','activity','light'].includes(readingKey);
+    const add=point=>{if(point&&Number.isFinite(point.at)&&point.at<=now&&(point.value===null||Number.isFinite(point.value)))values.set(point.at,{...point});};
+    if(imported){for(const point of (watchPoints||watchSeries(recording))[readingKey]||[])add({...point,sourceName:'Actiwatch CSV / '+watch.filename,sourceKey:'watch:'+watch.id});}
+    else{
+      for(const record of [...records].reverse())add(observation(record.snapshot?.readings?.[readingKey],now,record.sourceName||'Manual entry'));
+      if(key==='wellbeing')for(const report of selfReports)add(observation(report,now,'Self-report'));
+    }
+    const matching=[...records].find(record=>{const value=record.snapshot?.readings?.[readingKey];return value?.observedAt===current?.observedAt&&value?.value===current?.value;});
+    const point=observation(current,now,imported?'Actiwatch CSV / '+watch.filename:matching?.sourceName||'Current saved reading');
+    if(point){const existing=values.get(point.at);if(!existing||existing.value!==point.value)add({...point,sourceKey:imported?'watch:'+watch.id:point.sourceKey,gapBefore:true});}
+    return [...values.values()].sort((left,right)=>left.at-right.at);
+  }
   function statistics(points){
-    const prior=points.slice(0,-1),average=mean(prior),variance=prior.reduce((sum,value)=>sum+(value-average)**2,0)/Math.max(1,prior.length-1),sd=Math.sqrt(variance),last=points.at(-1);
-    const z=sd>1e-10?Math.abs(last-average)/sd:Math.abs(last-average)<1e-10?0:Infinity;
-    return {average,sd,z,level:z<2?'green':z<3?'amber':'red',delta:last-points[0]};
+    const valid=points.filter(point=>Number.isFinite(point.value));if(!valid.length)return null;
+    const last=valid.at(-1),prior=valid.slice(0,-1).filter(point=>point.sourceKey===last.sourceKey);
+    let average=0,variance=0;for(let index=0;index<prior.length;index++){const delta=prior[index].value-average;average+=delta/(index+1);variance+=delta*(prior[index].value-average);}
+    const sd=prior.length>1?Math.sqrt(variance/(prior.length-1)):null,z=Number.isFinite(sd)?sd>0?Math.abs(last.value-average)/sd:last.value===average?0:Infinity:null;
+    return {count:valid.length,delta:valid.length>1?last.value-valid[0].value:null,average:prior.length?average:null,sd,z,level:prior.length<3||z===null?'neutral':z<2?'green':z<3?'amber':'red'};
   }
-  function demoSeries(key,current,periodId){
-    const config=metrics[key],periodIndex=periods.findIndex(period=>period.id===periodId),period=periods[periodIndex];
-    if(!config||!period||!Number.isFinite(current))return null;
-    const seed=Object.keys(metrics).indexOf(key)+1;
-    if(periodId==='1m'){
-      // One timeline preserves shared window points during updates and navigation.
-      const second=Math.floor(Date.now()/1000)-minuteOrigin,amplitude=config.spread*period.scale;
-      const points=Array.from({length:61},(_,index)=>{
-        const at=second-60+index,shape=Math.sin(at*.53+seed)*.8+Math.cos(at*.21)*.45+Math.sin(at*.11+seed*2)*.3;
-        return Math.max(config.bounds[0],Math.min(config.bounds[1],current+amplitude*shape));
-      });
-      return {points,...statistics(points)};
-    }
-    // Other periods use a fixed demonstration pattern.
-    const shape=Array.from({length:60},(_,index)=>Math.sin(index*.53+seed)*.8+Math.cos(index*.21+periodIndex)*.45+Math.sin(index*.11+seed*2)*.3);
-    const center=mean(shape),sd=Math.sqrt(shape.reduce((sum,value)=>sum+(value-center)**2,0)/(shape.length-1)),amplitude=config.spread*period.scale;
-    const points=shape.map(value=>Math.max(config.bounds[0],Math.min(config.bounds[1],current+amplitude*((value-center)/sd-config.offset[periodIndex]))));
-    points.push(current);
-    return {points,...statistics(points)};
+  function segments(points,period){
+    const result=[];let previous=null;
+    for(const point of points){if(point.value===null){previous=null;continue;}const gap=point.gapBefore||!previous||point.sourceKey!==previous.sourceKey||point.at-previous.at>(point.maxGapMs||previous.maxGapMs||period.ms/4);if(gap)result.push([]);result.at(-1).push(point);previous=point;}
+    return result;
   }
-  function metricValue(key,raw){
-    const text=String(raw||'').replace(/[\u00a0\u202f]/g,' ').trim();
-    if(key==='pressure'){const pair=text.match(/^(\d+(?:[.,]\d+)?)\s*\/\s*\d/);return pair?Number(pair[1].replace(',','.')):null;}
-    if(key==='sleep'){
-      const hours=text.match(/(\d+(?:[.,]\d+)?)\s*h/),minutes=text.match(/(\d+(?:[.,]\d+)?)\s*min/);
-      if(hours||minutes)return (hours?Number(hours[1].replace(',','.')):0)+(minutes?Number(minutes[1].replace(',','.'))/60:0);
-    }
-    const number=text.replace(/\s+/g,'').match(/^-?\d+(?:[.,]\d+)?/);
-    return number?Number(number[0].replace(',','.')):null;
+  function sample(segment,limit=500){
+    if(segment.length<=limit)return segment;
+    const output=[segment[0]],buckets=Math.max(1,Math.floor((limit-2)/2)),width=(segment.length-2)/buckets;
+    for(let bucket=0;bucket<buckets;bucket++){const from=1+Math.floor(bucket*width),to=Math.min(segment.length-1,1+Math.floor((bucket+1)*width));let low=from,high=from;for(let index=from;index<to;index++){if(segment[index].value<segment[low].value)low=index;if(segment[index].value>segment[high].value)high=index;}for(const index of [...new Set([low,high])].sort((a,b)=>a-b))output.push(segment[index]);}
+    output.push(segment.at(-1));return output;
   }
-  const home=document.getElementById('mission-home'),bodyPanel=home?.querySelector('.home-body-panel');
-  if(!bodyPanel)return;
-  const cards=[...bodyPanel.querySelectorAll('[data-home-metric]')].filter(card=>metrics[card.dataset.homeMetric]);
-  if(!cards.length)return;
-  const make=(tag,cls,text)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;};
+  globalThis.MissionHomeTrendData=Object.freeze({periods,metrics,observation,watchSeries,history,statistics,segments,sample});
+  const home=document.getElementById('mission-home'),bodyPanel=home?.querySelector('.home-body-panel');if(!bodyPanel)return;
+  const cards=[...bodyPanel.querySelectorAll('[data-home-metric]')].filter(card=>metrics[card.dataset.homeMetric]);if(!cards.length)return;
+  const make=(tag,cls,text)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;},owner=()=>window.missionProfileName?.identity?.storageScope||null;
   const panel=make('section','home-trends panel glass');panel.id='home-trends';panel.setAttribute('aria-labelledby','home-trend-heading');
   const header=make('header','home-trend-heading'),heading=make('h2'),reading=make('span','home-trend-reading');heading.id='home-trend-heading';header.append(heading,reading);
-  const controls=make('div','home-trend-periods');controls.setAttribute('role','group');controls.setAttribute('aria-label','Trend period');
-  for(const period of periods){const button=make('button','',period.label);button.type='button';button.dataset.trendPeriod=period.id;button.setAttribute('aria-label',period.name);controls.append(button);}
-  const graph=make('div','home-trend-graph');graph.id='home-trend-chart';
-  const yAxis=make('div','home-trend-yaxis');yAxis.setAttribute('aria-hidden','true');
-  const plot=make('div','home-trend-plot'),ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 800 210');svg.setAttribute('preserveAspectRatio','none');svg.setAttribute('role','img');
-  const dot=make('span','home-trend-dot');dot.setAttribute('aria-hidden','true');plot.append(svg,dot);
-  const empty=make('p','home-trend-empty','No history for this period.');empty.hidden=true;graph.append(yAxis,plot,empty);
-  const xAxis=make('div','home-trend-xaxis');xAxis.setAttribute('aria-hidden','true');
-  const legend=make('div','home-trend-legend'),source=make('span','home-trend-source','Demo / personal baseline'),meaning=make('span','','Color: difference from baseline / not a diagnosis');legend.append(source,meaning);
-  legend.title='The demonstration baseline uses preceding points from the selected period. Green: |z| < 2; amber: 2 <= |z| < 3; red: |z| >= 3. The band shows the mean +/- 2 standard deviations. Statistical limits are not medical norms.';
-  panel.append(header,controls,graph,xAxis,legend);bodyPanel.after(panel);
-  let selected='hr',periodId='24h',scheduled=0,minuteTimer=0,suspended=false;
-  const indicators=new Map(),format=(number,digits=1)=>new Intl.NumberFormat('en',{maximumFractionDigits:digits}).format(number);
-  for(const card of cards){
-    const line=make('span','home-vital-trend');line.setAttribute('aria-hidden','true');card.append(line);indicators.set(card,line);
-    card.setAttribute('role','button');card.tabIndex=0;card.setAttribute('aria-controls','home-trend-chart');
-    const choose=()=>{selected=card.dataset.homeMetric;refresh();};
-    card.addEventListener('click',event=>{if(!event.target.closest('button,a,input,select,textarea'))choose();});
-    card.addEventListener('keydown',event=>{if(event.target!==card)return;if(event.key==='Enter'||event.key===' '){event.preventDefault();choose();}});
+  const controls=make('div','home-trend-periods');controls.setAttribute('role','group');controls.setAttribute('aria-label','Trend period');for(const period of periods){const button=make('button','',period.label);button.type='button';button.dataset.trendPeriod=period.id;button.setAttribute('aria-label',period.name);controls.append(button);}
+  const graph=make('div','home-trend-graph'),yAxis=make('div','home-trend-yaxis'),plot=make('div','home-trend-plot'),ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');graph.id='home-trend-chart';yAxis.setAttribute('aria-hidden','true');svg.setAttribute('viewBox','0 0 800 210');svg.setAttribute('preserveAspectRatio','none');svg.setAttribute('role','img');
+  const dot=make('span','home-trend-dot');dot.setAttribute('aria-hidden','true');plot.append(svg,dot);const empty=make('p','home-trend-empty');graph.append(yAxis,plot,empty);const xAxis=make('div','home-trend-xaxis');xAxis.setAttribute('aria-hidden','true');
+  const legend=make('div','home-trend-legend'),source=make('span','home-trend-source'),meaning=make('span','','Actual observations / time gaps are not filled');legend.append(source,meaning);legend.title='Color compares the latest observation with at least three earlier observations from the same source. This is a descriptive personal baseline, not a medical range.';panel.append(header,controls,graph,xAxis,legend);bodyPanel.after(panel);
+  let selected='hr',periodId='24h',scheduled=0,minuteTimer=0,suspended=false,destroyed=false,polling=false,pollVersion=0,lastPoll=-Infinity,scope=owner(),watchCache=null;
+  const indicators=new Map(),selfReports=new Map(),listeners=[],format=(value,digits=1)=>new Intl.NumberFormat('en',{maximumFractionDigits:digits}).format(value);
+  const listen=(target,type,callback)=>{target.addEventListener(type,callback);listeners.push([target,type,callback]);};
+  for(const card of cards){const line=make('span','home-vital-trend');line.setAttribute('aria-hidden','true');card.append(line);indicators.set(card,line);card.setAttribute('role','button');card.tabIndex=0;card.setAttribute('aria-controls','home-trend-chart');const choose=()=>{selected=card.dataset.homeMetric;refresh();};listen(card,'click',event=>{if(!event.target.closest('button,a,input,select,textarea'))choose();});listen(card,'keydown',event=>{if(event.target===card&&(event.key==='Enter'||event.key===' ')){event.preventDefault();choose();}});}
+  function visible(){return !destroyed&&!suspended&&!document.hidden&&!home.hidden&&home.getClientRects().length>0;}
+  function context(){
+    if(owner()!==scope){scope=owner();selfReports.clear();watchCache=null;lastPoll=-Infinity;}
+    if(!scope)return {records:[],model:{readings:{}},watch:null,recording:null,watchPoints:null,selfReports:[]};
+    const model=window.missionHome?.model?.()||{readings:{}},records=window.missionReadings?.records?.()||[],watch=window.missionActiwatch?.current?.()||null,recording=window.missionActiwatch?.recording?.()||null;
+    const selectedReport=window.missionCheckin?.selection?.(),report=window.missionCheckin?.current?.();if(Number.isFinite(selectedReport?.at)&&selectedReport.at<=Date.now()&&report?.wellbeingScale===100&&Number.isFinite(report.score)){selfReports.set(selectedReport.at,{value:report.score,source:'manual',observedAt:new Date(selectedReport.at).toISOString()});if(selfReports.size>200)selfReports.delete(selfReports.keys().next().value);}
+    if(!watch||!recording)watchCache=null;else if(watchCache?.recording!==recording||watchCache.id!==watch.id)watchCache={id:watch.id,recording,points:watchSeries(recording)};
+    return {records,model,watch,recording,watchPoints:watchCache?.points||null,selfReports:[...selfReports.values()]};
   }
-  function deltaText(key,delta){
-    const config=metrics[key],value=key==='sleep'?delta*60:delta,digits=key==='sleep'?0:config.digits,threshold=.5*10**-digits;
-    const visibleUnit=key==='sleep'?' min':key==='temp'?' °C':key==='spo2'?' pp':'';
-    if(Math.abs(value)<threshold)return {visible:'\u2192 0'+visibleUnit,accessible:'unchanged'};
-    const arrow=value>0?'\u2191':'\u2193',sign=value>0?'+':'-',unit=config.deltaUnit||config.unit;
-    return {visible:arrow+' '+sign+format(Math.abs(value),digits)+visibleUnit,accessible:(value>0?'increase of ':'decrease of ')+format(Math.abs(value),digits)+' '+unit};
-  }
-  function snapshot(card){
-    const key=card.dataset.homeMetric,raw=card.querySelector('strong')?.textContent||'',value=metricValue(key,raw),isDemo=card.dataset.source==='demo';
-    return {key,raw,value,isDemo,result:isDemo?demoSeries(key,value,periodId):null};
-  }
+  function item(card,data,now){const key=card.dataset.homeMetric,period=periods.find(value=>value.id===periodId),current=data.model.readings?.[metrics[key].reading]||null,points=history(key,{...data,current},now).filter(point=>point.at>=now-period.ms&&point.at<=now);return {key,current,points,result:statistics(points)};}
+  function deltaText(key,delta){const value=key==='sleep'?delta*60:delta,digits=key==='sleep'?0:metrics[key].digits,unit=key==='sleep'?' min':key==='spo2'?' pp':key==='temp'||key==='bodyTemp'?' °C':'';return Math.abs(value)<.5*10**-digits?'\u2192 0'+unit:(value>0?'\u2191 +':'\u2193 -')+format(Math.abs(value),digits)+unit;}
   function svgNode(tag,attributes){const node=document.createElementNS(ns,tag);for(const [name,value]of Object.entries(attributes))node.setAttribute(name,String(value));return node;}
-  function renderGraph(item){
-    const config=metrics[item.key],period=periods.find(value=>value.id===periodId),result=item.result;
-    heading.textContent=config.name;reading.textContent=item.key==='pressure'&&item.value!==null?format(item.value,0)+' mmHg. units.':item.raw;panel.dataset.trendLevel=result?.level||'neutral';panel.dataset.trendMetric=item.key;panel.dataset.trendPeriod=periodId;
-    controls.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.trendPeriod===periodId)));
-    svg.replaceChildren();yAxis.replaceChildren();xAxis.replaceChildren();empty.hidden=Boolean(result);plot.hidden=!result;yAxis.hidden=!result;xAxis.hidden=!result;
-    const noMinuteFeed=periodId==='1m'&&!item.isDemo;
-    empty.textContent=noMinuteFeed?'No measurement stream for the last minute.':'No history for this period.';
-    source.textContent=result?(periodId==='1m'?'Demo / personal baseline · update 1 s':'Demo / personal baseline'):noMinuteFeed?'No measurement stream':'No history for this period';
-    if(!result){svg.setAttribute('aria-label',config.name+'. '+empty.textContent);return;}
-    const {points,average,sd,level}=result,minimum=Math.min(...points,average-2*sd),maximum=Math.max(...points,average+2*sd),padding=Math.max((maximum-minimum)*.14,config.spread*.05),low=minimum-padding,high=maximum+padding;
-    const y=value=>210-(value-low)/(high-low)*210,x=index=>index/(points.length-1)*800;
-    svg.append(svgNode('rect',{x:0,y:y(average+2*sd),width:800,height:Math.max(0,y(average-2*sd)-y(average+2*sd)),class:'home-trend-band'}));
-    for(let index=0;index<4;index++){
-      const value=high-(high-low)*index/3,position=index*70;svg.append(svgNode('line',{x1:0,x2:800,y1:position,y2:position,class:'home-trend-grid'}));yAxis.append(make('span','',format(value,item.key==='temp'?2:config.digits)));
-    }
-    svg.append(svgNode('line',{x1:0,x2:800,y1:y(average),y2:y(average),class:'home-trend-baseline'}));
-    const line=points.map((value,index)=>(index?'L':'M')+x(index).toFixed(2)+' '+y(value).toFixed(2)).join(' ');
-    svg.append(svgNode('path',{d:line+' L 800 210 L 0 210 Z',class:'home-trend-fill'}),svgNode('path',{d:line,class:'home-trend-line'}));
-    dot.style.top=(y(points.at(-1))/210*100)+'%';for(const label of period.axis)xAxis.append(make('span','',label));
-    const delta=deltaText(item.key,result.delta);svg.setAttribute('aria-label',config.name+', '+period.name+'. Demonstration trend. '+delta.accessible+'. '+levels[level].name+': '+levels[level].description+'.');
+  function renderGraph(value,now){
+    const config=metrics[value.key],period=periods.find(item=>item.id===periodId),points=value.points.filter(point=>Number.isFinite(point.value)),start=now-period.ms;
+    heading.textContent=config.name;reading.textContent=observation(value.current,now)?format(value.current.value,config.digits)+' '+config.unit:'Not measured';panel.dataset.trendLevel=value.result?.level||'neutral';panel.dataset.trendMetric=value.key;panel.dataset.trendPeriod=periodId;panel.dataset.observationCount=String(points.length);
+    controls.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.trendPeriod===periodId)));svg.replaceChildren();yAxis.replaceChildren();xAxis.replaceChildren();empty.hidden=points.length>0;plot.hidden=yAxis.hidden=xAxis.hidden=!points.length;
+    empty.textContent=periodId==='1m'?'No measurements recorded in the last minute.':'No observations recorded in this period.';
+    source.textContent=points.length?(value.current?.source==='import'?'Recorded 24 h aggregates from Actiwatch epochs':'Saved observations')+' / '+points.length+' point'+(points.length===1?'':'s')+' / UTC':empty.textContent;
+    if(!points.length){svg.setAttribute('aria-label',config.name+'. '+empty.textContent);return;}
+    let low=Math.min(...points.map(point=>point.value)),high=Math.max(...points.map(point=>point.value));const padding=Math.max((high-low)*.12,Math.max(Math.abs(low),Math.abs(high))*1e-6,10**-config.digits);low-=padding;high+=padding;
+    if(!Number.isFinite(high-low)||high===low){empty.hidden=false;empty.textContent='Recorded values exceed the chart display range.';plot.hidden=yAxis.hidden=xAxis.hidden=true;return;}
+    const y=value=>210-(value-low)/(high-low)*210,x=at=>Math.max(0,Math.min(800,(at-start)/period.ms*800));
+    for(let index=0;index<4;index++){svg.append(svgNode('line',{x1:0,x2:800,y1:index*70,y2:index*70,class:'home-trend-grid'}));yAxis.append(make('span','',format(high-(high-low)*index/3,config.digits)));}
+    const lines=[],marks=[];for(const segment of segments(value.points,period)){const observed=sample(segment);if(observed.length>1)lines.push(observed.map((point,index)=>(index?'L':'M')+x(point.at).toFixed(2)+' '+y(point.value).toFixed(2)).join(' '));else if(observed.length){const point=observed[0],px=x(point.at),py=y(point.value);marks.push('M'+(px-3).toFixed(2)+' '+py.toFixed(2)+'a3 3 0 1 0 6 0a3 3 0 1 0 -6 0');}}
+    if(lines.length)svg.append(svgNode('path',{d:lines.join(' '),class:'home-trend-line'}));if(marks.length)svg.append(svgNode('path',{d:marks.join(' '),fill:'var(--home-trend-color)',class:'home-trend-points'}));
+    const last=points.at(-1);dot.style.top=y(last.value)/210*100+'%';dot.style.left=x(last.at)/800*100+'%';dot.style.right='auto';
+    const axisFormat=new Intl.DateTimeFormat('en-GB',period.ms<=day?{hour:'2-digit',minute:'2-digit',...(periodId==='1m'?{second:'2-digit'}:{}),timeZone:'UTC'}:{day:'2-digit',month:'short',...(periodId==='1y'?{year:'2-digit'}:{}),timeZone:'UTC'});for(let index=0;index<5;index++)xAxis.append(make('span','',axisFormat.format(new Date(start+period.ms*index/4))));
+    svg.setAttribute('aria-label',config.name+', '+period.name+'. '+points.length+' actual observations. Latest observation '+new Date(last.at).toISOString()+'. Gaps are not filled.');
   }
   function refresh(){
-    const snapshots=cards.map(snapshot);
-    for(let index=0;index<cards.length;index++){
-      const card=cards[index],item=snapshots[index],result=item.result,line=indicators.get(card),level=result?.level||'neutral',period=periods.find(value=>value.id===periodId),delta=result?deltaText(item.key,result.delta):null;
-      card.dataset.trendLevel=level;card.dataset.trendPeriod=periodId;card.setAttribute('aria-pressed',String(item.key===selected));
-      if(result){card.dataset.trendDelta=String(result.delta);card.dataset.trendZ=String(result.z);}else{delete card.dataset.trendDelta;delete card.dataset.trendZ;}
-      line.textContent=delta?delta.visible:'No history';line.title=result?'Change since period start '+period.name+'. Demo / personal baseline. '+levels[level].name+': '+levels[level].description+'.':'No actual history for '+period.name+'. Value preserved without synthetic continuation.';
-      card.setAttribute('aria-label',metrics[item.key].name+': '+item.raw+'. '+(delta?delta.accessible+' over '+period.name+'. ':'')+levels[level].name+': '+levels[level].description+'.'+(result?' Demo / personal baseline.':''));
-    }
-    renderGraph(snapshots.find(item=>item.key===selected)||snapshots[0]);
-    syncMinuteClock();
+    if(destroyed)return;const now=Date.now(),data=context(),values=cards.map(card=>item(card,data,now));
+    for(let index=0;index<cards.length;index++){const card=cards[index],value=values[index],result=value.result,line=indicators.get(card);card.dataset.trendLevel=result?.level||'neutral';card.dataset.trendPeriod=periodId;card.setAttribute('aria-pressed',String(value.key===selected));if(result?.delta!==null&&result?.delta!==undefined){card.dataset.trendDelta=String(result.delta);line.textContent=deltaText(value.key,result.delta);}else{delete card.dataset.trendDelta;line.textContent=result?'One observation':'No history';}if(result?.z!==null&&result?.z!==undefined)card.dataset.trendZ=String(result.z);else delete card.dataset.trendZ;line.title=result?'Based on '+result.count+' actual observations in the selected period.':'No observations recorded in this period.';}
+    renderGraph(values.find(value=>value.key===selected)||values[0],now);syncMinuteClock();
   }
-  controls.addEventListener('click',event=>{const button=event.target.closest('[data-trend-period]');if(button){periodId=button.dataset.trendPeriod;refresh();}});
-  function visible(){return !suspended&&!document.hidden&&!home.hidden&&home.getClientRects().length>0;}
-  function stopMinuteClock(){clearTimeout(minuteTimer);minuteTimer=0;}
-  function syncMinuteClock(){
-    const card=cards.find(item=>item.dataset.homeMetric===selected);
-    if(periodId!=='1m'||!visible()||card?.dataset.source!=='demo'||!Number.isFinite(metricValue(selected,card.querySelector('strong')?.textContent))){stopMinuteClock();return;}
-    if(!minuteTimer)minuteTimer=setTimeout(()=>{minuteTimer=0;if(visible()&&periodId==='1m')refresh();else stopMinuteClock();},1000-Date.now()%1000);
+  function stopMinuteClock(){clearTimeout(minuteTimer);minuteTimer=0;pollVersion++;polling=false;}
+  function pollActual(){
+    if(polling||!visible()||periodId!=='1m'||!owner()||Date.now()-lastPoll<5000)return;
+    const requests=[window.missionReadings,window.missionActiwatch].filter(store=>typeof store?.refresh==='function');if(!requests.length)return;
+    polling=true;lastPoll=Date.now();const expected=owner(),ticket=++pollVersion;void Promise.allSettled(requests.map(store=>Promise.resolve().then(()=>store.refresh()))).finally(()=>{if(ticket!==pollVersion)return;polling=false;if(visible()&&owner()===expected)schedule();});
   }
+  function syncMinuteClock(){if(periodId!=='1m'||!visible()||!owner()){stopMinuteClock();return;}pollActual();if(!minuteTimer)minuteTimer=setTimeout(()=>{minuteTimer=0;if(visible()&&periodId==='1m')refresh();else stopMinuteClock();},1000-Date.now()%1000);}
   function schedule(){if(!visible()){stopMinuteClock();cancelAnimationFrame(scheduled);scheduled=0;return;}if(!scheduled)scheduled=requestAnimationFrame(()=>{scheduled=0;refresh();});}
-  const observer=new MutationObserver(schedule);
-  for(const card of cards){const number=card.querySelector('strong');if(number)observer.observe(number,{childList:true,subtree:true,characterData:true});observer.observe(card,{attributes:true,attributeFilter:['data-source']});}
-  const visibilityObserver=new MutationObserver(schedule);visibilityObserver.observe(home,{attributes:true,attributeFilter:['hidden']});visibilityObserver.observe(document.body,{attributes:true,attributeFilter:['data-home','data-overview','data-mission-workspace']});
-  document.addEventListener('visibilitychange',schedule);
-  window.addEventListener('mission-wellbeing-change',schedule);
-  window.addEventListener('pageshow',()=>{suspended=false;schedule();});
-  window.addEventListener('pagehide',event=>{suspended=true;stopMinuteClock();cancelAnimationFrame(scheduled);scheduled=0;if(!event.persisted){observer.disconnect();visibilityObserver.disconnect();}});
-  window.missionHomeTrends={refresh};refresh();
+  listen(controls,'click',event=>{const button=event.target.closest('[data-trend-period]');if(button){periodId=button.dataset.trendPeriod;refresh();}});
+  const observer=new MutationObserver(schedule);for(const card of cards)observer.observe(card,{attributes:true,attributeFilter:['data-source','data-reading-value','data-observed-at']});const visibilityObserver=new MutationObserver(schedule);visibilityObserver.observe(home,{attributes:true,attributeFilter:['hidden']});visibilityObserver.observe(document.body,{attributes:true,attributeFilter:['data-home','data-overview','data-mission-workspace']});
+  listen(document,'visibilitychange',schedule);for(const name of ['mission-wellbeing-change','mission-readings-change','mission-actiwatch-change','mission-profile-change'])listen(window,name,schedule);listen(window,'pageshow',()=>{suspended=false;schedule();});listen(window,'pagehide',event=>{suspended=true;stopMinuteClock();cancelAnimationFrame(scheduled);scheduled=0;if(!event.persisted){destroyed=true;observer.disconnect();visibilityObserver.disconnect();for(const [target,type,callback]of listeners)target.removeEventListener(type,callback);}});
+  window.missionHomeTrends=Object.freeze({refresh});refresh();
 })();

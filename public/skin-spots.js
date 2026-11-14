@@ -9,6 +9,7 @@
   }
   document.querySelector('#appearance-extra-methods').append(root);
   const status=root.querySelector('#skin-spots-status'),referenceLabel=root.querySelector('#skin-spots-reference'),search=root.querySelector('#skin-spots-search'),list=root.querySelector('#skin-spots-items'),reset=root.querySelector('#skin-spots-reset');
+  reset.disabled=true;
   const names={'forehead':'Forehead','left-cheek':'Left frame area / cheek','right-cheek':'Right frame area / cheek'},reasons={need_camera:'Enable the camera for comparison.',need_frames:'A complete sharp face frame is required.',need_closeup:'Move closer: there are not enough pixels for individual spots.',not_enough_detail:'Could not reliably isolate the regions. Repeat the close-up and lighting.',no_reference:'Skin baseline required.',unstable:'Waiting for three stable frames.',conditions_changed:'Match lighting, baseline distance and angle.',collecting:'Collecting skin baseline'};
   let scope='',reference=null,samples=[],lastTime=0,latestTime=0,latest=null,report=core.unavailable('need_camera'),storageOk=true;
   const sampleVisual=window.missionAnalysisSamples?.visual;let sampleAllowed=true;

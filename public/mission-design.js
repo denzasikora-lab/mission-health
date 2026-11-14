@@ -14,7 +14,7 @@
   switcher.hidden=true;switcher.setAttribute('aria-hidden','true');
   switcher.append(document.querySelector('.panel-heading'), document.getElementById('crew-list'));
   navigation.after(switcher);
-  document.querySelector('.aside-note').textContent = 'NASA profiles. Health readings and diary scenarios are simulated.';
+  document.querySelector('.aside-note').textContent = 'Public NASA profiles / no shared health measurements.';
   const anatomy = document.createElement('section'); anatomy.className='mission-anatomy'; anatomy.setAttribute('aria-label','Profile readings diagram'); anatomy.innerHTML='<img src="assets/health-body.svg?v=20261030-illustrated1" alt="Human body illustration, without medical diagnosis"><div>'+[['hr','Pulse'],['spo2','SpO₂'],['temp','Temp.'],['fatigue','Tone']].map(([key,label])=>`<button type="button" data-body-metric="${key}"><span>${label}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${metricIcons[key]}"/></svg></button>`).join('')+'</div>'; rail.append(anatomy);
   const oldResearch = document.getElementById('research-workspace'), oldCrew = document.getElementById('crew-workspace');
   const heading = document.createElement('header'); heading.className = 'mission-heading'; heading.lang = 'en';

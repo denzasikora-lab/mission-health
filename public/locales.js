@@ -1,7 +1,7 @@
 translations.ur={
   "locale": "ur-PK",
-  "missionDay": "مہم کا دن 142",
-  "simulated": "فرضی ڈیٹا",
+  "missionDay": "MISSION HEALTH",
+  "simulated": "تحقیقی نمونہ",
   "appearance": "ظاہری شکل",
   "lightTheme": "روشن تھیم",
   "darkTheme": "تاریک تھیم",
@@ -14,9 +14,9 @@ translations.ur={
   "crew": "خلاباز",
   "memberCount": "3 پروفائل",
   "missionContext": "مہم کا پس منظر",
-  "demoMission": "نمونہ مہم، دن 142",
-  "latestSample": "آخری پیمائش: 08:42 UTC",
-  "fictional": "NASA کے حقیقی پروفائل۔ صحت کی تمام پیمائشیں اور ڈائری کے منظرنامے فرضی ہیں۔",
+  "demoMission": "تحقیقی نمونہ",
+  "latestSample": "مشترکہ پیمائش کا وقت دستیاب نہیں",
+  "fictional": "NASA کے عوامی پروفائل۔ صحت کی مشترکہ پیمائشیں دستیاب نہیں۔",
   "dashboard": "صحت کا جائزہ",
   "measurements": "موجودہ پیمائشیں",
   "trend": "پیمائش کا رجحان",
@@ -146,7 +146,7 @@ translations.ur={
     }
   ],
   "biography": "NASA کی سوانح",
-  "profileSimulation": "صحت کی فرضی پیمائشیں",
+  "profileSimulation": "مشترکہ پیمائش دستیاب نہیں",
   "healthTab": "صحت کا جائزہ",
   "journalTab": "چیٹ اور ڈائری",
   "viewLabel": "پروفائل کا حصہ",
@@ -320,5 +320,5 @@ translations.ur={
   "experimentalWarning": "پہلے کا تجرباتی جواب۔ دعوے اصل اندراج سے جانچیں۔ یہ ماڈل اب استعمال نہیں ہوتا۔",
   "workspaceLabel": "ایپ کا حصہ",
   "crewHeadline": "عملے کی صحت کا جائزہ",
-  "crewIntro": "نمونے کے پروفائل کی فرضی پیمائشیں اور ذاتی ڈائریاں۔ اصل تحقیقی پیمائشیں حقیقی تحقیقی ڈیٹا کے حصے میں ہیں۔"
+  "crewIntro": "خلابازوں کے عوامی پروفائل اور آپ کی ذاتی پیمائشیں۔ اصل تحقیقی ریکارڈ تحقیق کے حصے میں دستیاب ہیں۔"
 };

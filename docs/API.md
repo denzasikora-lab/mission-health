@@ -37,6 +37,8 @@ The current personal demo persona is **Cdr. Sara Khan**, astronaut label **AST-0
 | Method | Route | Purpose |
 | --- | --- | --- |
 | GET | `/api/status` | Report configured assistant, history, photo, and semantic-memory capabilities |
+| GET | `/api/readings` | Read the owner's latest-known manual measurements, provenance, and up to 200 saved records |
+| POST | `/api/readings` | Save a validated manual measurement snapshot and factual archive/RAG record without calling the language agent |
 | GET | `/api/health-analysis` | Read the owner's latest prototype readings analysis |
 | GET | `/api/health-analysis/{id}` | Read one owned saved analysis |
 | POST | `/api/health-analysis` | Validate a snapshot, calculate prototype rules, and ask the primary agent |
@@ -346,6 +348,20 @@ Diary context now retains the recorded self-report, normalized 1-100 scale, and 
 
 The current media request sends the transcript, supported browser measurements, and up to three selected video frames. It does not send the entire original audio/video file to Azure. General chat now receives a saved numeric dashboard snapshot with source and time metadata. Canonical Actiwatch summary data is loaded by owner and explicit import ID. Past recording analyses are not automatically attached. Dashboard skin temperature is never relabeled as body temperature. The structured readings route enforces its own deterministic prototype status independently of free-form conversation.
 
+## Recorded personal measurements
+
+`POST /api/readings` accepts exactly `id`, `snapshot`, and `sourceName`. The ID is a client-generated UUID reused unchanged on retry. The source label must contain 1-120 characters after trimming and cannot contain control characters. A typical label is `Manual entry` or the name of a user-uploaded CSV. Such a label does not verify an instrument connection.
+
+The snapshot uses the same units, ranges, personal profile, and timestamp validation as the prototype rules. At least one reading is required. Every supplied value must use `source: "manual"` and its actual `observedAt` timestamp. Missing values remain null. `demo`, `import`, non-personal profiles, and a non-null `actiwatchImportId` are rejected by this intake route. Genuine Actiwatch uploads retain their separate `/api/actiwatch` path and owner-verified import ID.
+
+The response contains `{record, snapshot, provenance, duplicate}`. The immutable `record` contains `id`, the normalized submitted `snapshot`, `sourceName`, `createdAt`, and its current `vectorStatus`. The top-level `snapshot` combines the owner's latest-known value for each field by the actual observation time. `provenance` maps each available field to its `recordId`, `sourceName`, and save time. It never fills an absent field with an average or converts skin temperature to body temperature.
+
+`GET /api/readings` returns `{snapshot, provenance, records, maxRecords: 200, truncated}`. Records are ordered by save time, newest first. The current snapshot uses the full saved history even when the returned history is truncated. A new owner receives an all-null snapshot and no records. Old readings retain their original timestamps; the client and rules must not present them as current telemetry.
+
+Saving a snapshot atomically creates a factual personal archive note containing the supplied values, units, source label, and observation times. The note is sent to the existing owner-scoped embedding/Qdrant pipeline when configured. An unavailable embedder leaves the saved record `pending`; a successful upsert changes it to `indexed`. An idempotent retry can finish deferred indexing without creating another note. No Azure or utility generation request is made by this save operation. Retrieved notes remain input data, not instructions or validated clinical conclusions.
+
+The endpoint returns 201 for a new record and 200 for an unchanged retry. Reusing an ID with different content/source or an ID belonging to another owner returns 409. A preexisting diary ID cannot be appropriated. The same authenticated session and mutation-origin protections as the other personal APIs apply.
+
 ## Prototype readings workflow
 
 `POST /api/health-analysis` accepts exactly `{id, snapshot}`. `id` is a UUID. `snapshot` contains `profileId: "personal"`, an ISO `capturedAt`, optional `actiwatchImportId`, and a `readings` object. Each reading is null or `{value, unit, source, observedAt}`. Allowed sources are `demo`, `manual`, and `import`. Example readings have `observedAt: null`; the snapshot time is not a sensor time. Manual/import observations require valid timestamps. Client source labels do not establish a verified device connection.
@@ -372,7 +388,7 @@ The response has `snapshot`, `rules`, `result`, `createdAt`, `updatedAt`, and `p
 
 An ID with an unchanged canonical snapshot reuses a successful result. Another owner or a different snapshot conflicts. Failed analyses can be retried with the same ID; a 60-second server lease prevents overlapping model calls. An overlapping POST returns HTTP 202 with `pending: true`. GET `/api/health-analysis` returns `{item: <latest or null>}`; GET `/api/health-analysis/{id}` reads one owned record. Reads never call a model.
 
-Agent input contains `astronaut`, unknown `mission_time: null`, `latest`, `rule_result`, provenance, and `recent_trend`. Trends require ten distinct non-demo observation times from the same source: the mean of the latest five versus the previous five. Insufficient history and generated chart data never become a real trend.
+Agent input contains `astronaut`, unknown `mission_time: null`, `latest`, `rule_result`, provenance, and `recent_trend`. Trends use owned saved measurement records and analyses, requiring ten distinct non-demo observation times with the same source and unit: the mean of the latest five versus the previous five. Duplicated observations are counted once, and older records remain eligible even beyond the returned history window. Insufficient history and generated chart data never become a real trend.
 
 The browser calls Azure analysis only when Analyze is selected. Chat automatically attaches `healthSnapshot` once when creating its pending request. The server saves the canonical snapshot and rules in `message.healthContext`; retries reuse that original context even if the dashboard has changed. Ordinary conversation remains separate from the structured Health analysis and does not gain diary access.
 

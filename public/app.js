@@ -34,17 +34,16 @@ function renderMetrics(person){
   $("metrics").innerHTML=Object.keys(metricInfo).map(key=>{const trend=friendMetricTrend(person,key),current=trend.values.at(-1),delta=trend.delta,arrow=delta===null?'':delta>0?'↑':delta<0?'↓':'→',change=delta===null?copy.missing:`${arrow} ${delta>0?'+':delta<0?'-':''}${format(Math.abs(delta),key)} ${friendDeltaUnit(key)}`;return `<button class="metric-card glass" type="button" data-metric="${key}" data-level="${trend.level}" aria-pressed="${state.metric===key}" title="${copy.method}"><span class="metric-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${metricIcons[key]}"/></svg>${labels[key]}</span><span class="metric-value">${['spo2','fatigue'].includes(key)?window.missionGauge.markup({value:current,max:key==='fatigue'?10:100,label:labels[key],unit:key==='spo2'?'%':undefined,reverse:key==='fatigue',digits:1}):`<bdi>${Number.isFinite(current)?format(current,key):'-'}</bdi><span class="metric-unit">${unit(key)}</span>`}</span><span class="metric-spark">${spark(key,trend.values)}</span><span class="metric-trend"><bdi class="metric-delta">${change}</bdi><span class="metric-period">${copy.since} · ${t.periods[state.period]}</span></span></button>`}).join("");
 }
 function seriesFor(person,key,period){
-  if(period==='24h')return person.history[key];
-  const count={'1m':30,'1h':24,'7d':28,'1mo':30,'1y':52}[period],base=person.baseline[key],current=person.metrics[key],scale=key==='temp'?.12:key==='spo2'?.45:key==='fatigue'?.7:2.5;
-  return Array.from({length:count},(_,index)=>{const fraction=index/(count-1),trend=period==='1m'?current+(base-current)*.04*(1-fraction):period==='1h'?base+(current-base)*(.82+.18*fraction):base+(current-base)*Math.pow(fraction,period==='1y'?2.3:1.4),noise=index===count-1?0:Math.sin(index*1.75+state.crew)*scale*(period==='1m'?.3:1);let value=trend+noise;if(key==='spo2')value=Math.min(100,Math.max(0,value));if(key==='fatigue')value=Math.min(10,Math.max(0,value));return key==='temp'?Number(value.toFixed(1)):Math.round(value)});
+  if(person.readingsSource!=='shared-measurements')return [];
+  const values=person.recordedHistory?.[key]?.[period];
+  return Array.isArray(values)?values.map(value=>Number.isFinite(value)?value:null):[];
 }
-function friendTrendCopy(){return ({en:{since:'Since period start',missing:'No data',baseline:'Period baseline',method:'Demo / mean and SD of preceding points in the selected period. Amber: 2 SD, red: 3 SD. Arrow: change since period start. These are not medical limits.'},})[state.language]||{since:text().periods[state.period],missing:'-',baseline:text().baseline,method:text().simulated};}
+function friendTrendCopy(){return ({en:{since:'Since period start',missing:'No shared measurements',baseline:'Period baseline',method:'Recorded measurements only. Color shows difference from the preceding recorded points, not a medical assessment.'},})[state.language]||{since:text().periods[state.period],missing:'مشترکہ پیمائش دستیاب نہیں',baseline:text().baseline,method:'صرف ریکارڈ شدہ پیمائشیں۔ رنگ طبی تشخیص نہیں ہے۔'};}
 function friendDeltaUnit(key){return key==='spo2'?'pp':key==='fatigue'?'pts':unit(key);}
 function friendMetricLevel(value,mean,sigma){if(!Number.isFinite(value)||!Number.isFinite(mean)||!Number.isFinite(sigma)||sigma<=0)return 'neutral';const z=Math.abs(value-mean)/sigma;return z>=3?'red':z>=2?'amber':'green';}
 function friendMetricTrend(person,key){
   const values=seriesFor(person,key,state.period),current=values.at(-1),first=values[0],prior=values.slice(0,-1).filter(Number.isFinite),delta=Number.isFinite(current)&&Number.isFinite(first)?Number((current-first).toFixed(6)):null;
   if(prior.length<2||!Number.isFinite(current))return {values,delta,mean:null,sigma:null,level:'neutral'};
-  // Minimum SD matches the resolution of simulated values, rather than a medical threshold.
   const mean=prior.reduce((sum,value)=>sum+value,0)/prior.length,sigma=Math.max(key==='temp'?.1:1,Math.sqrt(prior.reduce((sum,value)=>sum+(value-mean)**2,0)/(prior.length-1)));
   return {values,delta,mean,sigma,level:friendMetricLevel(current,mean,sigma)};
 }
@@ -62,12 +61,11 @@ function renderChart(person){
   $("baseline-caption").innerHTML=Number.isFinite(trend.mean)?`<strong>${copy.baseline}:</strong> <bdi>${format(trend.mean,key)} ${unit(key)}</bdi> · 2σ / 3σ` : copy.missing;$("baseline-caption").title=copy.method;
 }
 function renderAssessment(person){
-  const t=text(),p=t.people[state.crew],activityTimes=["07:10 UTC","06:35 UTC","07:50 UTC"],sleepMinutes=[378,425,405],sleep=sleepMinutes[state.crew];
-  $("profile-photo").src=person.photo;$("profile-photo").alt=p.name;$("profile-photo").title=person.credit;$("profile-bio").href=person.bio;$("profile-name").textContent=p.name;$("profile-meta").innerHTML=`${p.role} · ${t.deepSpace} · ${t.sampleAt} <bdi dir="ltr">${person.events[0][1]}</bdi>`;
-  $("profile-state").className=`profile-state ${person.status}`;$("profile-state").textContent=t.status[person.status];$("assessment-heading").textContent=p.assessment;$("assessment-desc").textContent=p.description;$("signal-list").className=`signal-list ${person.status==="normal"?"stable":""}`;$("signal-list").innerHTML=p.signals.map(signal=>`<li>${signal}</li>`).join("");$("next-step").textContent=p.next;
-  const context=[`${t.activities[state.crew]} · <bdi dir="ltr">${activityTimes[state.crew]}</bdi>`,`${format(Math.floor(sleep/60),"hr")} ${t.hoursShort} ${format(sleep%60,"hr")} ${t.minutesShort}`,format(142,"hr"),t.good];
-  $("context-list").innerHTML=t.contextLabels.map((label,index)=>`<li><span>${label}</span><span>${context[index]}</span></li>`).join("");
-  const events=[t.events[state.crew],t.activityLogged,t.previousSample];$("event-list").innerHTML=events.map((label,index)=>`<li><span class="event-marker" aria-hidden="true"></span><p>${label}<time>${index===2?t.yesterday:`<bdi dir="ltr">${person.events[index][1]}</bdi>`}</time></p></li>`).join("");
+  const t=text(),p=t.people[state.crew],copy=friendTrendCopy(),ur=state.language==='ur';
+  $("profile-photo").src=person.photo;$("profile-photo").alt=p.name;$("profile-photo").title=person.credit;$("profile-bio").href=person.bio;$("profile-name").textContent=p.name;$("profile-meta").textContent=p.role+' / '+copy.missing;
+  $("profile-state").className='profile-state unavailable';$("profile-state").textContent=ur?'کوئی ڈیٹا نہیں':'NO DATA';$("assessment-heading").textContent=ur?'صحت کے اعداد و شمار دستیاب نہیں':'Health data unavailable';$("assessment-desc").textContent=ur?'اس پروفائل نے صحت کی پیمائشیں شیئر نہیں کیں۔':'This profile has not shared health measurements.';$("signal-list").className='signal-list';$("signal-list").replaceChildren();$("next-step").textContent=ur?'اپنی پیمائشیں شامل کرنے کے لیے صحت کا حصہ کھولیں۔':'Open Health to add your own measurements.';
+  $("context-list").innerHTML=t.contextLabels.map(label=>`<li><span>${label}</span><span>-</span></li>`).join('');
+  $("event-list").replaceChildren();
 }
 function renderSources(){
   const t=text(),indices=state.metric==="hr"?[1,0]:[0,2];$("source-list").innerHTML=indices.map(index=>`<a class="source-card" href="${sourceUrls[index]}" target="_blank" rel="noopener noreferrer"><span class="source-tag">NASA / HRP</span><span class="source-title">${t.sourceTitles[index]}</span><span class="source-desc">${t.sourceDescriptions[index]}</span></a>`).join("");

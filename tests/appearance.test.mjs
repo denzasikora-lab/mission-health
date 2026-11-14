@@ -61,9 +61,9 @@ function environment(storage=new Map(),samples=null){
   function collect(){for(let i=0;i<24;i++)sample();}
   return {api,node,workers,frames,timers,input,tick,sample,begin,collect,storage,setBitmap:p=>pendingBitmap=p,blockStorage:()=>blockStorage=true};
 }
-test('Reference numbers are never saved as personal results and are replaced by measurements or saved results',()=>{
+test('Personal appearance values stay empty until measured and saved results remain restorable',()=>{
   const e=environment(new Map(),controlSamples),cards=e.node('appearance-metrics').children;
-  assert.equal(cards.length,12);assert.ok(cards.every(card=>card.dataset.resultSource==='sample'&&/\d/.test(card.children[1].textContent)));assert.match(e.node('appearance-status').textContent,/Reference sample/);assert.equal(e.node('appearance-reset').disabled,true);e.api.stop();assert.equal(e.storage.size,0);
+  assert.equal(cards.length,12);assert.ok(cards.every(card=>card.dataset.resultSource==='missing'&&card.children[1].textContent==='No comparison'));assert.doesNotMatch(e.node('appearance-status').textContent,/Reference sample/);assert.equal(e.node('appearance-reset').disabled,true);e.api.stop();assert.equal(e.storage.size,0);
   e.begin();assert.ok(cards.every(card=>card.dataset.resultSource!=='sample'));e.collect();for(let i=0;i<5;i++)e.sample();assert.ok(cards.every(card=>card.dataset.resultSource==='live'));e.api.stop();
   const next=environment(e.storage,controlSamples);next.api.setIdentity({storageScope:'owner-a',name:'Egor Fedosov'});assert.ok(next.node('appearance-metrics').children.every(card=>card.dataset.resultSource==='saved'));assert.doesNotMatch(next.node('appearance-status').textContent,/Reference sample/);
 });

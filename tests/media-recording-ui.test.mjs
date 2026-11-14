@@ -245,9 +245,9 @@ function voiceAnalysisFixture({decode,samples}={}){
   const panel=kind=>host.children.find(item=>item.dataset.voiceAnalysis===kind),feature=(kind,key)=>panel(kind).querySelector('[data-voice-feature='+key+'] strong');return{api:window.missionVoiceAnalysis,panel,feature,workers};
 }
 const savedVoice={kind:'audio',createdAt:'2026-11-05T08:10:00Z',features:{acoustic:{level:-25.4,quiet:.2,clipping:.001,seconds:5},model:'embeddinggemma-2:daa72c51243991dfcaf9f9137d2c573d8f7790c0:q4:768',tone:[{label:'neutral',similarity:.62}]},transcript:'Saved speech'};
-test('Initial acoustic values come from reference files and do not prevent restoring older personal recordings',async()=>{
+test('Personal acoustic panels stay empty before recording and restore actual saved analysis',async()=>{
   const samples=audioSamples(),f=voiceAnalysisFixture({samples});await samples.audio;await settle();
-  for(const item of audioControlManifest.items){const kind=item.observation.kind,a=item.observation.features.acoustic;assert.equal(f.panel(kind).dataset.resultSource,'sample');assert.ok(f.panel(kind).children[1].children.every(card=>card.dataset.resultSource==='sample'));assert.equal(f.feature(kind,'level').textContent,a.level.toLocaleString('en-GB',{maximumFractionDigits:1})+' dBFS');assert.equal(f.feature(kind,'pauses').innerHTML,'gauge:'+a.quiet*100);assert.equal(f.feature(kind,'clipping').innerHTML,'gauge:'+a.clipping*100);assert.equal(f.feature(kind,'tone').textContent,'Synthesized speech / Samantha');assert.equal(f.panel(kind).children[4].children[0].textContent,'Reference sample text');}
+  for(const kind of ['audio','video']){assert.equal(f.panel(kind).dataset.resultSource,'missing');assert.ok(f.panel(kind).children[1].children.every(card=>card.dataset.resultSource==='missing'));for(const key of ['level','pauses','clipping'])assert.equal(f.feature(kind,key).textContent,'Recording required');assert.equal(f.feature(kind,'tone').textContent,'Voice analysis required');}
   assert.equal(f.api.restore('audio',{...savedVoice,createdAt:'2025-01-01T00:00:00Z'}),true);assert.equal(f.panel('audio').dataset.resultSource,'saved');assert.equal(f.feature('audio','level').textContent,'-25 dBFS');assert.equal(f.feature('audio','tone').textContent,'Neutral / 0.62');
 });
 test('A late reference file does not replace a new recording or its decode failure',async()=>{

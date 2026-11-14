@@ -238,6 +238,7 @@ const missionHandler={
     try{
       const user=owner(request,env);
       if(request.method!=='GET'&&((request.headers.get('origin')&&request.headers.get('origin')!==url.origin)||request.headers.get('sec-fetch-site')==='cross-site'))fail('forbidden',403);
+      if(url.pathname==='/api/readings')return await readingsRoute(request,env,user);
       const healthMatch=url.pathname.match(/^\/api\/health-analysis(?:\/([a-f0-9-]{36}))?$/i);if(healthMatch)return await healthAnalysisRoute(request,env,user,healthMatch[1]);
       if(url.pathname==='/api/media-analysis')return await mediaAnalysisRoute(request,env,user);
       const mediaFileMatch=url.pathname.match(/^\/api\/media-analysis\/([a-f0-9-]{36})\/media$/i);if(mediaFileMatch)return await mediaAnalysisFileRoute(request,env,user,mediaFileMatch[1]);
@@ -313,6 +314,7 @@ async function englishDisplay(body,env,user){
   return replace(body);
 }
 async function englishResponse(response,request,env){
+  if(new URL(request.url).pathname==='/api/readings')return response;
   if(!response.ok||!new URL(request.url).pathname.startsWith('/api/')||!response.headers.get('content-type')?.includes('application/json'))return response;
   const data=await response.json(),body=await englishDisplay(data,env,owner(request,env)),headers=response.headers;
   return new Response(JSON.stringify(body),{status:response.status,headers});

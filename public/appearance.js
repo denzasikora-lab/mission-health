@@ -3,6 +3,7 @@
   const status=document.getElementById('appearance-status'),hint=document.getElementById('appearance-hint'),referenceLabel=document.getElementById('appearance-reference');
   const progress=document.getElementById('appearance-progress'),preview=document.getElementById('appearance-preview'),ctx=preview.getContext('2d');
   const resetButton=document.getElementById('appearance-reset'),cards=new Map();
+  resetButton.disabled=true;
   const sampleVisual=window.missionAnalysisSamples?.visual;let sampleAllowed=true;
   const labels={green:'Close to baseline',amber:'Recheck frame',red:'Persistent difference',neutral:'No comparison'};
   let epoch=0,engine,ready=false,busy=false,active=false,frame=0,lastSent=0,timer,frameTimer,video,identity,scope='',cameraKey='',reference,collecting=false;
@@ -43,7 +44,7 @@
     cards.set(metric.key,{node,value,bar,label});
   }
   document.getElementById('appearance-metrics').prepend(...Array.from(cards.values(),card=>card.node));
-  neutral();sampleSummary();
+  neutral();mark('Waiting for camera');sampleSummary();
   function key(){return storagePrefix+JSON.stringify([identity.storageScope,identity.name,cameraKey]);}
   function load(){
     reference=null;storageOk=true;

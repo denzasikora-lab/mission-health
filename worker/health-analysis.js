@@ -12,14 +12,16 @@ async function canonicalHealthSnapshot(env,user,input){
 }
 function healthContextValue(raw){try{const value=JSON.parse(raw||'null');return value?.snapshot&&value?.rules?value:null;}catch{return null;}}
 function healthAnalysisView(row){return {id:row.id,snapshot:JSON.parse(row.snapshot_json),rules:JSON.parse(row.rules_json),result:JSON.parse(row.result_json),createdAt:row.created_at,updatedAt:row.updated_at,pending:row.lease_until>Date.now()};}
-async function healthTrendContext(env,user,snapshot){
-  const {results}=await database(env).prepare('SELECT snapshot_json FROM health_analyses WHERE owner_id=? AND created_at<=? ORDER BY created_at DESC,id DESC LIMIT 80').bind(user,snapshot.capturedAt).all();
-  const history=[snapshot,...results.map(row=>JSON.parse(row.snapshot_json))],trends={};
+async function healthTrendContext(env,user,snapshot,createdAt){
+  const db=database(env),trends={},cutoff=new Date(Math.min(Date.parse(snapshot.capturedAt),Date.parse(createdAt||new Date().toISOString()))).toISOString();
   const fields={heart_rate:'heart_rate',spo2:'spo2',temperature:'body_temperature',bp_systolic:'bp_systolic',bp_diastolic:'bp_diastolic',respiratory_rate:'respiratory_rate',fatigue_index:'fatigue_index',stress_index:'stress_index'};
   for(const [parameter,key] of Object.entries(fields)){
     const current=snapshot.readings[key];trends[parameter]='unknown';if(!current||current.source==='demo')continue;
+    const path='$.readings.'+key;
+    const {results}=await db.prepare("WITH candidates AS (SELECT json_extract(snapshot_json,?) AS reading_json,created_at,id,0 AS source_rank FROM health_readings WHERE owner_id=? AND created_at<=? UNION ALL SELECT json_extract(snapshot_json,?) AS reading_json,created_at,id,1 AS source_rank FROM health_analyses WHERE owner_id=? AND created_at<=?), compatible AS (SELECT reading_json,created_at,id,source_rank,ROW_NUMBER() OVER (PARTITION BY json_extract(reading_json,'$.observedAt') ORDER BY created_at DESC,source_rank ASC,id DESC) AS same_time FROM candidates WHERE json_extract(reading_json,'$.source')=? AND json_extract(reading_json,'$.unit')=? AND json_extract(reading_json,'$.observedAt')<=?) SELECT reading_json FROM compatible WHERE same_time=1 ORDER BY json_extract(reading_json,'$.observedAt') DESC LIMIT 10").bind(path,user,cutoff,path,user,cutoff,current.source,current.unit,current.observedAt).all();
+    const history=[current,...results.map(row=>JSON.parse(row.reading_json))];
     const seen=new Set(),points=[];
-    for(const item of history){const reading=item.readings?.[key];if(!reading||reading.source!==current.source||reading.unit!==current.unit||!reading.observedAt||reading.observedAt>current.observedAt||seen.has(reading.observedAt))continue;seen.add(reading.observedAt);points.push(reading);}
+    for(const reading of history){if(!reading||reading.source!==current.source||reading.unit!==current.unit||!reading.observedAt||reading.observedAt>current.observedAt||seen.has(reading.observedAt))continue;seen.add(reading.observedAt);points.push(reading);}
     points.sort((a,b)=>Date.parse(b.observedAt)-Date.parse(a.observedAt));if(points.length<10)continue;
     const latest=points.slice(0,5).reduce((sum,item)=>sum+item.value,0)/5,previous=points.slice(5,10).reduce((sum,item)=>sum+item.value,0)/5,difference=latest-previous;
     trends[parameter]=Math.abs(difference)<1e-9?'flat':difference>0?'rising':'falling';
@@ -28,7 +30,7 @@ async function healthTrendContext(env,user,snapshot){
 }
 async function healthAgentPayload(env,user,context,withTrends=false){
   const {snapshot,rules}=context,parameters=rules.parameters,usable=key=>parameters[key]?.status!=='NO_SIGNAL'?parameters[key]?.value??null:null,fatigue=usable('fatigue_stress');
-  return {astronaut:{id:'AST-014',name:(await savedProfileName(env,user))?.display_name||'Cdr. Sara Khan'},mission_time:null,captured_at:snapshot.capturedAt,latest:{heart_rate:usable('heart_rate'),spo2:usable('spo2'),temperature:usable('temperature'),bp:usable('bp'),respiratory_rate:usable('respiratory_rate'),fatigue:fatigue===null?null:fatigue>=70?'High':fatigue>=40?'Moderate':'Low',fatigue_index:parameters.fatigue_stress?.components?.fatigue_index??null,stress_index:parameters.fatigue_stress?.components?.stress_index??null},rule_result:{status:rules.status,flags:rules.flags,missing:rules.missing,stale:rules.stale,complete:rules.complete,escalated:rules.escalated,version:rules.version},recent_trend:withTrends?await healthTrendContext(env,user,snapshot):{},provenance:{is_demo:rules.isDemo,client_reported:true,direct_sensor_connection:false,readings:snapshot.readings,actiwatch_import_id:snapshot.actiwatchImportId},limitations:['Prototype thresholds from the project document; not validated medical limits.','Skin temperature is separate from body temperature.','Wellbeing and recovery are not fatigue or stress indices.','Interface example values and simulated charts are not astronaut telemetry.','A missing or stale core measurement is unknown, not normal.']};
+  return {astronaut:{id:'AST-014',name:(await savedProfileName(env,user))?.display_name||'Cdr. Sara Khan'},mission_time:null,captured_at:snapshot.capturedAt,latest:{heart_rate:usable('heart_rate'),spo2:usable('spo2'),temperature:usable('temperature'),bp:usable('bp'),respiratory_rate:usable('respiratory_rate'),fatigue:fatigue===null?null:fatigue>=70?'High':fatigue>=40?'Moderate':'Low',fatigue_index:parameters.fatigue_stress?.components?.fatigue_index??null,stress_index:parameters.fatigue_stress?.components?.stress_index??null},rule_result:{status:rules.status,flags:rules.flags,missing:rules.missing,stale:rules.stale,complete:rules.complete,escalated:rules.escalated,version:rules.version},recent_trend:withTrends?await healthTrendContext(env,user,snapshot,context.createdAt):{},provenance:{is_demo:rules.isDemo,client_reported:true,direct_sensor_connection:false,readings:snapshot.readings,actiwatch_import_id:snapshot.actiwatchImportId},limitations:['Prototype thresholds from the project document; not validated medical limits.','Skin temperature is separate from body temperature.','Wellbeing and recovery are not fatigue or stress indices.','Interface example values and simulated charts are not astronaut telemetry.','A missing or stale core measurement is unknown, not normal.']};
 }
 function healthChatAnswer(text,context){
   if(!context)return readableHealthAnswer(text);
@@ -55,7 +57,7 @@ async function healthAnalysisRoute(request,env,user,id){
     await db.prepare('INSERT OR IGNORE INTO health_analyses (id,owner_id,snapshot_json,rules_json,result_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?)').bind(input.id,user,snapshotText,JSON.stringify(rules),JSON.stringify(result),createdAt,createdAt).run();
     row=await db.prepare('SELECT * FROM health_analyses WHERE id=?').bind(input.id).first();if(row.owner_id!==user||row.snapshot_json!==snapshotText)fail('id_conflict',409);
   }
-  const context={snapshot:JSON.parse(row.snapshot_json),rules:JSON.parse(row.rules_json)};let result=JSON.parse(row.result_json);
+  const context={snapshot:JSON.parse(row.snapshot_json),rules:JSON.parse(row.rules_json),createdAt:row.created_at};let result=JSON.parse(row.result_json);
   const now=Date.now(),lease=now+60000,claim=await db.prepare('UPDATE health_analyses SET lease_until=? WHERE id=? AND owner_id=? AND lease_until<=? AND result_json=?').bind(lease,input.id,user,now,row.result_json).run();
   if(!(claim.meta?.changes??claim.changes)){const current=healthAnalysisView(await db.prepare('SELECT * FROM health_analyses WHERE id=? AND owner_id=?').bind(input.id,user).first());return json({...current,duplicate:current.result.agentAvailable},current.pending?202:200);}
   if(languageModelConfigured(env)){

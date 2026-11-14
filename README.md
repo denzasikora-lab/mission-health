@@ -20,9 +20,17 @@ Team start: [docs/TEAM_HANDOFF.md](docs/TEAM_HANDOFF.md). Development workflow: 
 
 The interface supports English and Urdu, light and dark themes, and adapts to narrow windows and mobile screens. Display presets include desktop, tablet, phone, and iPhone Duo. They change layout dimensions; they do not emulate physical devices.
 
-NASA portraits and archive stories include source attribution. Jessica Meir, Jack Hathaway, and Christina Koch are real astronauts; the health readings and conversations associated with prototype profiles are simulated, not their personal medical records or statements. The body illustration is not a scan. Sample archive material is kept distinct from user recordings.
+NASA portraits and archive stories include source attribution. Jessica Meir, Jack Hathaway, and Christina Koch are real astronauts. Their profiles contain public biography and archive material, without invented medical readings. Preloaded conversations are illustrative, not statements by those astronauts. The body illustration is not a scan. Sample archive material is kept distinct from user recordings.
 
 The current personal demo persona is **Cdr. Sara Khan (AST-014), Orion Station, Expedition 7**. Sara represents the existing personal workspace, not an added crew profile. A custom name saved by the signed-in owner takes precedence in NasaGPT; demo labels do not change account identity or imply live medical telemetry.
+
+## Personal measurements
+
+Health cards start without measurements. Add values through **Add or import readings**, a CSV/JSON snapshot, or an owned Actiware CSV import. Every saved value retains its unit, reported source and observation time. A reported device name is not proof of a direct hardware connection. Body and skin temperature remain separate; recovery, stress and fatigue are explicitly reported values, not inferred sensor measurements.
+
+Cards, recorded charts, rule checks and AI input share the same personal readings. Charts never synthesize a past history or fill missing intervals. Minute view checks for new saved records while visible. Core readings older than 15 minutes are excluded from current rule status; a wellbeing check-in expires after 12 hours. Missing data cannot establish NORMAL status.
+
+`POST /api/readings` saves an immutable measurement snapshot and a factual archive note. The text embedder indexes that note in owner-scoped Qdrant memory for archive search and cited answers. Saving measurements does not call a generative model. Camera/audio panels remain empty until an actual recording or saved result is available; reference archive samples stay explicitly labeled.
 
 ## Research data
 

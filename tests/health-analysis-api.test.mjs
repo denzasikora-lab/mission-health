@@ -9,7 +9,7 @@ const root=new URL('../',import.meta.url);
 const source=(await Promise.all([
   'public/health-rules-core.js','worker/activity.js','worker/scheduler.js','worker/personal.js',
   'worker/photos.js','worker/stories.js','worker/speech.js','worker/training.js','worker/book.js',
-  'worker/health-analysis.js','worker/index.js'
+  'worker/health-analysis.js','worker/readings.js','worker/index.js'
 ].map(path=>readFile(new URL(path,root),'utf8')))).join('\n').replace('export default','globalThis.app =');
 const migrations=await Promise.all((await readdir(new URL('drizzle/',root))).filter(name=>name.endsWith('.sql')).sort().map(name=>readFile(new URL('drizzle/'+name,root),'utf8')));
 const copy=value=>JSON.parse(JSON.stringify(value));
@@ -21,7 +21,7 @@ function snapshot(overrides={}){
 function fixture(t){
   const sql=new DatabaseSync(':memory:');t.after(()=>sql.close());for(const migration of migrations)sql.exec(migration);
   let claimHook=null;
-  const DB={prepare(query){const statement=sql.prepare(query);return {bind(...values){return {first:async()=>statement.get(...values)||null,all:async()=>({results:statement.all(...values)}),run:async()=>{if(query.startsWith('UPDATE health_analyses SET lease_until=')&&claimHook){const callback=claimHook;claimHook=null;callback();return {changes:0};}return statement.run(...values);}};}};}};
+  const DB={prepare(query){const statement=sql.prepare(query);return {bind(...values){return {first:async()=>statement.get(...values)||null,all:async()=>({results:statement.all(...values)}),run:async()=>{if(query.startsWith('UPDATE health_analyses SET lease_until=')&&claimHook){const callback=claimHook;claimHook=null;callback();return {changes:0};}return statement.run(...values);}};}};},async batch(commands){sql.exec('BEGIN');try{const results=[];for(const command of commands)results.push(await command.run());sql.exec('COMMIT');return results;}catch(error){sql.exec('ROLLBACK');throw error;}}};
   const outgoing=[];let code=200,answer=JSON.stringify({status:'NORMAL',alerts:[],summary:'Synthetic readings were supplied. Review the supplied measurements.'}),gate=null,signalRequest=null;
   const scope={URL,Request,Response,FormData,Blob,Uint8Array,TextEncoder,TextDecoder,DataView,AbortSignal,crypto:webcrypto,atob,console:{warn(){},error(){}},fetch:async(url,options)=>{
     const body=JSON.parse(options.body);outgoing.push({url,body});signalRequest?.();if(gate)await gate;
@@ -151,6 +151,61 @@ test('Repeated timestamps and foreign-owner snapshots cannot manufacture a real 
   const saved=await f.post(snapshot({heart_rate:reading(80,'bpm')}));assert.equal(saved.status,201);assert.equal(f.payload().recent_trend.heart_rate,'unknown');
 });
 
+test('Actual measurement saves inform the first analysis without requiring previous language-model calls',async t=>{
+  const f=fixture(t),base=Date.parse(now);
+  for(let index=0;index<9;index++){
+    const observedAt=new Date(base-(9-index)*60000).toISOString(),value={profileId:'personal',capturedAt:observedAt,readings:{heart_rate:reading(index<5?60:80,'bpm','manual',observedAt)}};
+    const saved=await f.run('/api/readings',{method:'POST',body:{id:webcrypto.randomUUID(),snapshot:value,sourceName:'Synthetic manual trend fixture'}});assert.equal(saved.status,201);
+  }
+  assert.equal(f.outgoing.length,0);assert.equal(f.sql.prepare('SELECT COUNT(*) AS n FROM health_analyses').get().n,0);
+  const current=snapshot({heart_rate:reading(80,'bpm')});current.capturedAt=new Date().toISOString();const saved=await f.post(current);assert.equal(saved.status,201);assert.equal(f.payload().recent_trend.heart_rate,'rising');assert.equal(f.outgoing.length,1);
+});
+
+test('Recent trend deduplicates observations across measurements and analyses and excludes incompatible or foreign evidence',async t=>{
+  const f=fixture(t),base=Date.parse(now);
+  for(let index=0;index<9;index++){
+    const observedAt=new Date(base-(index%4+1)*60000).toISOString(),value=snapshot({heart_rate:reading(60,'bpm','manual',observedAt)});value.capturedAt=observedAt;
+    const id=webcrypto.randomUUID();f.sql.prepare('INSERT INTO health_readings (id,owner_id,snapshot_json,source_name,created_at) VALUES (?,?,?,?,?)').run(id,'owner-a',JSON.stringify(value),'Synthetic duplicate timestamp',observedAt);
+    f.sql.prepare('INSERT INTO health_analyses (id,owner_id,snapshot_json,rules_json,result_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?)').run(webcrypto.randomUUID(),'owner-a',JSON.stringify(value),'{}','{}',observedAt,observedAt);
+    const foreignTime=new Date(base-(index+5)*60000).toISOString(),foreign=snapshot({heart_rate:reading(60,'bpm','manual',foreignTime)});foreign.capturedAt=foreignTime;
+    f.sql.prepare('INSERT INTO health_readings (id,owner_id,snapshot_json,source_name,created_at) VALUES (?,?,?,?,?)').run(webcrypto.randomUUID(),'owner-b',JSON.stringify(foreign),'Synthetic foreign owner',foreignTime);
+    const wrongUnit=copy(foreign);wrongUnit.readings.heart_rate.unit='ms';f.sql.prepare('INSERT INTO health_analyses (id,owner_id,snapshot_json,rules_json,result_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?)').run(webcrypto.randomUUID(),'owner-a',JSON.stringify(wrongUnit),'{}','{}',foreignTime,foreignTime);
+  }
+  const current=snapshot({heart_rate:reading(80,'bpm')});current.capturedAt=new Date().toISOString();assert.equal((await f.post(current)).status,201);assert.equal(f.payload().recent_trend.heart_rate,'unknown');
+});
+
+test('Unrelated newer saves do not truncate actual measurement evidence needed by the agent trend',async t=>{
+  const f=fixture(t),base=Date.parse(now);
+  for(let index=0;index<9;index++){
+    const observedAt=new Date(base-(9-index)*60000).toISOString(),value={profileId:'personal',capturedAt:observedAt,readings:{heart_rate:reading(index<5?60:80,'bpm','manual',observedAt)}};
+    assert.equal((await f.run('/api/readings',{method:'POST',body:{id:webcrypto.randomUUID(),snapshot:value,sourceName:'Synthetic older heart-rate fixture'}})).status,201);
+  }
+  for(let index=0;index<205;index++){
+    const value={profileId:'personal',capturedAt:now,readings:{steps:reading(index,'steps')}};
+    assert.equal((await f.run('/api/readings',{method:'POST',body:{id:webcrypto.randomUUID(),snapshot:value,sourceName:'Synthetic unrelated newer measurement'}})).status,201);
+  }
+  const current=snapshot({heart_rate:reading(80,'bpm')});current.capturedAt=new Date().toISOString();assert.equal((await f.post(current)).status,201);assert.equal(f.payload().recent_trend.heart_rate,'rising');assert.equal(f.outgoing.length,1);
+});
+
+test('Trend direction uses the newest ten actual observations rather than all historic values',async t=>{
+  const f=fixture(t),base=Date.parse(now);
+  for(let index=0;index<19;index++){
+    const observedAt=new Date(base-(19-index)*60000).toISOString(),value={profileId:'personal',capturedAt:observedAt,readings:{heart_rate:reading(index<10?50+index*5:80,'bpm','manual',observedAt)}};
+    assert.equal((await f.run('/api/readings',{method:'POST',body:{id:webcrypto.randomUUID(),snapshot:value,sourceName:'Synthetic changing historic fixture'}})).status,201);
+  }
+  const current=snapshot({heart_rate:reading(80,'bpm')});current.capturedAt=new Date().toISOString();assert.equal((await f.post(current)).status,201);assert.equal(f.payload().recent_trend.heart_rate,'flat');
+});
+
+test('Measurements saved after a frozen snapshot do not retroactively create its trend',async t=>{
+  const f=fixture(t),base=Date.parse(now),capturedAt=new Date(base-60000).toISOString();
+  for(let index=0;index<9;index++){
+    const observedAt=new Date(base-(10-index)*60000).toISOString(),value={profileId:'personal',capturedAt:observedAt,readings:{heart_rate:reading(60,'bpm','manual',observedAt)}};
+    assert.equal((await f.run('/api/readings',{method:'POST',body:{id:webcrypto.randomUUID(),snapshot:value,sourceName:'Synthetic subsequently saved fixture'}})).status,201);
+  }
+  const current=snapshot({heart_rate:reading(80,'bpm','manual',capturedAt),spo2:reading(98,'%','manual',capturedAt),body_temperature:reading(36.8,'C','manual',capturedAt)});current.capturedAt=capturedAt;
+  assert.equal((await f.post(current)).status,201);assert.equal(f.payload().recent_trend.heart_rate,'unknown');
+});
+
 test('Concurrent retry returns pending without starting a second Azure request',{timeout:2000},async t=>{
   const f=fixture(t),{release,started}=f.hold(),body={id:webcrypto.randomUUID(),snapshot:snapshot()};t.after(release);
   const first=f.run('/api/health-analysis',{method:'POST',body});await started;
@@ -170,4 +225,16 @@ test('A completed concurrent analysis is returned as ready when the lease CAS lo
   const f=fixture(t),id=webcrypto.randomUUID(),result={status:'NORMAL',agentStatus:'NORMAL',agentAvailable:true,summary:'The concurrent request completed.',alerts:[]};
   f.beforeClaim(()=>{f.sql.prepare('UPDATE health_analyses SET result_json=?,lease_until=0 WHERE id=?').run(JSON.stringify(result),id);});
   const response=await f.post(snapshot(),{body:{id}});assert.equal(response.status,200);assert.equal(response.body.pending,false);assert.equal(response.body.duplicate,true);assert.equal(response.body.result.summary,result.summary);assert.equal(f.outgoing.length,0);
+});
+
+
+test('Future client capture times cannot admit later measurement saves into an analysis retry',async t=>{
+  const f=fixture(t),id=webcrypto.randomUUID(),current=snapshot({heart_rate:reading(80,'bpm')});current.capturedAt=new Date(Date.now()+240000).toISOString();f.provider(503);
+  const body={id,snapshot:current};assert.equal((await f.run('/api/health-analysis',{method:'POST',body})).status,201);
+  const created=f.sql.prepare('SELECT created_at FROM health_analyses WHERE id=?').get(id).created_at;
+  for(let index=0;index<9;index++){
+    const value=snapshot({heart_rate:reading(index<5?70:80,'bpm','manual',new Date(Date.parse(now)-(9-index)*1000).toISOString())});
+    f.sql.prepare('INSERT INTO health_readings (id,owner_id,snapshot_json,source_name,created_at) VALUES (?,?,?,?,?)').run(webcrypto.randomUUID(),'owner-a',JSON.stringify(value),'Synthetic later save',new Date(Date.parse(created)+1000).toISOString());
+  }
+  f.provider(200);assert.equal((await f.run('/api/health-analysis',{method:'POST',body})).status,201);assert.equal(f.payload().recent_trend.heart_rate,'unknown');
 });
