@@ -78,3 +78,5 @@ audio.book-observation-media{height:54px;max-height:54px}
 .book-page-structured .book-page-running{font-size:9px;letter-spacing:.05em}
 
 .book-search-actions{display:flex;justify-content:center;margin:16px 14px 24px}.book-search-actions #book-search-open{display:inline-flex;align-items:center;justify-content:center;gap:10px;width:min(100%,420px);min-height:52px;padding:13px 22px;border-color:var(--accent);border-radius:12px;background:var(--accent-solid);color:#123a25;font:inherit;font-size:.95rem;font-weight:650;line-height:1.4;white-space:normal;text-align:center}.book-search-actions #book-search-open svg{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}.book-search-actions #book-search-open:hover{filter:brightness(1.06)}
+
+.book-search-flow{margin:12px 0 18px;font-size:.64rem;line-height:1.8;color:var(--accent);overflow-wrap:anywhere}

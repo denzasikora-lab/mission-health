@@ -32,6 +32,8 @@
     'Microphone is off.':'مائیکروفون بند ہے.','Waiting for microphone permission.':'مائیکروفون کی اجازت کا انتظار ہے.',
     'Preparing audio recording.':'آڈیو ریکارڈنگ تیار ہو رہی ہے.','Recording sent for analysis.':'ریکارڈنگ تجزیے کے لیے بھیج دی گئی.',
     'Recording audio. Press «Audio», to stop.':'آڈیو ریکارڈ ہو رہی ہے. روکنے کے لیے آڈیو دبائیں.',
+    'Qdrant vector search finds relevant records across your health history. RAG uses these records to ground NasaGPT answers and link back to the original entries.':'Qdrant کی ویکٹر تلاش آپ کی صحت کی تاریخ سے متعلقہ ریکارڈ تلاش کرتی ہے. RAG ان ریکارڈز کی مدد سے NasaGPT کو جواب کے لیے سیاق دیتا ہے اور اصل اندراجات کے روابط دکھاتا ہے.',
+    'Embeddings → Qdrant → Relevant records → NasaGPT':'ایمبیڈنگز → Qdrant → متعلقہ ریکارڈ → NasaGPT',
     'Home / Mission Health':'مرکزی صفحہ / Mission Health'
   };
   const rules=[];
@@ -56,6 +58,8 @@
   add('#mission-home-button',['Home'],'aria-label');add('#mission-home-button',['Home'],'title');
   add('.brand',['Home / Mission Health'],'aria-label');
   add('#book-search-open > span',['Search archive']);
+  add('.book-search-intro',['Qdrant vector search finds relevant records across your health history. RAG uses these records to ground NasaGPT answers and link back to the original entries.']);
+  add('.book-search-flow',['Embeddings → Qdrant → Relevant records → NasaGPT']);
   add('.home-body-panel > header > h2',['My readings']);
   add('.home-example-button',['PREFLIGHT RUN']);add('.home-example-button',['Load clearly labeled example readings'],'title');add('.home-sample-button',['LOAD READINGS']);add('.home-sample-button',['Load saved readings and imported device data'],'title');
   add('.home-sample-clear',['Clear generated sample'],'aria-label');add('.home-sample-clear',['Clear generated sample'],'title');
