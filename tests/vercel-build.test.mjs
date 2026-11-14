@@ -20,6 +20,6 @@ test('Vercel serves the existing frontend with a session gate before every appli
 test('Vercel configuration routes API traffic to the isolated VPS backend without embedding credentials',async()=>{
   const config=JSON.parse(await readFile(new URL('../vercel.json',import.meta.url),'utf8'));
   assert.equal(config.framework,null);assert.equal(config.buildCommand,'npm run build:vercel');assert.equal(config.outputDirectory,'vercel-static');assert.equal(config.git.deploymentEnabled,true);
-  assert.deepEqual(config.rewrites,[{source:'/api/:path*',destination:'https://app.fereyappfuturewinterworkbookgrace.store/mission-health-api/api/:path*'}]);
+  assert.deepEqual(config.rewrites,[{source:'/api/:path*',destination:'https://users.fereyuserstopstrongcloudwinter.shop/mission-health-api/api/:path*'}]);
   assert.equal(config.env,undefined);assert.equal(config.build,undefined);
 });

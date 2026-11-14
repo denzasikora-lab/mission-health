@@ -19,3 +19,12 @@ public/vendor/
 .vercel/
 vercel-static/
 dist/backend/
+runtime.env
+session-secret
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+**/backend/data/
+**/backend/backups/
+**/backend/ssh/
