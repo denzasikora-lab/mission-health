@@ -18,7 +18,7 @@ __pycache__/
 public/vendor/
 .vercel/
 vercel-static/
-dist/backend/
+dist/
 runtime.env
 session-secret
 *.sqlite

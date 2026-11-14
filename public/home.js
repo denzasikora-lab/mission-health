@@ -22,8 +22,9 @@
   }
   sampleButton.addEventListener('click',fillSample);sampleClear.addEventListener('click',clearSample);
   function setSource(key,label,url){const note=cards.get(key)?.querySelector(':scope > small');if(!note)return;note.replaceChildren();if(url){const link=make('a','home-instrument',label);link.href=url;link.target='_blank';link.rel='noopener';note.append(link);}else note.textContent=label;}
-  function model(){
-    if(sampleActive())return JSON.parse(JSON.stringify(generated));
+  function sampleBase(){return sampleActive()?JSON.parse(JSON.stringify(generated)):null;}
+  function model(now=Date.now()){
+    if(sampleActive())return window.MissionHomeTrendData?.sampleSnapshot?.(generated,now)||sampleBase();
     const stored=window.missionReadings?.current?.(),readings=Object.fromEntries(keys.map(key=>[key,stored?.readings?.[key]?{...stored.readings[key]}:null]));
     const report=window.missionCheckin.current(),at=window.missionCheckin.selection?.()?.at;
     if(report?.wellbeingScale===100&&Number.isInteger(report.score)&&report.score>=1&&report.score<=100&&Number.isFinite(at)&&at<=Date.now()&&Date.now()-at<12*3600000&&(!readings.wellbeing||Date.parse(readings.wellbeing.observedAt)<=at))readings.wellbeing={value:report.score,unit:'/100',source:'manual',observedAt:new Date(at).toISOString()};
@@ -40,8 +41,8 @@
     const reported=window.missionReadings?.provenance?.()[key];if(reported?.sourceName)return reported.sourceName;
     const record=window.missionReadings?.records?.().find(item=>{const candidate=item.snapshot?.readings?.[key];return candidate&&candidate.value===reading.value&&candidate.observedAt===reading.observedAt;});return record?.sourceName||'Manual entry';
   }
-  function renderValues(){
-    const value=model();
+  function renderValues(now=Date.now()){
+    const value=model(now);
     for(const [key,readingKey,label,unit]of fields){
       const card=cards.get(key),number=card.querySelector('strong'),reading=value.readings[readingKey],second=key==='pressure'?value.readings.bp_diastolic:null,valid=Number.isFinite(reading?.value),observed=reading?.observedAt;
       card.dataset.source=(reading||second)?.source||'missing';card.dataset.readingValue=valid?String(reading.value):'';card.dataset.observedAt=observed||second?.observedAt||'';
@@ -59,5 +60,5 @@
     const chat=document.getElementById('nasagpt-sidebar');if(!isOverview&&!chat.hidden)window.missionChatComposer.stopWithin(chat);chat.hidden=!isOverview;if(chat.parentElement!==home.parentElement)home.before(chat);friendProfile.classList.toggle('friend-profile',true);renderValues();
     if(state.workspace==='crew'&&state.view==='health'&&state.visiting){document.getElementById('mission-heading-title').textContent='Visiting / '+crew[state.crew].name;document.getElementById('mission-heading-description').textContent='Friend profile readings';}
   }
-  window.missionHome={render,renderValues,setSource,model,snapshot,sampleActive};window.addEventListener('mission-profile-change',()=>{if(generatedOwner!==owner())clearSample();render();});for(const event of ['mission-wellbeing-change','mission-readings-change','mission-actiwatch-change'])window.addEventListener(event,()=>{if(generated&&generatedBaseline!==actualSignature())clearSample();else renderValues();});render();window.dispatchEvent(new Event('mission-home-ready'));
+  window.missionHome={render,renderValues,setSource,model,snapshot,sampleActive,sampleBase};window.addEventListener('mission-profile-change',()=>{if(generatedOwner!==owner())clearSample();render();});for(const event of ['mission-wellbeing-change','mission-readings-change','mission-actiwatch-change'])window.addEventListener(event,()=>{if(generated&&generatedBaseline!==actualSignature())clearSample();else renderValues();});render();window.dispatchEvent(new Event('mission-home-ready'));
 })();

@@ -28,23 +28,57 @@ class Node{
   getClientRects(){return this.hidden||this.parent&&!this.parent.getClientRects().length?[]:[{}];}
 }
 function fixture({records=[],readings={},watch=null,recording=null,report=null,reportAt=null,scope='owner-a'}={}){
-  let now=initialNow,id=0,stored=records,model={readings},imported=watch,epochs=recording,currentReport=report,selectedReport=reportAt===null?null:{at:reportAt},manualPolls=0,watchPolls=0;
+  let now=initialNow,id=0,stored=records,model={readings},imported=watch,epochs=recording,currentReport=report,selectedReport=reportAt===null?null:{at:reportAt},manualPolls=0,watchPolls=0,generated=null,generatedOwner=null;
   const timers=new Map(),observers=[],body=new Node('body'),home=new Node('section'),bodyPanel=new Node('section');
   home.id='mission-home';bodyPanel.className='home-body-panel';body.append(home);home.append(bodyPanel);
   const cards=new Map();for(const key of ['hr','spo2','wellbeing','activity','sleep','light','temp','bodyTemp','hrv','respiration','pressure','recovery','fatigue','stress','steps']){const card=new Node('article'),number=new Node('strong');card.dataset={homeMetric:key,source:'demo',readingValue:'999',observedAt:null};number.textContent='999';card.append(number);bodyPanel.append(card);cards.set(key,card);}
   const document=new Node('document');Object.assign(document,{body,hidden:false,createElement:tag=>new Node(tag),createElementNS:(_ns,tag)=>new Node(tag),getElementById:key=>key==='mission-home'?home:null});
-  const window=new Node('window');window.missionProfileName={identity:scope?{storageScope:scope}:null};window.missionHome={model:()=>model};window.missionReadings={records:()=>stored,refresh:async()=>{manualPolls++;}};window.missionActiwatch={current:()=>imported,recording:()=>epochs,refresh:async()=>{watchPolls++;}};window.missionCheckin={current:()=>currentReport,selection:()=>selectedReport};
+  const window=new Node('window');window.missionProfileName={identity:scope?{storageScope:scope}:null};window.missionHome={model:()=>model,sampleActive:()=>generated!==null&&generatedOwner===(window.missionProfileName.identity?.storageScope||null),sampleBase:()=>window.missionHome.sampleActive()?clone(generated):null};window.missionReadings={records:()=>stored,refresh:async()=>{manualPolls++;}};window.missionActiwatch={current:()=>imported,recording:()=>epochs,refresh:async()=>{watchPolls++;}};window.missionCheckin={current:()=>currentReport,selection:()=>selectedReport};
   const setTimeout=(callback,delay)=>{timers.set(++id,{callback,at:now+delay});return id;},clearTimeout=key=>timers.delete(key);
   class FakeDate extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
   class Observer{constructor(callback){this.callback=callback;this.observations=[];this.disconnected=false;observers.push(this);}observe(target,options){this.observations.push({target,options});}disconnect(){this.observations=[];this.disconnected=true;}}
   const sandbox={window,document,Date:FakeDate,Intl,MutationObserver:Observer,setTimeout,clearTimeout,requestAnimationFrame:callback=>setTimeout(callback,16),cancelAnimationFrame:clearTimeout};
   vm.runInNewContext(watchSource,sandbox);vm.runInNewContext(source,sandbox);
+  window.missionHome.renderValues=at=>{const value=sandbox.MissionHomeTrendData.sampleSnapshot(generated,at);for(const [key,card]of cards){card.dataset.source='demo';card.dataset.readingValue=String(value.readings[sandbox.MissionHomeTrendData.metrics[key].reading]?.value??'');}};
   const panel=home.querySelector('.home-trends'),controls=panel.querySelector('.home-trend-periods'),svg=panel.querySelector('svg');
   function advance(milliseconds){const end=now+milliseconds;let steps=0;while(true){const next=[...timers].filter(([,timer])=>timer.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];if(!next)break;if(steps++>1000)throw new Error('timer loop');now=next[1].at;timers.delete(next[0]);next[1].callback();}now=end;}
   function mutate(target,attribute){for(const observer of observers){if(observer.observations.some(item=>item.target===target&&(!attribute||item.options.attributeFilter?.includes(attribute))))observer.callback([]);}}
   const period=value=>controls.emit('click',{target:controls.children.find(node=>node.dataset.trendPeriod===value)}),select=key=>cards.get(key).emit('click'),path=()=>svg.querySelector('.home-trend-line')?.attributes.d||null;
-  return {window,document,home,cards,panel,svg,timers,observers,period,select,path,advance,mutate,api:window.missionHomeTrends,core:sandbox.MissionHomeTrendData,watchCore:sandbox.MissionActiwatch,polls:()=>({manual:manualPolls,watch:watchPolls}),now:()=>now,setRecords:value=>{stored=value;},setReadings:value=>{model={readings:value};},setWatch:(value,data)=>{imported=value;epochs=data;},setReport:(value,at)=>{currentReport=value;selectedReport=at===null?null:{at};},owner:value=>{window.missionProfileName.identity=value?{storageScope:value}:null;window.emit('mission-profile-change');}};
+  return {window,document,home,cards,panel,svg,timers,observers,period,select,path,advance,mutate,api:window.missionHomeTrends,core:sandbox.MissionHomeTrendData,watchCore:sandbox.MissionActiwatch,polls:()=>({manual:manualPolls,watch:watchPolls}),now:()=>now,setRecords:value=>{stored=value;},setReadings:value=>{model={readings:value};},setSample:value=>{generated=value?clone(value):null;generatedOwner=window.missionProfileName.identity?.storageScope||null;window.emit('mission-sample-change');},setWatch:(value,data)=>{imported=value;epochs=data;},setReport:(value,at)=>{currentReport=value;selectedReport=at===null?null:{at};},owner:value=>{window.missionProfileName.identity=value?{storageScope:value}:null;window.emit('mission-profile-change');}};
 }
+
+function sampleSnapshot(){
+  const values={heart_rate:74,spo2:98,body_temperature:36.9,skin_temperature:34,bp_systolic:112,bp_diastolic:72,respiratory_rate:15,fatigue_index:26,stress_index:24,wellbeing:83,recovery:84,sleep_hours:7.8,hrv:48,steps:6500,activity:32500,light:360};
+  return {profileId:'personal',capturedAt:new Date(initialNow).toISOString(),actiwatchImportId:null,readings:Object.fromEntries(Object.entries(values).map(([key,value])=>[key,{value,source:'demo',observedAt:null}]))};
+}
+
+test('Explicit samples supply all metric periods with finite ordered histories ending at the shared current value',()=>{
+  const f=fixture(),base=sampleSnapshot(),before=clone(base),at=initialNow+37123,current=f.core.sampleSnapshot(base,at);
+  for(const [key,config]of Object.entries(f.core.metrics))for(const period of f.core.periods){const points=f.core.sampleHistory(key,base,period,at);assert.ok(points.length>=61,key+':'+period.id);assert.equal(points[0].at,at-period.ms);assert.equal(points.at(-1).at,at);assert.equal(points.at(-1).value,current.readings[config.reading].value);assert.ok(points.every((point,index)=>Number.isFinite(point.value)&&point.value>=0&&(index===0||points[index-1].at<point.at)));assert.equal(f.core.segments(points,period).length,1);assert.ok(points.every(point=>point.sourceName==='Generated sample'));}
+  assert.deepEqual(base,before);assert.ok(Object.values(current.readings).every(value=>value.source==='demo'&&value.observedAt===null));assert.deepEqual(clone(f.core.sampleSnapshot(base,initialNow)).readings,base.readings);assert.equal(f.core.sampleHistory('unknown',base,f.core.periods[0],at).length,0);assert.equal(f.core.sampleHistory('hr',{...base,readings:{heart_rate:reading(74)}},f.core.periods[0],at).length,0);
+});
+
+test('Sample histories remain stable at shared timestamps while minute time advances',()=>{
+  const f=fixture(),base=sampleSnapshot(),period=f.core.periods[0],first=f.core.sampleHistory('hr',base,period,initialNow),next=f.core.sampleHistory('hr',base,period,initialNow+1000);
+  assert.deepEqual(clone(f.core.sampleHistory('hr',base,period,initialNow)),clone(first));assert.deepEqual(clone(next.slice(0,-1)),clone(first.slice(1)));assert.notDeepEqual(clone(f.core.sampleHistory('hr',base,period,initialNow+30000)),clone(first));
+});
+
+test('An active sample fills every chart period without mixing saved observations or implying real measurements',()=>{
+  const records=[record('heart_rate',199)],f=fixture({records,readings:{heart_rate:reading(199)}}),base=sampleSnapshot();f.setSample(base);f.advance(16);
+  for(const key of Object.keys(f.core.metrics)){f.select(key);for(const period of f.core.periods){f.period(period.id);assert.equal(f.panel.dataset.source,'demo');assert.ok(Number(f.panel.dataset.observationCount)>=61);assert.ok(f.path());assert.match(f.svg.attributes['aria-label'],/generated sample points/);assert.match(f.panel.querySelector('.home-trend-source').textContent,/Sample history/);assert.equal(f.panel.dataset.trendLevel,'neutral');assert.equal(f.cards.get(key).querySelector('.home-vital-trend').hidden,true);}}
+  assert.deepEqual(records,[record('heart_rate',199)]);assert.deepEqual(f.polls(),{manual:0,watch:0});
+  f.setSample(null);f.advance(16);f.select('hr');f.period('24h');assert.equal(f.panel.dataset.source,'observations');assert.equal(f.panel.dataset.observationCount,'1');assert.equal(f.path(),null);assert.equal(f.panel.querySelector('.home-trend-reading').textContent,'199 bpm');
+});
+
+test('The sample minute clock updates graph and cards together without polling stores and pauses while hidden',async()=>{
+  const f=fixture({scope:null}),base=sampleSnapshot();f.setSample(base);f.advance(16);f.period('1m');const first=f.path();f.advance(30000);await flush();assert.notEqual(f.path(),first);assert.deepEqual(f.polls(),{manual:0,watch:0});
+  const value=f.core.sampleSnapshot(base,Math.floor(f.now()/1000)*1000).readings.heart_rate.value;assert.equal(f.cards.get('hr').dataset.readingValue,String(value));assert.equal(f.panel.querySelector('.home-trend-reading').textContent,value+' bpm');
+  f.document.hidden=true;f.document.emit('visibilitychange');const paused=f.path();assert.equal(f.timers.size,0);f.advance(10000);assert.equal(f.path(),paused);f.document.hidden=false;f.document.emit('visibilitychange');f.advance(16);assert.notEqual(f.path(),paused);f.setSample(null);f.advance(16);assert.equal(f.panel.dataset.observationCount,'0');assert.equal(f.timers.size,0);
+});
+
+test('An owner change removes a generated history before showing another session',()=>{
+  const f=fixture();f.setSample(sampleSnapshot());f.advance(16);assert.equal(f.panel.dataset.source,'demo');f.owner('owner-b');f.advance(16);assert.equal(f.panel.dataset.source,'observations');assert.equal(f.panel.dataset.observationCount,'0');assert.equal(f.path(),null);
+});
 
 test('Missing data never parses synthetic card text or invents chart points',()=>{
   const f=fixture();assert.equal(f.panel.dataset.observationCount,'0');assert.equal(f.path(),null);assert.equal(f.panel.querySelector('.home-trend-reading').textContent,'Not measured');assert.match(f.panel.querySelector('.home-trend-empty').textContent,/No observations/);assert.equal(f.cards.get('hr').querySelector('.home-vital-trend').textContent,'No history');assert.equal(f.timers.size,0);

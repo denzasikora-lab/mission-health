@@ -6,6 +6,7 @@ import {webcrypto} from 'node:crypto';
 
 const root=new URL('../',import.meta.url),homeSource=await readFile(new URL('public/home.js',root),'utf8'),uiSource=await readFile(new URL('public/health-context.js',root),'utf8'),coreSource=await readFile(new URL('public/health-rules-core.js',root),'utf8'),personalSource=await readFile(new URL('public/personal-space.js',root),'utf8');
 const clone=value=>JSON.parse(JSON.stringify(value)),now=Date.parse('2026-11-14T10:00:00Z'),importId='a7337ee1-9cf8-42cf-b0d5-75d90258835c';
+const trendSource=await readFile(new URL('public/home-trends.js',root),'utf8');
 class Clock extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
 class Node{
   constructor(tag='div'){this.tagName=tag;this.children=[];this.dataset={};this.attributes={};this.events={};this.className='';this.parentElement=null;this.hidden=false;this.disabled=false;this.open=false;this._text='';this.htmlWrites=0;this.classList={add:(...values)=>{this.className=[...new Set([...this.className.split(' ').filter(Boolean),...values])].join(' ');},toggle:(value,on)=>{const names=new Set(this.className.split(' ').filter(Boolean));if(on===undefined? !names.has(value):on)names.add(value);else names.delete(value);this.className=[...names].join(' ');}};}
@@ -90,6 +91,14 @@ test('Explicit sample generation fills every card with valid fictional values wi
     assert.equal(f.home.querySelectorAll('.home-vital').filter(card=>card.dataset.source==='demo').length,15);assert.deepEqual(clone(f.scope.missionReadings.current()),actual);
   }
   const sample=clone(f.api.snapshot());sample.readings.heart_rate.value=999;assert.notEqual(f.api.snapshot().readings.heart_rate.value,999);f.home.querySelector('.home-sample-clear').emit('click');assert.equal(f.api.sampleActive(),false);assert.deepEqual(clone(f.api.snapshot()),original);assert.equal(f.home.querySelector('.home-sample-clear').hidden,true);
+});
+
+test('Cards, analysis snapshots and sample chart endpoints use one time-dependent model without changing its anchor',()=>{
+  const f=homeFixture(),original=manualSnapshot(),trendScope={document:{getElementById:()=>null},Date:Clock};vm.runInNewContext(trendSource,trendScope);f.scope.MissionHomeTrendData=trendScope.MissionHomeTrendData;f.readings(original);f.home.querySelector('.home-sample-button').emit('click');const base=clone(f.api.sampleBase()),at=now+37000;
+  class LaterClock extends Date{constructor(...args){super(...(args.length?args:[at]));}static now(){return at;}}
+  f.scope.Date=LaterClock;f.api.renderValues();const snapshot=clone(f.api.snapshot());assert.equal(snapshot.capturedAt,new LaterClock().toISOString());
+  for(const [key,config]of Object.entries(trendScope.MissionHomeTrendData.metrics)){const value=snapshot.readings[config.reading].value;assert.equal(f.home.querySelector('[data-home-metric='+key+']').dataset.readingValue,String(value));for(const period of trendScope.MissionHomeTrendData.periods)assert.equal(trendScope.MissionHomeTrendData.sampleHistory(key,base,period,at).at(-1).value,value);}
+  assert.deepEqual(clone(f.api.sampleBase()),base);f.api.sampleBase().readings.heart_rate.value=999;assert.deepEqual(clone(f.api.sampleBase()),base);assert.ok(Object.values(snapshot.readings).every(value=>value.source==='demo'&&value.observedAt===null));f.home.querySelector('.home-sample-clear').emit('click');assert.equal(f.api.sampleBase(),null);assert.deepEqual(clone(f.api.snapshot()).readings,original.readings);
 });
 
 test('Repeated generation changes the sample while unchanged polling and layout updates preserve it',()=>{

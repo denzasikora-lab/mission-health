@@ -21,9 +21,6 @@ await cp('node_modules/@huggingface/transformers/LICENSE','public/vendor/transfo
 await collect('public');
 await rm('dist',{recursive:true,force:true});
 await mkdir('dist/server',{recursive:true});
-await mkdir('dist/.openai',{recursive:true});
 const source=await readWorkerSource();
 await writeFile('dist/server/index.js','const assets='+JSON.stringify(assets)+';\n'+source);
-await cp('.openai/hosting.json','dist/.openai/hosting.json');
-try{await cp('drizzle','dist/.openai/drizzle',{recursive:true})}catch(error){if(error.code!=='ENOENT')throw error}
 console.log('Built server and '+Object.keys(assets).length+' assets.');

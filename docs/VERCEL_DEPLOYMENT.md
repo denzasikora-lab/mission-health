@@ -1,90 +1,34 @@
-# Vercel frontend and standalone backend
+# Deployment
 
-Production frontend target: https://mission-health-bug-busters.vercel.app/
+Website: https://mission-health-bug-busters.vercel.app/
 
-The Vercel project is `mission-health` in the `acme-2c0d` team and is connected to `denzasikora-lab/mission-health`. Its frontend build is `npm run build:vercel`, using Node.js 24. `vercel-static/` contains only public assets. The build adds the standalone session bootstrap before application scripts; it does not modify the Sites HTML source.
+## Where things run
 
-## Topology
+- **Vercel:** frontend; connected to GitHub `main`. Build: `npm run build:vercel`, output: `vercel-static/`, Node.js 24.
+- **t213:** Node.js API behind Nginx HTTPS, with private SQLite and media files. Vercel forwards `/api/*` using `vercel.json`.
+- **t4:** EmbeddingGemma 2 and Qdrant. The API uses a private SSH memory tunnel; the browser receives no database/model credentials.
+- **Azure:** Hanzala's NASA-AI agent. **ProxyAPI mini:** utility text features; Whisper handles cloud transcription.
 
-The t213 public API route was activated on 14 November 2026. Public Vercel checks passed for guest sessions, Sara profile loading and saving, NasaGPT sending and saved replies, task editing/deletion, private file upload, measurement persistence, Qdrant search and a cited RAG answer. Verification used separate synthetic guest sessions. The acceptance steps below remain the release checklist.
+## Configuration
 
-- Vercel serves the frontend and rewrites `/api/*` to `https://users.fereyuserstopstrongcloudwinter.shop/mission-health-api/api/*` on t213.
-- The existing Nginx HTTPS server on t213 uses `/etc/nginx/sites-enabled/users` and proxies that dedicated prefix to `127.0.0.1:8092`. It sets Host to `mission-health-bug-busters.vercel.app` and preserves the other applications and TLS configuration.
-- `server/standalone.mjs` adapts the existing Worker routes to Node.js. It keeps the same input validation, deterministic rules, primary Azure provider, and utility provider.
-- SQLite and recording/object files are private under `/home/t213/mission-health/backend/data`. They are separate from the GPT site's D1/R2 storage. Existing GPT-site personal records are not copied to this deployment.
-- The text memory service and embedder remain on t4 at `127.0.0.1:8091`; Qdrant remains on t4 loopback at port 6333. A dedicated SSH tunnel exposes the memory service only at `127.0.0.1:18091` on t213 and forwards it to t4 loopback port 8091. The API uses `MEMORY_URL=http://127.0.0.1:18091` with its private memory credential.
-- The browser receives neither memory credentials nor direct access to the tunnel, embedder, or Qdrant ports. The additional `/mission-health-memory/` HTTPS route on t213 requires the private bearer credential and rejects requests with an Origin header; it is reserved for server-to-server clients. Vercel uses the API routes, and the standalone API continues to use its loopback tunnel.
-- Existing VPN services and other applications on both servers are outside this deployment.
+Keep runtime settings in the server's mode-600 `runtime.env`, outside releases and Git. Preserve `DATA_DIR` and the stable `SESSION_SECRET_FILE` across releases.
 
-The GPT site's runtime and audience remain independent. Its authenticated Sites identity is not reused as an anonymous Vercel identity.
+Required settings: `PUBLIC_ORIGIN`, `DATA_DIR`, `SESSION_SECRET_FILE`, `WORKER_MODULE`, `MIGRATIONS_DIR`, `LLM_PROVIDER`, `AZURE_AGENT_ENDPOINT`, `AZURE_AGENT_API_KEY`. Utility and memory settings are listed in `.dev.vars.example`; never copy real keys there.
 
-## Sessions and limits
+The browser uses a signed, Secure, HttpOnly session cookie created by `/api/session`. Clearing it starts a new private archive. Cross-device accounts are not implemented. Keep production origin checks and caller-identity-header rejection enabled.
 
-On the standalone deployment, `/api/session` creates a signed guest session in a Secure, HttpOnly, SameSite cookie. The frontend waits for that bootstrap before making other API requests. Each browser session receives a separate owner scope. Incoming `oai-*` identity headers are discarded; `LOCAL_PREVIEW` is forbidden on the standalone server. Changing the display name does not grant access to another visitor's records.
+Default limits: 20 model calls/session/day, 100 globally/day, two concurrent upstream calls, and 1 GiB private object storage. These are technical limits, not a monetary spending cap.
 
-The session cookie is the access mechanism for that browser's records. It is not an account with cross-device recovery. Clearing it starts a new guest session. The t4-to-t213 migration preserves the standalone session-signing secret and saved state; no GPT-site personal health history is migrated.
+## Release
 
-The adapter validates the exact production Origin and Host, bounds request bodies/concurrency, and enforces persistent model-call quotas. Default model limits are 20 calls per session per UTC day, 100 calls globally per UTC day, and two concurrent upstream calls. Retries and utility generation also consume quota. These are request limits, not a guaranteed monetary spending cap. Service-unavailable or quota results must not be presented as successful analysis.
-
-Private object storage has a default global ceiling of 1 GiB, independently of the per-file limit. Replacements and deletions release their previous allocation, and the storage ceiling remains enforced after a restart.
-
-## Builds
-
-Environment: macOS or another Unix-like development shell, repository root, Node.js 24.
-
-```bash
-npm ci
-```
-
-```bash
-npm run build:vercel
-```
-
-```bash
-npm run build:backend
-```
-
-The backend output is `dist/backend/worker.mjs`. It uses the same ordered Worker source list as the GPT-site build, without embedding the public asset bundle. Deploy it together with `server/` and `drizzle/`; it has no Node package dependencies.
+From the repository root, using Node.js 24:
 
 ```bash
 node --test tests/*.test.mjs
+npm run build:vercel
+npm run build:backend
 ```
 
-## Server settings
+Push the verified commit to `main` for the frontend. For an API change, release `dist/backend/worker.mjs` with `server/` and `drizzle/` on t213, backing up persistent data first. Preserve secrets and unrelated services. The legacy `deploy/t4/configure_backend.mjs` must not be run on t213.
 
-Private runtime settings belong in `/home/t213/mission-health/backend/runtime.env`, mode 600. They must not be committed, copied into `vercel-static/`, or placed in browser environment variables.
-
-| Setting | Purpose |
-| --- | --- |
-| `PUBLIC_ORIGIN` | Exact HTTPS production Vercel origin |
-| `SESSION_SECRET_FILE` | Private stable signing secret outside the release |
-| `DATA_DIR` | Persistent private data outside the release |
-| `WORKER_MODULE` | Built Worker module for the selected release |
-| `MIGRATIONS_DIR` | The release's SQL migrations |
-| `API_HOST`, `API_PORT` | Loopback listener, `127.0.0.1:8092` |
-| `MAX_OBJECT_STORAGE_BYTES` | Global private object-byte ceiling, default 1 GiB |
-| `LLM_PROVIDER` | `azure_responses` for the primary NASA-AI agent |
-| `AZURE_AGENT_ENDPOINT`, `AZURE_AGENT_API_KEY` | Existing upstream agent and its server-side secret |
-| `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` | Separately configured utility provider |
-| `MEMORY_URL` | `http://127.0.0.1:18091`, the dedicated t213-to-t4 loopback tunnel |
-| `MEMORY_API_KEY` | Private credential for the existing t4 memory service |
-
-The `deploy/t4/` directory name is retained for compatibility; the selected API host for this topology is t213. `deploy/t4/configure_backend.mjs` is a legacy t4 bootstrap with hardcoded t4 paths. Do not run it for t213 or use it to recreate the migrated configuration.
-
-The migration preserves the existing mode-600 `runtime.env`, session-signing secret, and a consistent SQLite/object snapshot through an encrypted transfer. Keep upstream keys and the signing secret unchanged. Update only the four host-specific path settings (`SESSION_SECRET_FILE`, `DATA_DIR`, `MIGRATIONS_DIR`, and `WORKER_MODULE`) from `/home/t4/mission-health/backend` to `/home/t213/mission-health/backend`, and set `MEMORY_URL=http://127.0.0.1:18091`. Utility and memory credentials remain private runtime configuration; diagnostics must show setting names rather than secret values.
-
-The backend installer and HTTPS activation are separate steps. Check the API on t213 loopback and the private memory tunnel before Nginx changes. The API and tunnel user services require t213's user manager to remain active after logout; `Linger=yes` has been verified separately from HTTPS activation.
-
-`deploy/t4/activate_backend_https.py --server t213` reviews the dedicated route for `/etc/nginx/sites-enabled/users`. Its default `--server t4` preserves the previous t4 activation target for compatibility. Review the dry-run configuration hash before applying it with administrative rights on the selected server. The helper must preserve unrelated upstreams and TLS configuration and restore its own change if validation or reload fails. It does not change the VPN or enable unrelated services.
-
-## Acceptance evidence
-
-A complete release requires all of the following:
-
-1. The recorded Git commit passes the suite and both builds.
-2. The API's t213 loopback readiness succeeds, its session/data survive a service restart, and memory health succeeds through `127.0.0.1:18091` without publishing a memory port.
-3. Vercel reports a successful production deployment for that source.
-4. The selected t213 HTTPS route responds correctly. Through the Vercel URL, `/api/session` sets the private cookie; `/api/me`, task CRUD, and archive isolation work for separate browser sessions.
-5. A synthetic agent request identifies the actual configured backend. No real health records are required for this test.
-
-A reserved domain or a successful static page alone is not evidence of a working backend. Keep the final deployment receipt with the actual verified commit and test results.
+Before calling a release complete, verify Vercel deployment success, `/api/status`, profile loading, Send, recording analysis, archive/search, and isolation between two browser sessions. Keep a rollback release and record the verified commit/results.
