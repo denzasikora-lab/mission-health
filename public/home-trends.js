@@ -103,24 +103,32 @@
   function item(card,data,now){const key=card.dataset.homeMetric,period=periods.find(value=>value.id===periodId),current=data.model.readings?.[metrics[key].reading]||null,generated=Boolean(data.sampleBase),points=generated?sampleHistory(key,data.sampleBase,period,now):history(key,{...data,current},now).filter(point=>point.at>=now-period.ms&&point.at<=now);return {key,current,points,generated,result:statistics(points)};}
   function deltaText(key,delta){const value=key==='sleep'?delta*60:delta,digits=key==='sleep'?0:metrics[key].digits,unit=key==='sleep'?' min':key==='spo2'?' pp':key==='temp'||key==='bodyTemp'?' °C':'';return Math.abs(value)<.5*10**-digits?'\u2192 0'+unit:(value>0?'\u2191 +':'\u2193 -')+format(Math.abs(value),digits)+unit;}
   function svgNode(tag,attributes){const node=document.createElementNS(ns,tag);for(const [name,value]of Object.entries(attributes))node.setAttribute(name,String(value));return node;}
+  function axisLabels(host,labels){
+    for(let index=0;index<labels.length;index++){let node=host.children[index];if(!node){node=make('span');host.append(node);}if(node.textContent!==labels[index])node.textContent=labels[index];}
+    while(host.children.length>labels.length)host.lastElementChild.remove();
+  }
+  const graphText=(node,text)=>{if(node.textContent!==text)node.textContent=text;};
   function renderGraph(value,now){
     // Updating the self-report does not rebuild the unchanged chart above the slider.
     const graphKey=JSON.stringify([value.key,periodId,value.generated,value.current,value.points,Math.floor(now/(periodId==='1m'?1000:60000))]);if(graphKey===graphSignature)return;graphSignature=graphKey;
     const config=metrics[value.key],period=periods.find(item=>item.id===periodId),points=value.points.filter(point=>Number.isFinite(point.value)),start=now-period.ms;
-    heading.textContent=config.name;reading.textContent=(value.generated&&Number.isFinite(value.current?.value)||observation(value.current,now))?format(value.current.value,config.digits)+' '+config.unit:'Not measured';panel.dataset.trendLevel=value.generated?'neutral':value.result?.level||'neutral';panel.dataset.trendMetric=value.key;panel.dataset.trendPeriod=periodId;panel.dataset.observationCount=String(points.length);panel.dataset.source=value.generated?'demo':'observations';
-    meaning.textContent=value.generated?'Generated sample':'Actual observations / time gaps are not filled';
-    controls.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.trendPeriod===periodId)));svg.replaceChildren();yAxis.replaceChildren();xAxis.replaceChildren();empty.hidden=points.length>0;plot.hidden=yAxis.hidden=xAxis.hidden=!points.length;
-    empty.textContent=periodId==='1m'?'No measurements recorded in the last minute.':'No observations recorded in this period.';
-    source.textContent=points.length?(value.generated?'Sample history':value.current?.source==='import'?'Recorded 24 h aggregates from Actiwatch epochs':'Saved observations')+' / '+points.length+' point'+(points.length===1?'':'s')+' / UTC':empty.textContent;
-    if(!points.length){svg.setAttribute('aria-label',config.name+'. '+empty.textContent);return;}
+    graphText(heading,config.name);graphText(reading,(value.generated&&Number.isFinite(value.current?.value)||observation(value.current,now))?format(value.current.value,config.digits)+' '+config.unit:'Not measured');panel.dataset.trendLevel=value.generated?'neutral':value.result?.level||'neutral';panel.dataset.trendMetric=value.key;panel.dataset.trendPeriod=periodId;panel.dataset.observationCount=String(points.length);panel.dataset.source=value.generated?'demo':'observations';
+    graphText(meaning,value.generated?'Generated sample':'Actual observations / time gaps are not filled');
+    controls.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.trendPeriod===periodId)));empty.hidden=points.length>0;plot.hidden=yAxis.hidden=xAxis.hidden=!points.length;
+    graphText(empty,periodId==='1m'?'No measurements recorded in the last minute.':'No observations recorded in this period.');
+    graphText(source,points.length?(value.generated?'Sample history':value.current?.source==='import'?'Recorded 24 h aggregates from Actiwatch epochs':'Saved observations')+' / '+points.length+' point'+(points.length===1?'':'s')+' / UTC':empty.textContent);
+    if(!points.length){svg.replaceChildren();yAxis.replaceChildren();xAxis.replaceChildren();svg.setAttribute('aria-label',config.name+'. '+empty.textContent);return;}
     let low=Math.min(...points.map(point=>point.value)),high=Math.max(...points.map(point=>point.value));const padding=Math.max((high-low)*.12,Math.max(Math.abs(low),Math.abs(high))*1e-6,10**-config.digits);low-=padding;high+=padding;
     if(!Number.isFinite(high-low)||high===low){empty.hidden=false;empty.textContent='Recorded values exceed the chart display range.';plot.hidden=yAxis.hidden=xAxis.hidden=true;return;}
     const y=value=>210-(value-low)/(high-low)*210,x=at=>Math.max(0,Math.min(800,(at-start)/period.ms*800));
-    for(let index=0;index<4;index++){svg.append(svgNode('line',{x1:0,x2:800,y1:index*70,y2:index*70,class:'home-trend-grid'}));yAxis.append(make('span','',format(high-(high-low)*index/3,config.digits)));}
+    const nodes=[],yLabels=[],xLabels=[];
+    for(let index=0;index<4;index++){nodes.push(svgNode('line',{x1:0,x2:800,y1:index*70,y2:index*70,class:'home-trend-grid'}));yLabels.push(format(high-(high-low)*index/3,config.digits));}
     const lines=[],marks=[];for(const segment of segments(value.points,period)){const observed=sample(segment);if(observed.length>1)lines.push(observed.map((point,index)=>(index?'L':'M')+x(point.at).toFixed(2)+' '+y(point.value).toFixed(2)).join(' '));else if(observed.length){const point=observed[0],px=x(point.at),py=y(point.value);marks.push('M'+(px-3).toFixed(2)+' '+py.toFixed(2)+'a3 3 0 1 0 6 0a3 3 0 1 0 -6 0');}}
-    if(lines.length)svg.append(svgNode('path',{d:lines.join(' '),class:'home-trend-line'}));if(marks.length)svg.append(svgNode('path',{d:marks.join(' '),fill:'var(--home-trend-color)',class:'home-trend-points'}));
+    if(lines.length)nodes.push(svgNode('path',{d:lines.join(' '),class:'home-trend-line'}));if(marks.length)nodes.push(svgNode('path',{d:marks.join(' '),fill:'var(--home-trend-color)',class:'home-trend-points'}));
     const last=points.at(-1);dot.style.top=y(last.value)/210*100+'%';dot.style.left=x(last.at)/800*100+'%';dot.style.right='auto';
-    const axisFormat=new Intl.DateTimeFormat('en-GB',period.ms<=day?{hour:'2-digit',minute:'2-digit',...(periodId==='1m'?{second:'2-digit'}:{}),timeZone:'UTC'}:{day:'2-digit',month:'short',...(periodId==='1y'?{year:'2-digit'}:{}),timeZone:'UTC'});for(let index=0;index<5;index++)xAxis.append(make('span','',axisFormat.format(new Date(start+period.ms*index/4))));
+    const axisFormat=new Intl.DateTimeFormat('en-GB',period.ms<=day?{hour:'2-digit',minute:'2-digit',...(periodId==='1m'?{second:'2-digit'}:{}),timeZone:'UTC'}:{day:'2-digit',month:'short',...(periodId==='1y'?{year:'2-digit'}:{}),timeZone:'UTC'});for(let index=0;index<5;index++)xLabels.push(axisFormat.format(new Date(start+period.ms*index/4)));
+    // Keep axis rows populated so a refresh never temporarily shortens the page.
+    svg.replaceChildren(...nodes);axisLabels(yAxis,yLabels);axisLabels(xAxis,xLabels);
     svg.setAttribute('aria-label',config.name+', '+period.name+'. '+points.length+(value.generated?' generated sample points. Latest sample ':' actual observations. Latest observation ')+new Date(last.at).toISOString()+(value.generated?'.':'. Gaps are not filled.'));
   }
   function refresh(){

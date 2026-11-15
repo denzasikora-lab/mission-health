@@ -63,7 +63,7 @@
   let themeMode; try { themeMode = localStorage.getItem('mission-health-theme-mode') || localStorage.getItem('mission-health-theme') || 'system'; } catch { themeMode='system'; }
   function render() {
     document.body.dataset.missionWorkspace = state.workspace;
-    if(state.workspace==='crew')document.querySelector('.main-column').prepend(heading);else content.insertBefore(heading,oldResearch);
+    if(state.workspace==='crew'){const main=document.querySelector('.main-column');if(main.firstElementChild!==heading)main.prepend(heading);}else if(heading.parentElement!==content||heading.nextElementSibling!==oldResearch)content.insertBefore(heading,oldResearch);
     themeToggle.innerHTML=state.theme==='dark'?sun:moon;themeToggle.setAttribute('aria-label',state.theme==='dark'?'Switch to light theme':'Switch to dark theme');themeToggle.title=themeToggle.getAttribute('aria-label');
     anatomy.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.bodyMetric===state.metric)));
     const stats=document.querySelector('.mission-chart-stats');if(stats){const values=seriesFor(crew[state.crew],state.metric,state.period);stats.innerHTML=[['Mean',values.reduce((sum,value)=>sum+value,0)/values.length],['Min.',Math.min(...values)],['Max.',Math.max(...values)]].map(([label,value])=>`<div><span>${label}</span><strong>${format(value,state.metric)}<small> ${unit(state.metric)}</small></strong></div>`).join('');}

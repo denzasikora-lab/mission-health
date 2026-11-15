@@ -53,12 +53,32 @@ function researchEvidence(){
 }
 function researchAnalysis(){
  const t=researchText(),r=researchState.result;
- return `<section class="research-block panel glass" data-research-block="analysis"><header><div><span class="tiny-label">03 / NasaGPT</span><h2>${t.analysis}</h2></div><button type="button" class="research-primary" id="research-analyze" ${researchState.busy||!researchState.data?'disabled':''}>${researchState.busy?'...':t.button}</button></header><div class="research-answer" aria-live="polite">${r?`<p>${researchEscape(r.content).replace(/\n/g,'<br>')}</p><div class="research-citations">${[...new Map(r.references.map(v=>[v.url,v])).values()].map(v=>`<a href="${researchEscape(v.url)}" target="_blank" rel="noopener">${researchEscape(v.title)} ↗</a>`).join('')}</div><p class="research-caption">${r.retrieval==='qdrant'?t.qdrant:t.catalog} · ${t.saved}</p><button type="button" data-research-archive>${t.review} →</button>`:`<p>${researchState.busy?t.working:researchState.analysisError?t.failed:t.ready}</p>`}</div><details class="research-method"><summary>${t.sources}</summary><p>${t.scope}</p><p>${t.note}</p>${researchState.data?`<a href="/data/nasa-research.json" download>NASA data / provenance JSON ↓</a>`:''}</details></section>`;
+ return `<section class="research-block panel glass" data-research-block="analysis" aria-busy="${researchState.busy}"><header><div><span class="tiny-label">03 / NasaGPT</span><h2>${t.analysis}</h2></div><button type="button" class="research-primary" id="research-analyze" aria-disabled="${researchState.busy||!researchState.data}" ${!researchState.data?'disabled':''}>${t.button}</button></header><div class="research-answer" aria-live="polite">${r?`<p>${researchEscape(r.content).replace(/\n/g,'<br>')}</p><div class="research-citations">${[...new Map(r.references.map(v=>[v.url,v])).values()].map(v=>`<a href="${researchEscape(v.url)}" target="_blank" rel="noopener">${researchEscape(v.title)} ↗</a>`).join('')}</div><p class="research-caption">${r.retrieval==='qdrant'?t.qdrant:t.catalog} · ${t.saved}</p><button type="button" data-research-archive>${t.review} →</button>`:`<p>${researchState.busy?t.working:researchState.analysisError?t.failed:t.ready}</p>`}</div><details class="research-method"><summary>${t.sources}</summary><p>${t.scope}</p><p>${t.note}</p>${researchState.data?`<a href="/data/nasa-research.json" download>NASA data / provenance JSON ↓</a>`:''}</details></section>`;
 }
+function researchPatch(parent,next){
+ const children=[...next.childNodes];
+ for(let i=0;i<children.length;i++){
+  const incoming=children[i],current=parent.childNodes[i];
+  if(!current){parent.append(incoming.cloneNode(true));continue;}
+  if(current.nodeType!==incoming.nodeType||current.nodeName!==incoming.nodeName||current.nodeType===1&&current.id!==incoming.id){current.replaceWith(incoming.cloneNode(true));continue;}
+  if(current.nodeType!==1){if(current.nodeValue!==incoming.nodeValue)current.nodeValue=incoming.nodeValue;continue;}
+  // Reuse focused controls and expanded disclosures while updating their data.
+  const open=current.nodeName==='DETAILS'?current.open:null;
+  for(const attribute of [...current.attributes])if(!(open!==null&&attribute.name==='open')&&!incoming.hasAttribute(attribute.name))current.removeAttribute(attribute.name);
+  for(const attribute of incoming.attributes)if(!(open!==null&&attribute.name==='open')&&current.getAttribute(attribute.name)!==attribute.value)current.setAttribute(attribute.name,attribute.value);
+  researchPatch(current,incoming);
+  if(current.nodeName==='SELECT'&&current.value!==incoming.value)current.value=incoming.value;
+  if(open!==null)current.open=open;
+ }
+ while(parent.childNodes.length>children.length)parent.lastChild.remove();
+}
+let researchLayout='';
 function renderResearch(){
- const active=state.workspace==='research',t=researchText();$('crew-workspace').hidden=active;$('research-workspace').hidden=!active;document.querySelector('.photo-credit').hidden=active;
- window.missionDesign?.render();if(!active)return;
- $('research-sidebar-title').textContent=t.evidence;$('research-sidebar-note').textContent='';$('research-datasets').replaceChildren();$('research-main').innerHTML=researchPersonal()+researchEvidence()+researchAnalysis();
+ const active=state.workspace==='research',t=researchText(),layout=JSON.stringify([state.workspace,state.view,state.theme,state.language,state.crew,state.metric,state.period,state.visiting]);
+ if(layout!==researchLayout){researchLayout=layout;$('crew-workspace').hidden=active;$('research-workspace').hidden=!active;document.querySelector('.photo-credit').hidden=active;window.missionDesign?.render();}if(!active)return;
+ $('research-sidebar-title').textContent=t.evidence;$('research-sidebar-note').textContent='';if($('research-datasets').firstChild)$('research-datasets').replaceChildren();
+ const host=$('research-main'),html=researchPersonal()+researchEvidence()+researchAnalysis();
+ if(!host.firstElementChild)host.innerHTML=html;else{const template=document.createElement('template');template.innerHTML=html;researchPatch(host,template.content);}
  const title=document.getElementById('mission-heading-title'),description=document.getElementById('mission-heading-description');if(title)title.textContent=t.title;if(description)description.textContent=t.intro;document.title='Mission Health | '+t.title;
 }
 async function researchLoad(){researchState.error=false;try{const r=await fetch('/data/nasa-research.json?v=20261115-v1');if(!r.ok)throw Error('unavailable');researchState.data=await r.json();}catch{researchState.error=true;}renderResearch();}
