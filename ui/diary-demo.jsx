@@ -16,7 +16,7 @@ function paint(){
 window.missionKonstaDiaryDemo={mount(host,options){
   if(!mounted){
     const shadow=host.attachShadow({mode:'open'}),style=document.createElement('link'),content=document.createElement('div');
-    style.rel='stylesheet';style.href='/vendor/diary-demo.css?v=20261115-nasa-demo1';shadow.append(style,content);
+    style.rel='stylesheet';style.href='/vendor/diary-demo.css?v=20261115-nasa-demo2';shadow.append(style,content);
     mounted={root:createRoot(content),options};
   }
   mounted.options=options;paint();

@@ -23,14 +23,14 @@ function fixture(){
   return{element,events,changes,document,get options(){return options;},get plays(){return plays;},get pauses(){return pauses;},pending(value){pending=value;}};
 }
 
-test('Demo plays the NASA excerpt in the existing block with Laboratory selected and can replay',async()=>{
+test('Demo toggles the NASA loop in the existing block with Laboratory selected',async()=>{
   const f=fixture(),clip=f.element('video-log-demo');
   await f.options.onClick();
   assert.equal(f.element('video-log-background').value,'lab');assert.equal(clip.currentTime,0);
   assert.equal(clip.src,'/assets/diary-demo/nasa-dominick-lab-2s.mp4');assert.equal(clip.hidden,false);
   assert.equal(f.element('diary-demo-source').hidden,false);assert.equal(f.plays,1);assert.equal(f.options.playing,true);
-  clip.emit('ended');assert.equal(f.options.playing,false);assert.equal(clip.hidden,false);
-  clip.currentTime=2;await f.options.onClick();assert.equal(clip.currentTime,0);assert.equal(f.plays,2);
+  await f.options.onClick();assert.equal(f.options.playing,false);assert.equal(clip.hidden,true);assert.equal(f.element('diary-demo-source').hidden,true);
+  clip.currentTime=1;await f.options.onClick();assert.equal(clip.currentTime,0);assert.equal(f.plays,2);assert.equal(clip.hidden,false);
 });
 test('Camera use and leaving the diary stop and hide the preview',async()=>{
   const f=fixture();await f.options.onClick();f.element('video-log-camera').emit('click');
@@ -45,7 +45,7 @@ test('Demo never interrupts an active or pending camera session',async()=>{
 });
 test('A late play result cannot pause a newer preview',async()=>{
   const f=fixture();let resolve;f.pending(new Promise(done=>{resolve=done;}));const first=f.options.onClick();
-  f.pending(null);await f.options.onClick();const pauses=f.pauses;resolve();await first;
+  await f.options.onClick();f.pending(null);await f.options.onClick();const pauses=f.pauses;resolve();await first;
   assert.equal(f.pauses,pauses);assert.equal(f.element('video-log-demo').hidden,false);
 });
 test('A playback failure restores the original block and shows a retryable notice',async()=>{
@@ -58,6 +58,6 @@ test('The embedded public NASA clip keeps its source, exact excerpt and silent i
   const metadata=JSON.parse(await readFile(new URL('../public/assets/diary-demo/source.json',import.meta.url),'utf8'));
   assert.equal(metadata.sourceUrl,'https://www.youtube.com/shorts/FKsghZt8bLs');assert.equal(metadata.sourceStartSeconds,5);
   assert.equal(metadata.sourceEndSeconds,7);assert.equal(metadata.durationSeconds,2);assert.equal(metadata.frameCount,48);
-  assert.match(html,/id="video-log-demo"[^>]*playsinline muted preload="none"[^>]*hidden/);
+  assert.match(html,/id="video-log-demo"[^>]*playsinline muted loop preload="none"[^>]*hidden/);
   assert.match(html,/href="https:\/\/www.youtube.com\/shorts\/FKsghZt8bLs"/);
 });

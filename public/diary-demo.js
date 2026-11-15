@@ -11,6 +11,7 @@
   function render(){window.missionKonstaDiaryDemo?.mount(host,{label:copy()[0],title:copy()[1],disabled:cameraBusy(),playing,onClick:play});}
   function stop(){generation++;video.pause();video.hidden=true;source.hidden=true;playing=false;render();}
   async function play(){
+    if(playing){stop();return;}
     if(cameraBusy())return;
     const attempt=++generation;
     background.value='lab';background.dispatchEvent(new Event('change',{bubbles:true}));
