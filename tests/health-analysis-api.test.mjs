@@ -7,7 +7,7 @@ import {webcrypto} from 'node:crypto';
 
 const root=new URL('../',import.meta.url);
 const source=(await Promise.all([
-  'public/health-rules-core.js','worker/activity.js','worker/scheduler.js','worker/personal.js',
+  'public/analysis-samples.js','public/health-rules-core.js','worker/activity.js','worker/scheduler.js','worker/personal.js',
   'worker/photos.js','worker/stories.js','worker/speech.js','worker/training.js','worker/book.js',
   'worker/health-analysis.js','worker/readings.js','worker/index.js'
 ].map(path=>readFile(new URL(path,root),'utf8')))).join('\n').replace('export default','globalThis.app =');
@@ -245,6 +245,22 @@ test('Future client capture times cannot admit later measurement saves into an a
     f.sql.prepare('INSERT INTO health_readings (id,owner_id,snapshot_json,source_name,created_at) VALUES (?,?,?,?,?)').run(webcrypto.randomUUID(),'owner-a',JSON.stringify(value),'Synthetic later save',new Date(Date.parse(created)+1000).toISOString());
   }
   f.provider(200);assert.equal((await f.run('/api/health-analysis',{method:'POST',body})).status,201);assert.equal(f.payload().recent_trend.heart_rate,'unknown');
+});
+
+test('Complete Preflight supplies synthetic history and trends to analysis',async t=>{
+  const scenarioScope={};vm.runInNewContext(await readFile(new URL('public/analysis-samples.js',root),'utf8'),scenarioScope);
+  const value=copy(scenarioScope.MissionPreflightCore.create(Date.parse(now)).snapshot),f=fixture(t),saved=await f.post(value);
+  assert.equal(saved.status,201);assert.equal(saved.body.rules.complete,true);assert.deepEqual(saved.body.rules.missing,[]);
+  const payload=f.payload();assert.equal(payload.mode,'preflight');assert.equal(payload.preflight.history.length,12);assert.ok(Object.values(payload.recent_trend).every(value=>value==='flat'));assert.equal(payload.preflight.media.length,5);assert.equal(payload.preflight.crew.length,4);assert.equal(payload.preflight.synthetic,true);assert.ok(payload.preflight.history.every(item=>Object.keys(item.snapshot.readings).length===16));
+  assert.match(f.outgoing[0].body.input[0].content,/PREFLIGHT MODE/);
+});
+
+test('Partial demonstrations retain missing-data checks and Preflight preserves critical thresholds',async t=>{
+  const scenarioScope={};vm.runInNewContext(await readFile(new URL('public/analysis-samples.js',root),'utf8'),scenarioScope);
+  const value=copy(scenarioScope.MissionPreflightCore.create(Date.parse(now)).snapshot),f=fixture(t);value.readings.body_temperature=null;
+  await f.post(value);assert.equal(f.payload().mode,'provided_readings');assert.equal(f.payload().preflight,undefined);assert.equal(f.payload().rule_result.complete,false);
+  const complete=copy(scenarioScope.MissionPreflightCore.create(Date.parse(now)).snapshot);complete.readings.spo2.value=88;
+  const result=await f.post(complete);assert.equal(result.body.result.status,'CRITICAL');assert.equal(f.payload().latest.spo2,88);assert.equal(f.payload().preflight.history[0].snapshot.readings.spo2.value,88);
 });
 
 test('The agent receives a capture timestamp instead of missing mission time, with truthful sources',async t=>{

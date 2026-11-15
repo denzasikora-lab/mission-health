@@ -45,5 +45,6 @@ test('Preflight fills all four MARS groups and every visual feature with explici
   const scenario=scenarioScope.MissionPreflightCore.create(now),score=core.calculate(scenario,now,60000);
   assert.equal(score.coverage,100);assert.ok(Number.isFinite(score.score)&&score.score>0&&score.score<50);assert.ok(Object.values(score.groups).every(group=>group.coverage===1&&group.score!==null));
   assert.equal(Object.keys(scenario.visual.deltas).length,12);assert.ok(Object.values(scenario.snapshot.readings).every(reading=>reading.source==='demo'));assert.ok(scenario.media.every(item=>item.synthetic&&item.source==='preflight'));
+  assert.equal(scenario.records.length,12);assert.equal(core.crewScore(scenario.crew,100-scenario.social.interaction).members,4);
   const actual=core.calculate({...scenario,snapshot:snapshot({heart_rate:[76,'bpm']})},now,60000);assert.equal(actual.groups.A.score,null);assert.equal(actual.groups.S.score,null);assert.equal(actual.mediaCount,0);
 });

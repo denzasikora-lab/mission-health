@@ -4,6 +4,8 @@ An astronaut health monitoring prototype by **Bug Busters / NASA Space Apps**.
 
 **Live website:** https://mission-health-bug-busters.vercel.app/
 
+**LoRA weights and training code:** [Download and reproduce](research/lora/README.md).
+
 ## Features
 
 - Health readings, including heart rate, blood oxygen, temperature and trends.

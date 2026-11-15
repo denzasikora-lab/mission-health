@@ -31,8 +31,9 @@
     if(last.audioObservations)observations.set('voice','Voice observation: '+last.audioObservations.level.toFixed(1)+' dBFS / pauses '+Math.round(last.audioObservations.quiet*100)+'%');
     for(const [key,value]of observations){if(!observationNodes.has(key)){const node=make('li');observationNodes.set(key,node);list.append(node);}const node=observationNodes.get(key);node.hidden=false;text(node,value);}
     for(const [key,node]of observationNodes)node.hidden=!observations.has(key);
-    text(historyText,last.mediaCount+(last.isDemo?' simulated':' recorded')+' audio/video observations in this period. Crew Score awaits shared crew readings.');
-    text(errorText,error);errorText.hidden=!error;
+    const preflight=window.missionHome?.preflight?.(),crew=last.isDemo&&preflight?core.crewScore(preflight.crew,100-preflight.social.interaction):null;
+    text(historyText,last.mediaCount+(last.isDemo?' simulated':' recorded')+' audio/video observations in this period. '+(crew?'Preflight Crew Score: '+crew.score+' / 100 / '+crew.members+' simulated crew members.':'Crew Score awaits shared crew readings.'));
+    text(errorText,error);errorText.hidden=!error||Boolean(preflight);
   }
   async function refresh(){
     if(owner()!==scope){scope=owner();generation++;media=[];loading=null;error='';}render();if(!scope||loading)return loading;
