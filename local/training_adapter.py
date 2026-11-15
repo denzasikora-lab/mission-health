@@ -1,4 +1,4 @@
-"""Выполнять локальные задания LoRA без внешней передачи записей."""
+"""Run local LoRA jobs without sending observations to external services."""
 
 import hashlib
 import hmac
@@ -26,7 +26,7 @@ MINIMUM = 1 if ENGINE == "peft" else 20
 
 
 def save_state(folder, state):
-    """Атомарно сохранить состояние задания в закрытом каталоге."""
+    """Save job state atomically in the private job directory."""
     target = folder / "state.json"
     temporary = folder / "state.tmp"
     temporary.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
@@ -34,23 +34,23 @@ def save_state(folder, state):
 
 
 def ready():
-    """Проверить локальную модель и библиотеки без загрузки весов."""
+    """Check the local model and libraries without loading model weights."""
     packages = ("torch", "peft", "transformers") if ENGINE == "peft" else ("mlx_lm",)
     return (MODEL / "config.json").exists() and all(importlib.util.find_spec(name) is not None for name in packages)
 
 
 def training_command(folder):
-    """Сформировать команду обучения без исполнения пользовательского текста.
+    """Build the training command without executing user-provided text.
 
     Parameters
     ----------
     folder : Path
-        Закрытый каталог задания с подготовленными данными.
+        Private job directory containing the prepared dataset.
 
     Returns
     -------
     list[str]
-        Аргументы процесса с локальными путями.
+        Process arguments containing local paths.
     """
     if ENGINE == "peft":
         return [sys.executable, "-u", str(ROOT / "local/train_peft.py"),
@@ -64,7 +64,7 @@ def training_command(folder):
 
 
 def execute(folder, state):
-    """Обучить адаптер и сохранить фактический прогресс процесса."""
+    """Train the adapter and save the actual process progress."""
     environment = dict(os.environ, HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1",
                        WANDB_MODE="disabled", HF_HUB_DISABLE_TELEMETRY="1",
                        PYTHONIOENCODING="utf-8")
@@ -106,10 +106,10 @@ def execute(folder, state):
 
 
 class TrainingHandler(BaseHTTPRequestHandler):
-    """Принимать задания без автоматического подключения готовых адаптеров."""
+    """Accept jobs without automatically activating completed adapters."""
 
     def reply(self, status, body):
-        """Вернуть состояние без текста записей и внутренних путей."""
+        """Return status without observation text or internal paths."""
         value = json.dumps(body, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -119,14 +119,14 @@ class TrainingHandler(BaseHTTPRequestHandler):
         self.wfile.write(value)
 
     def authorized(self):
-        """Проверить секретный ключ обработчика."""
+        """Validate the worker secret key."""
         if not KEY or not hmac.compare_digest(self.headers.get("Authorization", ""), "Bearer " + KEY):
             self.reply(401, {"error": "unauthorized"})
             return False
         return True
 
     def do_GET(self):
-        """Показать готовность или сохраненное состояние задания."""
+        """Return readiness or the saved job state."""
         if not self.authorized():
             return
         if self.path == "/health":
@@ -147,7 +147,7 @@ class TrainingHandler(BaseHTTPRequestHandler):
         self.reply(200, {key: value for key, value in state.items() if key != "owner"})
 
     def do_POST(self):
-        """Создать задание по запросу или остановить существующий процесс."""
+        """Create a requested job or stop an existing process."""
         if not self.authorized():
             return
         length = int(self.headers.get("Content-Length", "0"))
@@ -226,7 +226,7 @@ class TrainingHandler(BaseHTTPRequestHandler):
             self.reply(202, {"id": identifier, "status": "queued"})
 
     def log_message(self, format, *args):
-        """Не записывать запросы с личными данными в общий журнал."""
+        """Keep requests containing personal data out of the shared log."""
         pass
 
 

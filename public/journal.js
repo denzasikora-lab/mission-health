@@ -5,7 +5,7 @@ function draftFor(id=crew[state.crew].id){if(!journalDrafts.has(id))journalDraft
 function journalDate(value){return new Intl.DateTimeFormat(text().locale,{dateStyle:'medium',timeStyle:'short'}).format(new Date(value))}
 function element(tag,className,content){const node=document.createElement(tag);if(className)node.className=className;if(content!==undefined)node.textContent=content;return node}
 async function journalApi(path,options){
-  const response=await fetch(path,{...options,headers:{'content-type':'application/json','x-mission-time-zone':Intl.DateTimeFormat().resolvedOptions().timeZone,'x-mission-language':typeof state!=='undefined'&&state.language==='ur'?'ur':'en',...options?.headers}});let body;try{body=await response.json()}catch{throw new Error('storage_unavailable')}
+  const response=await fetch(path,{...options,headers:{'content-type':'application/json','x-mission-time-zone':Intl.DateTimeFormat().resolvedOptions().timeZone,'x-mission-language':typeof state!=='undefined'&&['en','ur','es'].includes(state.language)?state.language:'en',...options?.headers}});let body;try{body=await response.json()}catch{throw new Error('storage_unavailable')}
   if(!response.ok)throw new Error(body.error||'storage_unavailable');return body;
 }
 function showJournalNotice(key){journalState.notice=key;renderJournalNotice()}

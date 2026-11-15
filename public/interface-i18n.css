@@ -9,3 +9,6 @@ html[lang=ur] .health-analysis-alerts{padding-inline-start:18px;padding-inline-e
 html[lang=ur] :is(.health-analysis h2,.health-analysis button){font-family:inherit;line-height:1.6}
 html[lang=ur] .shell .mission-frame .mission-nav>button>span{white-space:normal;overflow-wrap:break-word}
 @container mission (max-width:1000px){html[lang=ur] .shell .mission-frame .mission-nav>button>span{font-size:12px}}
+
+html[lang=es] :is(.mission-nav button>span,.personal-tabs button){min-inline-size:0;white-space:normal;overflow-wrap:break-word;letter-spacing:0;line-height:1.35}
+@container mission (max-width:700px){html[lang=es] :is(.mission-nav button>span,.personal-tabs button){font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:clamp(10px,2.4cqw,13px)}html[lang=es] .personal-tabs button{padding-inline:5px}}

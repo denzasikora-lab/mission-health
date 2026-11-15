@@ -1,6 +1,6 @@
 const metricIcons={hr:'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z',spo2:'M12 3v9m0-3-3-3c-3 1-6 5-6 11 0 3 5 3 7 1V9m2 0 3-3c3 1 6 5 6 11 0 3-5 3-7 1V9',temp:'M9 14V5a3 3 0 0 1 6 0v9a5 5 0 1 1-6 0Zm3-7v10',fatigue:'M8 9h.01M16 9h.01M8 15q4 4 8 0 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0'};
 const metricInfo={hr:{unit:"bpm"},spo2:{unit:"%"},temp:{unit:"°C"},fatigue:{unit:"/ 10"}};
-const languageInfo={en:{flag:"🇬🇧",name:"English"},ur:{flag:"🇵🇰",name:"اردو"}};
+const languageInfo={en:{flag:"🇬🇧",name:"English"},ur:{flag:"🇵🇰",name:"اردو"},es:{flag:"🇪🇸",name:"Español"}};
 const sourceUrls=["https://www.nasa.gov/hrp/risks/","https://www.nasa.gov/hrp/risks/","https://www.nasa.gov/hrp/"];
 const sourceKeywords=[
   ["health","risk","oxygen","hypoxia","fatigue","temperature","monitoring","baseline","健康","风险","血氧","氧气","疲劳","体温","الصحة","صحة","خطر","مخاطر","أكسجين","الأكسجين","تعب","حرارة","salud","riesgo","oxígeno","fatiga","temperatura"],
@@ -38,7 +38,7 @@ function seriesFor(person,key,period){
   const values=person.recordedHistory?.[key]?.[period];
   return Array.isArray(values)?values.map(value=>Number.isFinite(value)?value:null):[];
 }
-function friendTrendCopy(){return ({en:{since:'Since period start',missing:'No shared measurements',baseline:'Period baseline',method:'Recorded measurements only. Color shows difference from the preceding recorded points, not a medical assessment.'},})[state.language]||{since:text().periods[state.period],missing:'مشترکہ پیمائش دستیاب نہیں',baseline:text().baseline,method:'صرف ریکارڈ شدہ پیمائشیں۔ رنگ طبی تشخیص نہیں ہے۔'};}
+function friendTrendCopy(){return ({en:{since:'Since period start',missing:'No shared measurements',baseline:'Period baseline',method:'Recorded measurements only. Color shows difference from the preceding recorded points, not a medical assessment.'},es:{since:'Desde el inicio del periodo',missing:'Sin mediciones compartidas',baseline:'Referencia del periodo',method:'Solo mediciones registradas. El color muestra diferencias, no una evaluación médica.'},})[state.language]||{since:text().periods[state.period],missing:'مشترکہ پیمائش دستیاب نہیں',baseline:text().baseline,method:'صرف ریکارڈ شدہ پیمائشیں۔ رنگ طبی تشخیص نہیں ہے۔'};}
 function friendDeltaUnit(key){return key==='spo2'?'pp':key==='fatigue'?'pts':unit(key);}
 function friendMetricLevel(value,mean,sigma){if(!Number.isFinite(value)||!Number.isFinite(mean)||!Number.isFinite(sigma)||sigma<=0)return 'neutral';const z=Math.abs(value-mean)/sigma;return z>=3?'red':z>=2?'amber':'green';}
 function friendMetricTrend(person,key){
@@ -63,7 +63,7 @@ function renderChart(person){
 function renderAssessment(person){
   const t=text(),p=t.people[state.crew],copy=friendTrendCopy(),ur=state.language==='ur';
   $("profile-photo").src=person.photo;$("profile-photo").alt=p.name;$("profile-photo").title=person.credit;$("profile-bio").href=person.bio;$("profile-name").textContent=p.name;$("profile-meta").textContent=p.role+' / '+copy.missing;
-  $("profile-state").className='profile-state unavailable';$("profile-state").textContent=ur?'کوئی ڈیٹا نہیں':'NO DATA';$("assessment-heading").textContent=ur?'صحت کے اعداد و شمار دستیاب نہیں':'Health data unavailable';$("assessment-desc").textContent=ur?'اس پروفائل نے صحت کی پیمائشیں شیئر نہیں کیں۔':'This profile has not shared health measurements.';$("signal-list").className='signal-list';$("signal-list").replaceChildren();$("next-step").textContent=ur?'اپنی پیمائشیں شامل کرنے کے لیے صحت کا حصہ کھولیں۔':'Open Health to add your own measurements.';
+  $("profile-state").className='profile-state unavailable';$("profile-state").textContent=ur?'کوئی ڈیٹا نہیں':state.language==='es'?'SIN DATOS':'NO DATA';$("assessment-heading").textContent=ur?'صحت کے اعداد و شمار دستیاب نہیں':state.language==='es'?'Datos de salud no disponibles':'Health data unavailable';$("assessment-desc").textContent=ur?'اس پروفائل نے صحت کی پیمائشیں شیئر نہیں کیں۔':state.language==='es'?'Este perfil no ha compartido mediciones de salud.':'This profile has not shared health measurements.';$("signal-list").className='signal-list';$("signal-list").replaceChildren();$("next-step").textContent=ur?'اپنی پیمائشیں شامل کرنے کے لیے صحت کا حصہ کھولیں۔':state.language==='es'?'Abre Salud para añadir tus propias mediciones.':'Open Health to add your own measurements.';
   $("context-list").innerHTML=t.contextLabels.map(label=>`<li><span>${label}</span><span>-</span></li>`).join('');
   $("event-list").replaceChildren();
 }

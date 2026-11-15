@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 
-const source=await readFile(new URL('../public/interface-i18n.js',import.meta.url),'utf8');
+const source=(await Promise.all(['translations.js','spanish.js','interface-i18n.js'].map(name=>readFile(new URL('../public/'+name,import.meta.url),'utf8')))).join('\n');
 function fixture(initial='en'){
   const nodes=[],observers=[],frames=[],events=new Map();let writes=0,passes=0;
   const notify=record=>{for(const observer of observers)if(observer.active&&observer.options[record.type]!==false&&(record.type!=='attributes'||observer.options.attributes&&(!observer.options.attributeFilter||observer.options.attributeFilter.includes(record.attributeName))))observer.records.push(record);};
@@ -97,4 +97,19 @@ test('Check-in labels preserve timestamps and never alter the chosen score',()=>
 
 test('Urdu styles keep four chat tabs, wrap owned labels and isolate numeric values without remote fonts',async()=>{
   const css=await readFile(new URL('../public/interface-i18n.css',import.meta.url),'utf8');assert.match(css,/html\[lang=ur\]/);assert.match(css,/Noto Nastaliq Urdu/);assert.match(css,/\.personal-tabs\{grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);assert.match(css,/direction:ltr;unicode-bidi:isolate/);assert.match(css,/white-space:normal/);assert.doesNotMatch(css,/@import|https?:|font-face|flex-direction:column/);
+});
+
+
+test('Spanish navigation, profile controls and capture labels round-trip through Urdu without changing input',()=>{
+  const f=fixture(),nav=f.add('[data-mission-nav] > span','Health'),tab=f.add('[data-personal-tab]','Scheduled'),send=f.add('.personal-composer button[type="submit"]','Send'),save=f.add('.profile-name-form button','Save'),input=f.add('.profile-name-form input','',{'aria-label':'Full name',placeholder:'Full name'}),camera=f.add('#video-log-camera','Enable camera'),name=f.add('.personal-message header span','Cdr. Sara Khan');input.value='Cdr. Sara Khan';
+  f.start();f.language('es');assert.equal(nav.textContent,'Salud');assert.equal(tab.textContent,'Programado');assert.equal(send.textContent,'Enviar');assert.equal(save.textContent,'Guardar');assert.equal(input.getAttribute('placeholder'),'Nombre completo');assert.equal(camera.textContent,'Activar cámara');assert.equal(input.value,'Cdr. Sara Khan');assert.equal(name.textContent,'Cdr. Sara Khan');
+  f.language('ur');assert.equal(nav.textContent,'صحت');assert.equal(send.textContent,'بھیجیں');f.language('en');assert.equal(nav.textContent,'Health');assert.equal(send.textContent,'Send');assert.equal(save.textContent,'Save');assert.equal(input.getAttribute('placeholder'),'Full name');assert.equal(camera.textContent,'Enable camera');
+  f.language('es');const writes=f.writes;f.scope.missionInterfaceI18n.refresh();f.flush();assert.equal(f.writes,writes);
+});
+
+test('Spanish core catalog covers all English content while retaining canonical status codes and names',()=>{
+  const scope={};vm.runInNewContext(source.split('(() => {\n  const ur=')[0]+'\nthis.catalog=translations;',scope);
+  const unchanged=new Set(['en-GB','bpm','h','min','MISSION HEALTH','ATTENTION','NORMAL','REVIEW','Jessica Meir','Jack Hathaway','Christina Koch']);
+  function compare(en,es){for(const key of Object.keys(en)){const value=en[key],translated=es[key];if(typeof value==='object')compare(value,translated);else if(!unchanged.has(value)&&!/^\d+ (s|h|min)$/.test(value))assert.notEqual(translated,value,key);}}
+  compare(scope.catalog.en,scope.catalog.es);assert.equal(scope.catalog.es.locale,'es-ES');
 });

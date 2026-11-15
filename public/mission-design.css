@@ -57,3 +57,9 @@ body[data-display="duo"] .shell{max-width:768px}#mission-device-button{position:
   .shell .mission-frame .mission-rail>.stories-section .story-person>button:first-child{width:100%;min-width:0}
   .shell .mission-frame .mission-rail>.stories-section .story-ring{width:42px;height:42px;min-width:0}
 }
+
+/* Keep the document canvas and native controls in the selected theme. */
+html{min-block-size:100%;background-color:var(--bg)}
+body{min-block-size:100svh;background-color:var(--bg);color:var(--text)}
+:root[data-theme="dark"]{color-scheme:dark}
+:root[data-theme="light"]{color-scheme:light}

@@ -104,7 +104,7 @@
   function deltaText(key,delta){const value=key==='sleep'?delta*60:delta,digits=key==='sleep'?0:metrics[key].digits,unit=key==='sleep'?' min':key==='spo2'?' pp':key==='temp'||key==='bodyTemp'?' °C':'';return Math.abs(value)<.5*10**-digits?'\u2192 0'+unit:(value>0?'\u2191 +':'\u2193 -')+format(Math.abs(value),digits)+unit;}
   function svgNode(tag,attributes){const node=document.createElementNS(ns,tag);for(const [name,value]of Object.entries(attributes))node.setAttribute(name,String(value));return node;}
   function renderGraph(value,now){
-    // Изменение самооценки не перестраивает неизменившийся график над ползунком.
+    // Updating the self-report does not rebuild the unchanged chart above the slider.
     const graphKey=JSON.stringify([value.key,periodId,value.generated,value.current,value.points,Math.floor(now/(periodId==='1m'?1000:60000))]);if(graphKey===graphSignature)return;graphSignature=graphKey;
     const config=metrics[value.key],period=periods.find(item=>item.id===periodId),points=value.points.filter(point=>Number.isFinite(point.value)),start=now-period.ms;
     heading.textContent=config.name;reading.textContent=(value.generated&&Number.isFinite(value.current?.value)||observation(value.current,now))?format(value.current.value,config.digits)+' '+config.unit:'Not measured';panel.dataset.trendLevel=value.generated?'neutral':value.result?.level||'neutral';panel.dataset.trendMetric=value.key;panel.dataset.trendPeriod=periodId;panel.dataset.observationCount=String(points.length);panel.dataset.source=value.generated?'demo':'observations';

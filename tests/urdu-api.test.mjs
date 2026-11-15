@@ -39,13 +39,13 @@ function fixture(t){
   return {sql,outgoing,intentCalls,run,mediaForm,setAnswer:value=>{answer=value;},language:language=>scope.responseLanguage(new Request('https://mission.test',{headers:language===undefined?{}:{'x-mission-language':language}})),display:body=>scope.englishDisplay(body,env,'owner-a')};
 }
 
-test('Response language trusts only the exact Urdu header and defaults to English',t=>{
-  const f=fixture(t);assert.equal(f.language('ur'),'ur');for(const value of [undefined,'en','ru','fr','UR','ur-PK','ur;en'])assert.equal(f.language(value),'en');
+test('Response language accepts supported headers and defaults to English',t=>{
+  const f=fixture(t);assert.equal(f.language('ur'),'ur');assert.equal(f.language('es'),'es');for(const value of [undefined,'en','ru','fr','UR','ur-PK','ur;en'])assert.equal(f.language(value),'en');
 });
 
 test('Urdu chat uses an Urdu instruction and retains Urdu text in responses and storage',async t=>{
   const f=fixture(t),id=webcrypto.randomUUID(),saved=await f.run('/api/chat',{method:'POST',language:'ur',body:{id,content:greeting,attachments:[]}});
-  assert.equal(saved.status,201);assert.equal(saved.body.message.content,greeting);assert.equal(saved.body.reply.content,urdu);assert.match(f.outgoing[0].body.input[0].content,/briefly in Urdu/);assert.equal(f.outgoing[0].body.input.at(-1).content,greeting);assert.equal(f.outgoing.length,1);
+  assert.equal(saved.status,201);assert.equal(saved.body.message.content,greeting);assert.equal(saved.body.reply.content,urdu);assert.match(f.outgoing[0].body.input[0].content,/briefly in Urdu/);assert.equal(f.outgoing[0].body.input.findLast(item=>item.role==='user').content,greeting);assert.equal(f.outgoing.length,1);
   assert.equal(f.intentCalls.length,1);assert.match(f.intentCalls[0].body.messages[0].content,/Titles must be in Urdu/);assert.equal(JSON.parse(f.intentCalls[0].body.messages[1].content).message,greeting);assert.equal(saved.body.tasks.length,0);
   assert.equal(f.sql.prepare('SELECT content FROM general_chat_messages WHERE reply_to=?').get(id).content,urdu);
   const history=await f.run('/api/chat',{language:'ur'});assert.equal(history.body.messages.find(item=>item.id===id).content,greeting);assert.equal(history.body.messages.find(item=>item.replyTo===id).content,urdu);assert.equal(f.outgoing.length,1);
@@ -92,4 +92,19 @@ test('Archive answers use the selected Urdu language without rewriting the refer
   const f=fixture(t),id=webcrypto.randomUUID();
   const entry=await f.run('/api/astronauts/personal/messages',{method:'POST',language:'ur',body:{id,content:greeting,language:'ur',mode:'diary',attachments:[]}});assert.equal(entry.status,201);
   const answer=await f.run('/api/astronauts/personal/book-answer',{method:'POST',language:'ur',body:{query:'What did I write?',ids:[id]}});assert.equal(answer.status,200);assert.equal(answer.body.answer,urdu);assert.match(f.outgoing[0].body.input[0].content,/Always answer in Urdu/);assert.equal(f.sql.prepare('SELECT content FROM journal_messages WHERE id=?').get(id).content,greeting);
+});
+
+
+test('Spanish NasaGPT and scheduler requests retain selected language through storage and archive retrieval',async t=>{
+  const f=fixture(t),reply='He revisado tu historial.',id=webcrypto.randomUUID();f.setAnswer(reply);
+  const saved=await f.run('/api/chat',{method:'POST',language:'es',body:{id,content:'Hola, revisa mi historial.',attachments:[]}});
+  assert.equal(saved.status,201);assert.equal(saved.body.reply.content,reply);assert.match(f.outgoing[0].body.input[0].content,/briefly in Spanish/);assert.match(f.intentCalls[0].body.messages[0].content,/Titles must be in Spanish/);assert.equal(f.sql.prepare('select language from general_chat_messages where id=?').get(id).language,'es');
+  const history=await f.run('/api/chat',{language:'es'});assert.equal(history.body.messages.find(item=>item.replyTo===id).content,reply);
+});
+
+test('Spanish recording analysis preserves the saved language when retried from another locale',async t=>{
+  const f=fixture(t),id=webcrypto.randomUUID(),reply='Grabación analizada.';f.setAnswer(reply);
+  const saved=await f.run('/api/media-analysis',{method:'POST',language:'es',body:f.mediaForm(id)});
+  assert.equal(saved.status,200);assert.equal(saved.body.analysis,reply);assert.match(f.outgoing[0].body.input[0].content,/Answer in Spanish without/);
+  const retry=await f.run('/api/media-analysis',{method:'POST',language:'en',body:f.mediaForm(id)});assert.equal(retry.body.analysis,reply);assert.equal(f.outgoing.length,1);assert.ok(f.sql.prepare('select language from journal_messages where id=? or reply_to=?').all(id,id).every(row=>row.language==='es'));
 });

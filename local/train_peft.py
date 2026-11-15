@@ -1,4 +1,4 @@
-"""Обучить и сохранить отдельную версию персонального LoRA-адаптера."""
+"""Train and save a separate version of a personal LoRA adapter."""
 
 import argparse
 import hashlib
@@ -8,14 +8,14 @@ from pathlib import Path
 
 
 def run(folder, model_path):
-    """Обучить только параметры адаптера на локальных записях.
+    """Train only the adapter parameters on local observations.
 
     Parameters
     ----------
     folder : Path
-        Закрытый каталог задания с данными и состоянием.
+        Private job directory containing the dataset and job state.
     model_path : Path
-        Локальная базовая модель без исполнения удаленного кода.
+        Local base model loaded without executing remote code.
     """
     os.environ.update(HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1",
                       HF_HUB_DISABLE_TELEMETRY="1", WANDB_MODE="disabled")

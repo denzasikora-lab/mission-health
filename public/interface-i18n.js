@@ -84,10 +84,29 @@
   add('#voice-style option',['Particles','Wave']);add('.voice-readings > div > span',['Signal level','Source']);
   add('#voice-stage-hint',['Press Audio to start recording','The waveform responds to your voice','Allow microphone access in your browser']);
   add('#voice-notice',['Microphone is off.','Waiting for microphone permission.','Preparing audio recording.','Recording sent for analysis.','Recording audio. Press «Audio», to stop.']);
+  const es=typeof missionSpanish==='undefined'?{}:missionSpanish;
+  const catalogs=[ur,es];
+  add('.profile-name-form button',['Save','Retry']);
+  add('.profile-name-form input',['Full name'],'placeholder');
+  add('.profile-name-form input',['Full name'],'aria-label');
+  add('.profile-name-form input',['Full name'],'title');
+  add('.profile-name-form button',['Save full name','Retry profile connection'],'aria-label');
+  add('.personal-clear',['Clear NasaGPT chat'],'aria-label');
+  add('.training-links a',['Weights & run data ↗','Training code ↗']);
+  add('.book-training .book-eyebrow',['TRAINED LoRA / PUBLISHED WEIGHTS']);
+  add('.book-training h3',['A personal baseline for every mission']);
+  add('.book-training > div > p',['Our first LoRA adapter is trained and published. Saved readings, speech and diary observations support research into each astronaut’s patterns over time, helping flag changes for review and crew support.']);
+  add('.training-checkpoint',['Preflight research checkpoint / SmolLM2 / 200 training steps']);
+  add('#training-review',['Train personal adapter']);
+  add('#training-start',['Start training']);add('#training-cancel',['Stop training']);
+  add('#training-dialog h2',['Preparation LoRA']);
+  add('.personal-activity h2, .personal-activity h3',['Recent activity']);
+  add('.appearance-panel h3, .appearance-panel h2, .appearance-metric > span, .appearance-metric > strong, .skin-spot-card > span, .media-analysis-label, .media-analysis-card > span, .media-analysis-card > strong, .media-analysis-heading h3, .voice-analysis-header h3, .voice-analysis-card > span, .voice-analysis-card > strong, .voice-analysis details > summary',Object.keys(es));
+  add('#book-search-dialog label, #book-search-dialog button, #book-search-dialog .book-search-status, #book-search-dialog .book-search-shortcuts button',Object.keys(es));
   const compact={'Enable camera':'Camera','Disable camera':'Disable','Cancel connection':'Cancel','Preparing recording':'Processing','Start recording':'Recording','Stop recording':'Stop'};
   const baselines=new WeakMap(),selector=rules.map(rule=>rule.selector).join(', ');
   let scheduled=false,observer;
-  const language=()=>document.documentElement.lang==='ur'?'ur':'en';
+  const language=()=>['en','ur','es'].includes(document.documentElement.lang)?document.documentElement.lang:'en';
   function translate(node,rule){
     const original=rule.attribute==='textContent'?node.textContent:node.getAttribute(rule.attribute);
     if(typeof original!=='string')return;
@@ -95,18 +114,19 @@
     let records=baselines.get(node);if(!records){records=new Map();baselines.set(node,records);}
     let key=rule.values.includes(current)?current:null,suffix='';
     if(!key&&rule.selector==='.wellbeing-time'){
-      const prefix=language()==='ur'?'Your score / ':ur['Your score']+' / ';
-      if(current.startsWith(prefix)){key='Your score';suffix=current.slice(prefix.length);}
+      for(const prefix of ['Your score / ',...catalogs.map(catalog=>(catalog['Your score']||'Your score')+' / ')]){
+        if(current.startsWith(prefix)){key='Your score';suffix=current.slice(prefix.length);break;}
+      }
     }
     if(key)records.set(rule.attribute,{key,suffix});
     else{
       const saved=records.get(rule.attribute);
-      if(saved&&rule.values.includes(saved.key)&&current===(ur[saved.key]||saved.key)+(saved.suffix?' / '+saved.suffix:'')){key=saved.key;suffix=saved.suffix;}
-      else key=rule.values.find(value=>ur[value]===current);
+      if(saved&&rule.values.includes(saved.key)&&catalogs.some(catalog=>current===(catalog[saved.key]||saved.key)+(saved.suffix?' / '+saved.suffix:''))){key=saved.key;suffix=saved.suffix;}
+      else key=rule.values.find(value=>catalogs.some(catalog=>catalog[value]===current));
     }
     if(!key)return;
     if(rule.attribute==='data-compact-label'){key=node.matches('#voice-mic')?'Audio':compact[key]||key;records.set(rule.attribute,{key,suffix});}
-    const value=original.slice(0,original.length-original.trimStart().length)+(language()==='ur'?ur[key]||key:key)+(suffix?' / '+suffix:'')+original.slice(original.trimEnd().length);
+    const value=original.slice(0,original.length-original.trimStart().length)+(({ur,es}[language()]||{})[key]||key)+(suffix?' / '+suffix:'')+original.slice(original.trimEnd().length);
     if(value===original)return;
     if(rule.attribute==='textContent'){
       if(node.children.length)return;
@@ -117,7 +137,7 @@
   function refresh(){
     scheduled=false;observer?.disconnect();
     try{
-      for(const node of document.querySelectorAll('.mission-nav, .mission-heading, .personal-conversation-heading'))if(node.getAttribute('lang')!==language())node.setAttribute('lang',language());
+      for(const node of document.querySelectorAll('.mission-nav, .mission-heading, .personal-conversation-heading, .book-editor, .book-search-dialog, .voice-dialog'))if(node.getAttribute('lang')!==language())node.setAttribute('lang',language());
       for(const rule of rules)for(const node of document.querySelectorAll(rule.selector))translate(node,rule);
     }
     finally{observe();}

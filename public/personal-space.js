@@ -76,7 +76,7 @@
     const input=root.querySelector('input');input.setAttribute('aria-label','Your wellbeing from 1 to 100');root.querySelector('.wellbeing-range-shell').append(input);root.querySelector('label').remove();
     const reset=create('button','wellbeing-reset','Reset score');reset.type='button';reset.hidden=true;reset.addEventListener('click',()=>{if(!owner()||identity?.storageScope!==owner())return;selections.delete(selectionKey());try{if(identity)localStorage.removeItem(storageKey());}catch{}renderScores();scheduleExpiry();window.dispatchEvent(new Event('mission-wellbeing-change'));});root.append(reset);
     const widget={root,input,reset,value:root.querySelector('strong'),label:root.querySelector('.wellbeing-readout span'),mouth:root.querySelector('path'),time:root.querySelector('.wellbeing-time'),preview:null};
-    // Фокус перед штатным перетаскиванием запрашивается без прокрутки к полю.
+    // Focus the native slider without scrolling to the field before dragging.
     input.addEventListener('pointerdown',()=>{if(!input.disabled&&document.activeElement!==input)input.focus({preventScroll:true});});
     input.addEventListener('input',()=>{const score=Number(input.value);if(input.disabled||!owner()||identity?.storageScope!==owner()||!Number.isInteger(score)||score<1||score>100)return;widget.preview={scope:owner(),score,at:Date.now()};renderScore(widget);});
     const commit=()=>{const value=widget.preview;widget.preview=null;if(value&&value.scope===owner())choose(value.score);};
