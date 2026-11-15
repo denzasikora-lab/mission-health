@@ -9,7 +9,7 @@
   "framesPerSecond": 24,
   "frameCount": 48,
   "processing": "Face-centered crop, MediaPipe person segmentation, composited onto the existing Laboratory / Avatar background; audio omitted.",
-  "purpose": "Public NASA footage for the diary preview only; not a personal health observation.",
+  "purpose": "Public NASA footage for the diary and archive previews; not a personal health observation.",
   "cropPixels": {
     "x": 258,
     "y": 463,

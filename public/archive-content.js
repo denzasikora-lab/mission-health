@@ -95,7 +95,11 @@
     const imported=wearable?.latest,summary=imported?.summary?.latest24h;if(summary&&wearable.source!=='demo'){const values=[];if(finite(summary.sleepSeconds))values.push('Sleep: '+number(summary.sleepSeconds/3600)+' h');if(finite(summary.activityCounts))values.push('Movement: '+number(summary.activityCounts,0)+' samples');if(finite(summary.meanLightLux))values.push('Average illuminance: '+number(summary.meanLightLux)+' lx');if(values.length)blocks.push('Actiwatch / personal import\n'+values.join('\n'));}
     return {id:'archive-current-results',title:'Current results',content:'Current results\n\n'+blocks.join('\n\n'),createdAt:now,archiveCurrent:true};
   }
+  function introEntry(){
+    return {id:'archive-nasa-flight-preview',archiveIntro:true,title:'A moment aboard the ISS',content:'A moment aboard the ISS\n\nMatthew Dominick / NASA\nTwo seconds of public flight footage.'};
+  }
   function presentation(entry){
+    if(entry.archiveIntro===true)return {title:'A moment aboard the ISS',content:entry.content,media:{kind:'video',url:'/assets/diary-demo/nasa-dominick-lab-2s.mp4',publicPreview:true},structured:true,source:'nasa',sourceUrl:'https://www.youtube.com/shorts/FKsghZt8bLs'};
     const value=observation(entry),sample=entry.archiveSample===true,current=entry.archiveCurrent===true;
     if(!value)return {content:readableText(entry.content),title:entry.title||'',media:null,structured:current,source:current?'current':'personal'};
     const title=plain(entry.title)||(value.kind==='video'?'Video observation':'Audio observation'),duration=finite(value.duration)&&value.duration>0?' / '+number(value.duration)+' s':'',player=media(value);if(sample&&player?.kind==='video')player.poster='/assets/stories/iss075e0003980.jpg';
@@ -109,5 +113,5 @@
   function renderText(root,text,create){
     for(const paragraph of text.split(/\n\s*\n/)){const [first,...rest]=paragraph.split('\n');if(headings.has(first)){const body=rest.join('\n');if(!body.trim())continue;const section=create('section','book-observation-section');section.append(create('h4','',first),create('p','',body));root.append(section);}else root.append(create('p','',paragraph));}
   }
-  window.missionArchiveContent={presentation,observation,latest,currentEntry,captureVisual,readableText,renderText,splitTrailingHeading,visualTitles};
+  window.missionArchiveContent={introEntry,presentation,observation,latest,currentEntry,captureVisual,readableText,renderText,splitTrailingHeading,visualTitles};
 })();

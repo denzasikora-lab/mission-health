@@ -22,6 +22,7 @@ class Node{
   replaceChildren(...nodes){this.children.forEach(node=>node.parent=null);this.children=[];this._text='';this.append(...nodes);}
   remove(){if(this.parent){this.parent.children=this.parent.children.filter(node=>node!==this);this.parent=null;}}
   before(node){if(this.parent){node.remove();node.parent=this.parent;this.parent.children.splice(this.parent.children.indexOf(this),0,node);}}
+  after(node){if(this.parent){node.remove();node.parent=this.parent;this.parent.children.splice(this.parent.children.indexOf(this)+1,0,node);}}
   setAttribute(key,value){if(key==='id')this.id=String(value);else this.attributes[key]=String(value);if(key==='hidden')this.hidden=true;if(key==='value')this.value=String(value);}
   getAttribute(key){return this.attributes[key]??null;}
   matches(selector){if(selector.includes(','))return selector.split(',').some(part=>this.matches(part.trim()));const pseudo=selector.match(/^(.*):(first|last)-child$/);if(pseudo)return this.matches(pseudo[1])&&this.parent?.children.at(pseudo[2]==='first'?0:-1)===this;if(selector.startsWith('.'))return this.classList.contains(selector.slice(1));if(selector.startsWith('#'))return this.id===selector.slice(1);const attr=selector.match(/^\[([^=\]]+)(?:="([^"]*)")?\]$/);return attr?attr[2]===undefined?this.attributes[attr[1]]!==undefined:this.getAttribute(attr[1])===attr[2]:this.tagName.toLowerCase()===selector;}
@@ -73,7 +74,7 @@ test('Pagination accounts for width and multiline text, the original entry remai
   const first=f.text();f.tap(320);assert.notEqual(f.text(),first);f.resize(1000);assert.equal(f.spread.dataset.pages,2);assert.equal(f.entries[0].content,content);assert.ok(!f.spread.querySelector('.book-page-text').textContent.includes('\uFFFD'));
 });
 test('Turning back loads earlier entries without an extra button or losing current text',async()=>{
-  const f=await fixture({entries:[entry('2'),entry('3')],older:[entry('1')]});f.open();assert.equal(f.text(),'Entry text 2');f.tap(20);await settle();assert.ok(f.requests.some(path=>path.includes('?cursor=')));assert.equal(f.text(),'Entry text 1');f.tap(350);assert.equal(f.text(),'Entry text 2');
+  const f=await fixture({entries:[entry('2'),entry('3')],older:[entry('1')],withArchive:true});f.open();for(let i=0;i<100&&f.text()!=='Entry text 2';i++)f.tap(350);assert.equal(f.text(),'Entry text 2');f.tap(20);await settle();assert.ok(f.requests.some(path=>path.includes('?cursor=')));assert.equal(f.text(),'Entry text 1');f.tap(350);assert.equal(f.text(),'Entry text 2');
 });
 
 test('Wide screens do not increase page capacity beyond the maximum spread width',async()=>{
@@ -88,9 +89,18 @@ test('An empty personal archive includes preloaded video and audio, current resu
   assert.deepEqual([...kinds].sort(),['AUDIO','VIDEO']);assert.ok(positions.size>=2);assert.ok(contents.some(text=>text.includes('No comparison')));assert.ok(contents.some(text=>text.includes('No personal recording saved yet')));assert.ok(!contents.join('\n').includes('"acoustic"'));assert.equal(f.favoriteIds.length,0);assert.match(f.node('book-position').textContent,/entries: 0/);
 });
 
+test('NASA footage stays on the first archive page, apart from personal records, and pauses on navigation',async()=>{
+  const original=entry('1','My saved observation'),f=await fixture({entries:[original],withArchive:true});f.open();
+  const page=f.spread.querySelector('.book-page'),video=page.querySelector('video'),link=page.querySelector('a');
+  assert.equal(video.src,'/assets/diary-demo/nasa-dominick-lab-2s.mp4');assert.equal(video.muted,true);assert.equal(video.defaultMuted,true);assert.equal(video.autoplay,true);assert.equal(video.loop,true);assert.equal(video.playsInline,true);assert.equal(video.controls,true);
+  assert.equal(link.href,'https://www.youtube.com/shorts/FKsghZt8bLs');assert.match(page.textContent,/Matthew Dominick/);assert.equal(page.querySelector('time'),null);assert.match(f.node('book-position').textContent,/entries: 1/);assert.ok(f.favoriteIds.every(id=>id==='1'));
+  const first=f.text();f.tap(350,video);assert.equal(f.text(),first);video.paused=false;f.swipe(-70);assert.equal(video.paused,true);assert.notEqual(f.text(),first);const turning=f.spread.querySelector('.book-turn-leaf').querySelector('video');assert.equal(turning.autoplay,false);assert.equal(turning.paused,true);f.tap(20);assert.equal(f.text(),first);f.tap(20);assert.equal(f.node('book-cover').hidden,false);
+  f.open();const replay=f.spread.querySelector('video');replay.paused=false;f.visible(false);assert.equal(replay.paused,true);assert.equal(original.content,'My saved observation');assert.equal(f.entries.length,1);assert.ok(f.requests.every(path=>path.startsWith('/api/')));
+});
+
 test('The player appears only in the first entry section, stops during page turns and when leaving the archive',async()=>{
   const value={...entry('1','Original text'),observation:{kind:'video',duration:12,mediaUrl:'/api/media-analysis/12345678-1234-1234-1234-123456789abc/media',transcript:'My speech. '.repeat(150),analysis:'Personal analysis',features:{acoustic:{level:-25,quiet:.1,clipping:0,seconds:12}},status:'analyzed'}},f=await fixture({entries:[value],withArchive:true});f.open();
-  for(let i=0;i<100&&!f.spread.querySelector('video');i++)f.tap(350);const first=f.spread.querySelector('video');assert.ok(first);assert.ok(first.src.startsWith('/api/'));first.paused=false;f.tap(350);assert.equal(first.paused,true);let found=true;
+  for(let i=0;i<100&&!f.spread.querySelectorAll('video').some(media=>media.src?.startsWith('/api/'));i++)f.tap(350);const first=f.spread.querySelectorAll('video').find(media=>media.src?.startsWith('/api/'));assert.ok(first);first.paused=false;f.tap(350);assert.equal(first.paused,true);let found=true;
   for(let i=0;i<100;i++){const media=f.spread.querySelector('video');if(media?.src?.startsWith('/api/')){found=true;assert.ok(f.spread.querySelector('.book-page').children.indexOf(media)<f.spread.querySelector('.book-page').children.findIndex(node=>node.classList.contains('book-page-text')));media.paused=false;f.visible(false);assert.equal(media.paused,true);break;}const position=f.node('book-position').textContent;f.tap(350);if(position===f.node('book-position').textContent)break;}
   assert.equal(found,true);assert.ok(f.favoriteIds.every(id=>id==='1'));assert.equal(value.content,'Original text');const second=await fixture({entries:[],withArchive:true});second.open();const active=second.spread.querySelector('video');active.paused=false;second.window.events.pagehide();assert.equal(active.paused,true);
 });

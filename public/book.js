@@ -34,24 +34,25 @@
   function pauseMedia(){for(const node of $b('book-spread').querySelectorAll('audio,video'))node.pause();}
   function pageNode(page,number,measuring=false){
     const article=create('article','book-page');
-    const display=page?.presentation,extra=page?.entry.archiveSample||page?.entry.archiveCurrent;
+    const display=page?.presentation,intro=page?.entry.archiveIntro===true,extra=intro||page?.entry.archiveSample||page?.entry.archiveCurrent;
     if(display?.structured)article.classList.add('book-page-structured');
-    article.append(create('div','book-page-running',page?.entry.preflight?'PREFLIGHT / SIMULATED RECORD':page?.entry.archiveSample?'PRELOADED RECORDING / TECHNICAL SAMPLE':page?.entry.archiveCurrent?'MISSION HEALTH / CURRENT RESULTS':B.demo?'SAMPLE / FICTIONAL ENTRY':'MISSION HEALTH / PERSONAL ARCHIVE'));
+    article.append(create('div','book-page-running',intro?'NASA / PUBLIC FLIGHT FOOTAGE':page?.entry.preflight?'PREFLIGHT / SIMULATED RECORD':page?.entry.archiveSample?'PRELOADED RECORDING / TECHNICAL SAMPLE':page?.entry.archiveCurrent?'MISSION HEALTH / CURRENT RESULTS':B.demo?'SAMPLE / FICTIONAL ENTRY':'MISSION HEALTH / PERSONAL ARCHIVE'));
     if(page){
-      const date=create('time','book-page-date',stamp(page.entry.createdAt));date.dateTime=page.entry.createdAt;article.append(date);
+      if(!intro){const date=create('time','book-page-date',stamp(page.entry.createdAt));date.dateTime=page.entry.createdAt;article.append(date);}
       const lines=page.content.split('\n'),hasHeading=!page.part&&lines.length>1&&lines[0].trim().length>0&&lines[0].length<=72;
       article.append(create('h3','',page.part?'Continued':display?.title|| (hasHeading?lines[0]:'Recording')));
       if(!page.part&&page.entry.wellbeing&&!extra&&window.missionFavorites)article.append(window.missionFavorites.badge(page.entry.wellbeing));
       if(!page.part&&!B.demo&&!extra&&window.missionFavorites)article.append(window.missionFavorites.button(page.entry,'diary',B.profile));
       if(!page.part&&display?.media){
         const media=display.media,node=create(measuring?'div':media.kind,'book-media book-observation-media');
-        if(measuring)node.style.height=media.kind==='audio'?'54px':'210px';else{node.src=media.url;node.controls=true;node.preload='metadata';if(media.kind==='video'){node.playsInline=true;if(media.poster)node.poster=media.poster;}node.setAttribute('aria-label',media.kind==='video'?'Video observation recording':'Audio observation recording');}
+        if(measuring)node.style.height=media.kind==='audio'?'54px':'210px';else{node.src=media.url;node.controls=true;node.preload='metadata';if(media.kind==='video'){node.playsInline=true;if(media.poster)node.poster=media.poster;if(intro){node.muted=true;node.defaultMuted=true;node.autoplay=true;node.loop=true;node.setAttribute('muted','');node.setAttribute('playsinline','');}}node.setAttribute('aria-label',intro?'NASA astronaut Matthew Dominick / two-second preview':media.kind==='video'?'Video observation recording':'Audio observation recording');}
         article.append(node);
       }
       const body=hasHeading?lines.slice(1).join('\n').trim():page.content;
       const text=create('div','book-page-text');text.dir='auto';if(display?.structured&&window.missionArchiveContent)window.missionArchiveContent.renderText(text,body,create);else text.textContent=body;article.append(text);
       if(!page.part&&!display?.media)for(const media of page.entry.attachments||[]){const node=create(measuring?'div':media.kind==='video'?'video':'img','book-media');if(measuring)node.style.height='210px';else{node.src=media.url;if(media.kind==='video'){node.controls=true;node.playsInline=true;node.preload='metadata';if(media.posterUrl)node.poster=media.posterUrl}else{node.alt=media.region||'Photo from entry';node.loading='lazy'}}article.append(node);}
-      article.append(create('div','book-page-foot',page.entry.preflight?'Preflight rehearsal / simulated data':page.entry.archiveSample?'Technical sample / not personal data':page.entry.archiveCurrent?'Personal results / without demonstration readings':'Personal entry / '+(page.part?'continued':'original text')));
+      const foot=create('div','book-page-foot',intro?'Public NASA preview / source 00:05-00:07 / ':page.entry.preflight?'Preflight rehearsal / simulated data':page.entry.archiveSample?'Technical sample / not personal data':page.entry.archiveCurrent?'Personal results / without demonstration readings':'Personal entry / '+(page.part?'continued':'original text'));
+      if(intro){const link=create('a','','NASA source');link.href=display.sourceUrl;link.target='_blank';link.rel='noopener noreferrer';foot.append(link);}article.append(foot);
     }else{
       article.classList.add('book-page-empty');article.append(create('span','book-empty-orbit','✧'),create('h3','',B.pages.length?'Room for a new story':'Your first chapter is ahead'),create('p','',B.pages.length?'Your next observation will appear here.':'Write down, how your day went. The book will preserve your words, and NasaGPT will help you return to them.'));
       const add=create('button','','Write a page');add.type='button';add.addEventListener('click',openEditor);article.append(add);
@@ -77,6 +78,7 @@
     const measure=create('div','book-measure');measure.style.width=layout.width+'px';measure.setAttribute('aria-hidden','true');stage.append(measure);
     const pages=[],capacity=Math.max(240,Math.floor((layout.width-50)/8)*Math.floor((layout.height-190)/24));
     try{
+      if(!B.demo&&B.profile===personalProfileId&&window.missionArchiveContent?.introEntry){const entry=window.missionArchiveContent.introEntry(),presentation=window.missionArchiveContent.presentation(entry);pages.push({entry,content:presentation.content,part:0,offset:0,presentation});}
       const personal=[...B.entries].sort((a,b)=>a.createdAt.localeCompare(b.createdAt)||a.id.localeCompare(b.id)),entries=B.demo?personal:[...B.samples,...(B.snapshot?[B.snapshot]:[]),...personal];
       for(const entry of entries){
         const presentation=window.missionArchiveContent?.presentation(entry),pending=tools.chunks(presentation?.content??entry.content,capacity);let part=0,offset=0;
@@ -135,11 +137,11 @@
   async function turn(direction){
     if(B.cover){if(direction>0){B.cover=false;B.index=0;draw()}return}
     if(direction<0&&B.index===0){clearTimeout(turnTimer);B.cover=true;draw();$b('book-cover').focus({preventScroll:true});return}
-    const firstPersonal=B.pages.findIndex(page=>!page.entry.archiveSample&&!page.entry.archiveCurrent),version=B.version;
+    const firstPersonal=B.pages.findIndex(page=>!page.entry.archiveIntro&&!page.entry.archiveSample&&!page.entry.archiveCurrent),version=B.version;
     if(direction<0&&firstPersonal>=0&&B.index<=firstPersonal&&B.index+perSpread()>firstPersonal&&B.hasMore&&!B.demo&&!B.loading)await load(true,{id:B.pages[firstPersonal].entry.id,offset:0});
     if(version!==B.version)return;
     const index=Math.max(0,B.index+direction*perSpread());if(index===B.index||index>=B.pages.length)return;
-    clearTimeout(turnTimer);$b('book-spread').querySelectorAll('.book-turn-leaf').forEach(node=>node.remove());const old=$b('book-spread').querySelector(direction>0?'.book-page:last-child':'.book-page:first-child')?.cloneNode(true);B.index=index;draw();if(old){old.classList.add('book-turn-leaf');if(direction<0)old.classList.add('previous');old.setAttribute('aria-hidden','true');$b('book-spread').append(old);turnTimer=setTimeout(()=>old.remove(),520);}
+    clearTimeout(turnTimer);$b('book-spread').querySelectorAll('.book-turn-leaf').forEach(node=>node.remove());const old=$b('book-spread').querySelector(direction>0?'.book-page:last-child':'.book-page:first-child')?.cloneNode(true);B.index=index;draw();if(old){for(const media of old.querySelectorAll('audio,video')){media.autoplay=false;media.pause();}old.classList.add('book-turn-leaf');if(direction<0)old.classList.add('previous');old.setAttribute('aria-hidden','true');$b('book-spread').append(old);turnTimer=setTimeout(()=>old.remove(),520);}
   }
   function openEditor(){editor.showModal();$b('book-entry-text').focus();}
   function exitBook(){
