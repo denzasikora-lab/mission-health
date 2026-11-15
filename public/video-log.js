@@ -58,6 +58,7 @@
   }
   function renderControls() {
     renderPreview();
+    cameraButton.dataset.phase = phase;
     const active = phase === 'live' || phase === 'recording';
     cameraButton.textContent = phase === 'requesting' ? 'Cancel connection' : phase === 'recording' ? 'Stop recording' : phase === 'finishing' ? 'Preparing recording' : active ? 'Disable camera' : 'Enable camera';
     cameraButton.disabled = phase === 'finishing';

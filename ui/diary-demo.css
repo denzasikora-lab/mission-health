@@ -1,0 +1,7 @@
+@import 'tailwindcss';
+@import 'konsta/react/theme.css';
+@source './diary-demo.jsx';
+:host{display:inline-flex;font:11px/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.diary-demo-button{height:26px!important;min-height:26px!important;min-width:52px!important;margin:0!important;padding:0 9px!important;border:1px solid var(--border,#315b61)!important;border-radius:7px!important;background:var(--field,#102126)!important;color:var(--text,#d3edf0)!important;font:500 11px/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif!important;text-transform:none!important}
+.diary-demo-button:disabled{opacity:.45}
+.diary-demo-button:focus-visible{outline:2px solid var(--accent,#83e2d7);outline-offset:3px}

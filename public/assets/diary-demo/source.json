@@ -1,0 +1,19 @@
+{
+  "sourceUrl": "https://www.youtube.com/shorts/FKsghZt8bLs",
+  "title": "Astronaut Matthew Dominick Flies Through The International Space Station",
+  "publisher": "NASA",
+  "person": "Matthew Dominick",
+  "sourceStartSeconds": 5,
+  "sourceEndSeconds": 7,
+  "durationSeconds": 2,
+  "framesPerSecond": 24,
+  "frameCount": 48,
+  "processing": "Face-centered crop, MediaPipe person segmentation, composited onto the existing Laboratory / Avatar background; audio omitted.",
+  "purpose": "Public NASA footage for the diary preview only; not a personal health observation.",
+  "cropPixels": {
+    "x": 258,
+    "y": 463,
+    "side": 758
+  },
+  "minimumPersonCoverage": 0.5802739197530864
+}

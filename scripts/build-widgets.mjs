@@ -13,6 +13,8 @@ export async function buildWidgets(root){
   const chips=resolve(root,'public/vendor/story-widgets.css');await writeFile(chips,(await readFile(chips,'utf8')).replace(/(-?(?:\d*\.)?\d+)rem\b/g,(_match,value)=>Number(value)*16+'px'),'utf8');
   await execute(process.execPath,[resolve(root,'node_modules/@tailwindcss/cli/dist/index.mjs'),'-i','ui/skin-badge.css','-o','public/vendor/skin-badge.css','--minify'],{cwd:root,maxBuffer:1024*1024});
   const badges=resolve(root,'public/vendor/skin-badge.css');await writeFile(badges,(await readFile(badges,'utf8')).replace(/(-?(?:\d*\.)?\d+)rem\b/g,(_match,value)=>Number(value)*16+'px'),'utf8');
+  await execute(process.execPath,[resolve(root,'node_modules/@tailwindcss/cli/dist/index.mjs'),'-i','ui/diary-demo.css','-o','public/vendor/diary-demo.css','--minify'],{cwd:root,maxBuffer:1024*1024});
+  const demo=resolve(root,'public/vendor/diary-demo.css');await writeFile(demo,(await readFile(demo,'utf8')).replace(/(-?(?:\d*\.)?\d+)rem\b/g,(_match,value)=>Number(value)*16+'px'),'utf8');
   await cp(resolve(root,'ui/konsta-LICENSE.txt'),resolve(root,'public/vendor/konsta-LICENSE.txt'));
   for(const name of ['react','react-dom'])await cp(resolve(root,'node_modules',name,'LICENSE'),resolve(root,'public/vendor',name+'-LICENSE.txt'));
 }
