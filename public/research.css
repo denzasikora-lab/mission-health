@@ -21,6 +21,10 @@
 #research-main .research-caption{font-size:.71rem}#research-main .research-empty{padding:24px 0;text-align:center}
 #research-main .research-use{border-top:1px solid var(--border);padding-top:12px;margin-top:12px}#research-main .research-use strong{font-size:.77rem}#research-main .research-use p{margin-top:4px}
 #research-main .research-source-line{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:.72rem;color:var(--muted)}
+#research-main .research-sources-used{margin:6px 0 16px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+#research-main .research-sources-used h3{margin:0;font-size:.83rem;line-height:1.4;color:var(--text)}#research-main .research-sources-used p{font-size:.73rem;margin:4px 0 10px}
+#research-main .research-source-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 20px;list-style:none;margin:0;padding:0}#research-main .research-source-list li{display:grid;align-content:start;gap:2px;min-width:0}#research-main .research-source-list a{font-size:.75rem;font-weight:600;line-height:1.45}#research-main .research-source-list span{font-size:.69rem;line-height:1.4;color:var(--muted)}
+@container research-content (max-width:540px){#research-main .research-source-list{grid-template-columns:minmax(0,1fr)}}
 #research-main a{color:var(--accent);overflow-wrap:anywhere}#research-main .research-source-line span{flex:1;min-width:160px}
 #research-main .research-themes{display:flex;gap:9px;flex-wrap:wrap;margin:18px 0}#research-main .research-themes span{font-size:.8rem;border:1px solid var(--border);border-radius:20px;padding:7px 12px;background:var(--inset)}
 #research-main .research-answer p{color:var(--text)}#research-main .research-citations{display:flex;gap:10px 20px;flex-wrap:wrap;font-size:.75rem;margin-top:14px}
