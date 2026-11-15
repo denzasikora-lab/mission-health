@@ -25,6 +25,11 @@ test('Personal baseline excludes future, different sources, wrong units and dupl
   const result=core.personalSeries(snapshot(6),records,'sleep_hours',7);assert.equal(result.points.length,4);assert.equal(result.baseline,7);assert.equal(result.delta,-1);
   assert.equal(core.personalSeries(snapshot(),[],'sleep_hours').baseline,null);
 });
+test('Research displays the agent summary without its unrelated clinical template or raw emphasis',async()=>{
+  const scope={};vm.runInNewContext(await readFile(new URL('worker/research.js',root),'utf8')+';globalThis.clean=researchAnswer;',scope);
+  assert.equal(scope.clean('STATUS:\nNORMAL\n\nALERTS:\n- An alert\n\nSUMMARY:\n**Sleep** stayed stable.'),'Sleep stayed stable.');
+  assert.equal(scope.clean(JSON.stringify({status:'NORMAL',alerts:[],summary:'Review the earlier sleep observations.'})),'Review the earlier sleep observations.');
+});
 test('NASA baselines retain the same participant or exercise group and original units',()=>{
   const sleep=data.sources.find(s=>s.key==='sleep'),a=core.sourceSeries(sleep,'C1G0001','sleep_hours');assert.ok(a.length>20);assert.ok(Math.abs(core.baseline(a)-(7+44/60+7+50/60)/2)<1e-10);
   const exercise=core.sourceSeries(data.sources.find(s=>s.key==='exercise'),'CTRL','value');assert.equal(exercise.length,13);assert.equal(exercise[0].label,'PRE 1');assert.ok(core.baseline(exercise)>0);

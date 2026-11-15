@@ -1,11 +1,17 @@
 const researchTopics=new Set(['recovery','blood','behavior']);
+function researchAnswer(value){
+  let text=value.trim().replace(/\*\*/g,'');
+  try{const parsed=JSON.parse(text.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,''));if(typeof parsed?.summary==='string')text=parsed.summary;}catch{}
+  const section=text.match(/(?:^|\n)\s*(?:SUMMARY|RESUMEN|خلاصہ)\s*:\s*([\s\S]+)$/i);
+  return (section?section[1]:text).trim().replace(/[\u2013\u2014]/g,'-');
+}
 async function nasaResearchEvidence(env,query,topic=null){
   const data=globalThis.MissionNasaData;if(!data)return {method:'offline',entries:[]};
   const allowed=data.evidence.filter(e=>!topic||e.topic===topic||e.topics?.includes(topic)),byId=new Map(allowed.map(e=>[e.id,e]));
   if(memoryConfigured(env))try{
     const response=await memoryRequest(env,'/search',{ownerId:data.scope,astronautId:'personal',query:query.slice(0,6000)},5000);
     const entries=[],seen=new Set();for(const match of response.matches||[]){if(!byId.has(match.id)||seen.has(match.id)||!Number.isFinite(match.score)||match.score<.35||match.score>1)continue;seen.add(match.id);entries.push(byId.get(match.id));}
-    if(entries.length)return {method:'qdrant',entries:entries.slice(0,3)};
+    if(entries.length){const diverse=[...new Map(entries.map(e=>[e.sourceKey,e])).values()];return {method:'qdrant',entries:[...diverse,...entries.filter(e=>!diverse.includes(e))].slice(0,3)};}
   }catch{}
   return {method:'catalog',entries:globalThis.MissionResearchCore.lexicalEvidence(data,query,topic)};
 }
@@ -43,7 +49,7 @@ async function researchAnalysisRoute(request,env,user,id){
     const context={...await researchPersonalContext(env,user,snapshot,input.days,input.topic),nasaStudy:study},evidence=await nasaResearchEvidence(env,researchQuery(input.topic,context),input.topic);
     if(!languageModelConfigured(env))fail('assistant_unavailable',503);
     const answer=await completeLanguageMessages(env,[{role:'system',content:'Explain personal observations with NASA research in '+languageName(responseLanguage(request))+'. Write at most three short paragraphs: personal change, relevant NASA context with source URL, and one practical follow-up observation. Do not use Markdown emphasis, clinical diagnosis, treatment or invented data. Cite personal note dates and distinguish measurements, user reports and synthetic Preflight data. Baseline is the earliest up to three comparable observations in the selected window; it is not a clinical or preflight baseline. The numeric changes below are precomputed; do not recalculate or equate cohort values with this user. Report absent laboratory values briefly only when relevant to the chosen question. If source=demo, this is a complete synthetic rehearsal; discuss supplied values and history as Preflight. Do not assert weekly changes when observations span minutes. '+nasaPrompt(evidence)}, {role:'user',content:JSON.stringify({topic:input.topic,...context})}],{attempts:1,timeoutMs:45000,maxCompletionTokens:900});
-    const createdAt=new Date().toISOString(),content=answer.text.replace(/\*\*/g,'').replace(/[\u2013\u2014]/g,'-').slice(0,9000),result={id:input.id,topic:input.topic,days:input.days,createdAt,content,observations:context.observations,synthetic:context.preflight,retrieval:evidence.method,references:evidence.entries.map(({id,sourceKey,title,url})=>({id,sourceKey,title,url})),personalReferences:context.memories.map(({id,createdAt,source})=>({id,createdAt,source})),saved:true};
+    const createdAt=new Date().toISOString(),content=researchAnswer(answer.text).slice(0,9000),result={id:input.id,topic:input.topic,days:input.days,createdAt,content,observations:context.observations,synthetic:context.preflight,retrieval:evidence.method,references:[...new Map(evidence.entries.map(({id,sourceKey,title,url})=>[url,{id,sourceKey,title,url}])).values()],personalReferences:context.memories.map(({id,createdAt,source})=>({id,createdAt,source})),saved:true};
     await db.batch([
       db.prepare('UPDATE research_analyses SET result_json=?,lease_until=0 WHERE id=? AND owner_id=? AND lease_until=?').bind(JSON.stringify(result),input.id,user,lease),
       db.prepare('INSERT OR IGNORE INTO journal_messages(id,owner_id,astronaut_id,role,content,language,created_at,vector_status,references_json,attachments_json,assistant_source) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(input.id,user,'personal','note','NASA research review / '+input.topic+' / '+input.days+' days\n'+(context.preflight?'Preflight / synthetic observations\n':'Personal observations\n')+content+'\nSources:\n'+result.references.map(r=>r.title+' '+r.url).join('\n'),responseLanguage(request),createdAt,'pending','[]','[]','research-analysis')
