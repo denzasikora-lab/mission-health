@@ -13,3 +13,11 @@
 .skin-spot-item>strong{font-weight:500}.skin-spot-item p{margin:8px 0;color:#8eaaa3}
 .skin-spot-colors{display:flex;flex-wrap:wrap;gap:10px;font-size:.6rem}.skin-spot-colors span{display:inline-flex;align-items:center;gap:6px}.skin-spot-colors i{width:15px;height:15px;flex:none;border:1px solid #8eaaa366;border-radius:50%}
 .skin-spots-panel details a{color:inherit}
+.skin-metric-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:5px;min-width:0}
+.skin-metric-heading .appearance-metric-title{flex:1;min-width:0}
+.skin-metric-badge{display:inline-flex;flex:none;line-height:16px}
+.skin-metric-badge[hidden],.skin-metric-delta[hidden]{display:none}
+.skin-metric-reading{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;min-width:0}
+.skin-metric-delta{font-size:.6rem;line-height:1.3;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--indicator)}
+#media-diary-dialog .appearance-metric[data-visual-extra^=skin-][data-level=amber]{border-color:var(--indicator)}
+#media-diary-dialog .appearance-metric[data-visual-extra^=skin-] .skin-metric-reading strong{color:var(--indicator)}

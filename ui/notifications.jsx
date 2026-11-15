@@ -2,6 +2,7 @@ import React from 'react';
 import {createRoot} from 'react-dom/client';
 import {KonstaProvider, Notification} from 'konsta/react';
 import './story-widgets.jsx';
+import './skin-badge.jsx';
 
 let host,root,current=null;
 function render(){

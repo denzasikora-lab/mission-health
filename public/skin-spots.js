@@ -4,8 +4,8 @@
   const grid=document.querySelector('#appearance-metrics'),cards=[];
   for(const [key,title] of [['new','New skin areas'],['changed','Pigmentation changes']]){
     const card=document.createElement('article');card.className='appearance-metric appearance-metric-extra';card.setAttribute('data-visual-extra','skin-'+key);card.setAttribute('data-level','neutral');
-    card.innerHTML='<span class="appearance-metric-title">'+title+'</span><strong id="skin-spots-'+key+'">-</strong><p class="appearance-metric-status">No comparison</p>';grid.append(card);
-    cards.push({node:card,value:card.querySelector('#skin-spots-'+key),status:card.querySelector('.appearance-metric-status')});
+    card.innerHTML='<div class="skin-metric-heading"><span class="appearance-metric-title">'+title+'</span><span id="skin-spots-'+key+'-badge" class="skin-metric-badge" hidden></span></div><div class="skin-metric-reading"><strong id="skin-spots-'+key+'">-</strong><span id="skin-spots-'+key+'-delta" class="skin-metric-delta" hidden></span></div><p id="skin-spots-'+key+'-state" class="appearance-metric-status">No comparison</p>';grid.append(card);
+    cards.push({node:card,value:card.querySelector('#skin-spots-'+key),status:card.querySelector('#skin-spots-'+key+'-state'),badge:card.querySelector('#skin-spots-'+key+'-badge'),delta:card.querySelector('#skin-spots-'+key+'-delta')});
   }
   document.querySelector('#appearance-extra-methods').append(root);
   const status=root.querySelector('#skin-spots-status'),referenceLabel=root.querySelector('#skin-spots-reference'),search=root.querySelector('#skin-spots-search'),list=root.querySelector('#skin-spots-items'),reset=root.querySelector('#skin-spots-reset');
@@ -17,10 +17,17 @@
   function render(){
     list.replaceChildren();const compared=report.status==='compared'&&!trial,sample=(trial||sampleAllowed)&&Boolean(sampleVisual)&&!compared;
     root.setAttribute('data-result-source',sample?'preflight':compared?'current':'missing');
-    for(const [index,card] of cards.entries()){card.value.textContent=compared?(index===0?report.newCount:report.changedCount):sample?(index===0?sampleVisual.skin.newCount:sampleVisual.skin.changedCount):'-';card.node.setAttribute('data-result-source',compared?'current':sample?'preflight':'missing');card.status.textContent=sample?'Preflight data / synthetic':compared?'Baseline comparison':'No comparison';}
+    for(const [index,card] of cards.entries()){
+      const count=compared?(index===0?report.newCount:report.changedCount):sample?(index===0?sampleVisual.skin.newCount:sampleVisual.skin.changedCount):null,notice=count>0;
+      card.value.textContent=count??'-';card.node.setAttribute('data-result-source',compared?'current':sample?'preflight':'missing');card.node.setAttribute('data-level',count===null?'neutral':notice?'amber':'green');
+      card.delta.hidden=count===null;card.delta.textContent=count===null?'':'Δ '+(count>0?'+':'')+count;card.delta.title='Change count versus baseline';
+      const badge=sample?'Test':notice?'Review':'';card.badge.hidden=!badge;card.badge.textContent=badge;card.badge.title=sample?'Synthetic test / no personal measurement':'New or changed area to review';window.missionKonstaBadge?.mount(card.badge,badge);
+      card.status.textContent=count===null?'No comparison':notice?(index===0?'New area / check':'Pigmentation changed / check'):'No change vs baseline';
+      card.node.setAttribute('aria-label',(index===0?'New skin areas':'Pigmentation changes')+': '+(count??'No comparison')+(sample?'. Synthetic test':count===null?'':'. Baseline comparison'));
+    }
     status.textContent=sample?'Preflight data / synthetic skin comparison':compared?'Available regions compared / candidates require review':reasons[report.reason]||reasons.need_frames;
     referenceLabel.textContent=sample?'Preflight baseline / 5 simulated frames':reference?'Baseline '+new Date(reference.at).toLocaleString('en-GB',{dateStyle:'short',timeStyle:'short'})+(storageOk?' / on this device':' / this session only'):'Forehead and both cheeks / baseline '+samples.length+' from 5 frames';
-    if(sample){reset.disabled=true;search.textContent='Synthetic area / 3.4 px diameter / color change 2.1 ΔE';return;}
+    if(sample){reset.disabled=true;search.textContent='Test: 0 → 1 new area / same face before and after';return;}
     for(const item of report.items){
       const node=document.createElement('article'),title=document.createElement('strong'),detail=document.createElement('p'),colors=document.createElement('div');node.className='skin-spot-item';title.textContent=(item.change==='new'?'New contrasting area':item.change==='changed'?'Area changed':'Area matched')+' / '+names[item.region];
       detail.textContent='Equiv. diameter ≈ '+fmt(item.diameterPixels)+' px · area '+fmt(item.areaPixels)+' px²'+(item.baseline?' · area '+(item.areaChangePercent>0?'+':'')+fmt(item.areaChangePercent)+'% · color '+fmt(item.deltaE)+' ΔE':' · not detected in baseline');
@@ -63,6 +70,7 @@
   function pending(value){const clean=core.validate(value);if(clean?.status==='compared'&&clean.trackingKey===reference?.trackingKey&&!latest){sampleAllowed=false;report=clean;render();search.textContent='Size and color measured / recording vectorization pending.';}}
   function encoded(value){const clean=core.validate(value);if(!clean||clean.status==='compared'&&clean.trackingKey!==reference?.trackingKey)return;sampleAllowed=false;if(!latest){report=clean;render();}const count=clean.items.filter(v=>v.vector).length;search.textContent=count?'For '+count+' regions vectorized / searching earlier entries.':'Region vectors unavailable / pixel comparison preserved.';}
   function matches(value,trackingKey){if(trackingKey!==reference?.trackingKey||!Array.isArray(value)||value.length>4)return;search.textContent=value.length?'Similar regions found in '+new Set(value.map(v=>v.recordId)).size+' earlier entries. Similarity helps matching, it does not confirm the spot type.':'No comparable earlier vectors yet.';}
-  function preflight(enabled){trial=enabled;sampleAllowed=enabled;render();}
+  function preflight(enabled){if(latest)return;trial=enabled;sampleAllowed=enabled||report.status!=='compared';render();}
+  window.addEventListener?.('mission-badges-ready',render);
   window.missionSkinSpots={setScope,observe,pause,snapshot,pending,encoded,matches,preflight};render();
 })();

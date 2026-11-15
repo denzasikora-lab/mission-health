@@ -1,6 +1,6 @@
 (function(root){
   const deltas={width:.7,balance:.3,underEye:1.4,redness:.8,height:.4,jawWidth:.6,lowerFace:.5,eyeOpening:-.8,eyeBalance:.2,mouthWidth:.4,toneBalance:.6,underEyeBalance:.5};
-  const visual={deltas,age:{min:35,max:44},skin:{newCount:0,changedCount:1},cosine:.982};
+  const visual={deltas,age:{min:35,max:44},skin:{newCount:1,changedCount:0},cosine:.982};
   const transcript='Hello crew. I can hear you clearly. How are you feeling today? I slept well and I am ready for our next check in. This is a simulated preflight rehearsal.';
   function create(now=Date.now()){
     const units={heart_rate:'bpm',spo2:'%',body_temperature:'C',skin_temperature:'C',bp_systolic:'mmHg',bp_diastolic:'mmHg',respiratory_rate:'/min',fatigue_index:'/100',stress_index:'/100',wellbeing:'/100',recovery:'/100',sleep_hours:'h',hrv:'ms',steps:'steps',activity:'counts',light:'lx'};

@@ -54,7 +54,7 @@ function uiFixture(block=false,samples=null){
   vm.runInNewContext(uiSource,sandbox);return{api:sandbox.window.missionSkinSpots,storage,node,observe(v){now+=1000;sandbox.window.missionSkinSpots.observe(v,now);},context:scope=>({scope,since:0}),advance(){now+=5000;}};
 }
 test('Synthetic preflight counters cannot become a personal skin baseline',()=>{
-  const f=uiFixture(false,controlSamples),cards=f.node('#appearance-metrics').children;assert.equal(cards.length,2);assert.ok(cards.every(card=>card.attributes['data-result-source']==='preflight'));assert.equal(f.node('#skin-spots-new').textContent,0);assert.equal(f.node('#skin-spots-changed').textContent,1);assert.equal(f.node('#skin-spots-reset').disabled,true);assert.equal(f.api.snapshot(f.context('owner/camera')).report.status,'unavailable');assert.equal(f.storage.size,0);
+  const f=uiFixture(false,controlSamples),cards=f.node('#appearance-metrics').children;assert.equal(cards.length,2);assert.ok(cards.every(card=>card.attributes['data-result-source']==='preflight'));assert.equal(f.node('#skin-spots-new').textContent,1);assert.equal(f.node('#skin-spots-changed').textContent,0);assert.equal(f.node('#skin-spots-new-delta').textContent,'Δ +1');assert.equal(f.node('#skin-spots-new-badge').textContent,'Test');assert.equal(cards[0].attributes['data-level'],'amber');assert.equal(f.node('#skin-spots-changed-delta').textContent,'Δ 0');f.api.preflight(false);assert.equal(f.node('#skin-spots-new-badge').textContent,'Test');assert.equal(f.node('#skin-spots-reset').disabled,true);assert.equal(f.api.snapshot(f.context('owner/camera')).report.status,'unavailable');assert.equal(f.storage.size,0);
   f.api.setScope('owner/camera');assert.ok(cards.every(card=>card.attributes['data-result-source']==='missing'));assert.equal(f.node('#skin-spots-new').textContent,'-');for(let i=0;i<5;i++)f.observe(sample());assert.ok(cards.every(card=>card.attributes['data-result-source']==='current'));assert.equal(f.node('#skin-spots-new').textContent,0);assert.equal(f.api.snapshot(f.context('owner/camera')).report.status,'compared');
 });
 test('The controller preserves baselines by profile and camera, discards old frames and foreign contexts',()=>{
@@ -63,3 +63,13 @@ test('The controller preserves baselines by profile and camera, discards old fra
   f.api.setScope('owner-a/camera-a');for(let i=0;i<3;i++)f.observe(sample([mole()]));assert.equal(f.api.snapshot(f.context('owner-a/camera-a')).report.newCount,1);f.advance();assert.equal(f.api.snapshot(f.context('owner-a/camera-a')).report.status,'unavailable');
 });
 test('Storage failure shows a session baseline without promising persistence',()=>{const f=uiFixture(true);f.api.setScope('owner/camera');for(let i=0;i<5;i++)f.observe(sample());assert.equal(f.storage.size,0);assert.match(f.node('#skin-spots-reference').textContent,/this session only/);});
+
+test('A measured new area shows the count, delta and review badge without the test label',()=>{
+  const f=uiFixture(false,controlSamples),cards=f.node('#appearance-metrics').children;f.api.setScope('owner/camera');
+  assert.equal(f.node('#skin-spots-new-badge').hidden,true);assert.equal(f.node('#skin-spots-new-delta').hidden,true);
+  for(let i=0;i<5;i++)f.observe(sample());
+  assert.equal(f.node('#skin-spots-new').textContent,0);assert.equal(f.node('#skin-spots-new-delta').textContent,'Δ 0');assert.equal(f.node('#skin-spots-new-badge').hidden,true);
+  for(let i=0;i<3;i++)f.observe(sample([mole()]));
+  assert.equal(f.node('#skin-spots-new').textContent,1);assert.equal(f.node('#skin-spots-new-delta').textContent,'Δ +1');assert.equal(f.node('#skin-spots-new-badge').textContent,'Review');assert.equal(f.node('#skin-spots-new-badge').hidden,false);assert.equal(cards[0].attributes['data-level'],'amber');
+  assert.equal(f.node('#skin-spots-changed').textContent,0);assert.equal(cards[1].attributes['data-level'],'green');assert.equal(f.api.snapshot(f.context('owner/camera')).report.newCount,1);
+});
