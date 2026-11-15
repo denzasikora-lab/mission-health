@@ -17,6 +17,8 @@ For external-script development, use http://localhost:8765 and the [local Postma
 | GET, POST | `/api/readings` | Persist personal measurements and their provenance |
 | GET, POST | `/api/health-analysis` | Saved analysis or Analyze: rules plus Azure explanation |
 | GET | `/api/health-analysis/{id}` | One owned saved analysis |
+| POST | `/api/research-analysis` | Personal trends + retrieved NASA evidence + Azure; saves the review in Archive |
+| GET | `/api/research-analysis/{id}` | Owned review or pending status |
 | GET, POST | `/api/tasks` | List/create scheduled tasks |
 | PATCH, DELETE | `/api/tasks/{id}` | Edit/cancel a task |
 | POST | `/api/chat-files` | Upload an attachment; GET `/api/chat-files/{id}` retrieves it |
@@ -32,7 +34,9 @@ For external-script development, use http://localhost:8765 and the [local Postma
 
 `{profile}` is `personal`, `jessica-meir`, `jack-hathaway` or `christina-koch`. These are prototype profiles, not real astronauts' medical records. The default personal persona is **Cdr. Sara Khan / AST-014 / Orion Station / Expedition 7**.
 
-JSON requests use `Content-Type: application/json`. English and Urdu are supported through `x-mission-language: en|ur`; Russian is not an interface locale. Current additional/internal routes are defined in [worker/index.js](../worker/index.js).
+JSON requests use `Content-Type: application/json` and `x-mission-language: en|ur|es`. Current additional/internal routes are defined in [worker/index.js](../worker/index.js).
+
+Research body: `{id, topic, days, snapshot, study?}`. Optional `study: {source, participant, metric}` selects the exact NASA chart; values are validated against the bundled study. Use a UUID, `topic: recovery|blood|behavior`, `days: 1|7|30`, and the same snapshot format as Health Analyze. Reuse the unchanged request ID when retrying. Public NASA evidence has its own Qdrant namespace; personal history remains owner-scoped. Source data and checksums: `/data/nasa-research.json`.
 
 ## Send a message
 

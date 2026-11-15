@@ -14,7 +14,7 @@ import {createSessions} from '../server/session.mjs';
 const root=new URL('../',import.meta.url),publicOrigin='https://frontend.test',secret='synthetic-session-secret-with-at-least-32-bytes';
 const bundleDirectory=await mkdtemp(join(tmpdir(),'mission-worker-test-'));
 after(()=>rm(bundleDirectory,{recursive:true,force:true}));
-const modules=['public/analysis-samples.js','public/story-tags-core.js','worker/story-tags.js','public/skin-spots-core.js','public/apparent-age-core.js','public/appearance-core.js','public/face-session-core.js','public/actiwatch-core.js','worker/actiwatch.js','worker/activity.js','worker/scheduler.js','public/health-rules-core.js','worker/health-analysis.js','worker/personal.js','worker/photos.js','worker/stories.js','worker/local-reply.js','worker/speech.js','worker/training.js','worker/book.js','worker/compose.js','worker/media-analysis.js','worker/index.js'];
+const modules=['public/analysis-samples.js','public/story-tags-core.js','worker/story-tags.js','public/skin-spots-core.js','public/apparent-age-core.js','public/appearance-core.js','public/face-session-core.js','public/actiwatch-core.js','worker/actiwatch.js','worker/activity.js','worker/scheduler.js','public/health-rules-core.js','worker/health-analysis.js','worker/readings.js','worker/research-evidence.js','public/research-core.js','worker/research.js','worker/personal.js','worker/photos.js','worker/stories.js','worker/local-reply.js','worker/speech.js','worker/training.js','worker/book.js','worker/compose.js','worker/media-analysis.js','worker/index.js'];
 await writeFile(join(bundleDirectory,'worker.mjs'),'const assets={};\n'+(await Promise.all(modules.map(path=>readFile(new URL(path,root),'utf8')))).join('\n'));
 const actualWorker=(await import(pathToFileURL(join(bundleDirectory,'worker.mjs')))).default;
 async function fixture(t,options={}){
@@ -83,7 +83,7 @@ test('Declared and chunked oversized bodies are rejected before Worker writes',a
 });
 test('Aggregate object capacity returns a bounded error before adding another uploaded file',async t=>{
   const f=await fixture(t,{storageLimits:{maxStorageBytes:70}}),cookie=await f.mint();
-  async function upload(size){const form=new FormData();form.set('room','private');form.set('file',new Blob([new Uint8Array(size)]),'synthetic.bin');const encoded=new Request(publicOrigin,{method:'POST',body:form});return f.run('/api/chat-files',{method:'POST',cookie,headers:{...origin,'content-type':encoded.headers.get('content-type')},body:Buffer.from(await encoded.arrayBuffer())});}
+  async function upload(size){const form=new FormData();form.set('room','private');form.set('file',new Blob(['x'.repeat(size)],{type:'text/plain'}),'synthetic.txt');const encoded=new Request(publicOrigin,{method:'POST',body:form});return f.run('/api/chat-files',{method:'POST',cookie,headers:{...origin,'content-type':encoded.headers.get('content-type')},body:Buffer.from(await encoded.arrayBuffer())});}
   const first=await upload(50);assert.equal(first.status,201);const denied=await upload(30);assert.equal(denied.status,507);assert.deepEqual(denied.body,{error:'object_storage_limit'});assert.equal((await f.run(first.body.file.url,{cookie})).bytes.length,50);assert.equal((await f.storage.DB.prepare('SELECT COUNT(*) AS n FROM chat_files').first()).n,1);await f.restart();assert.equal((await upload(30)).status,507);
 });
 test('Persistent upstream quotas block excess AI calls across cookies and restarts while preserving rule-only results',async t=>{

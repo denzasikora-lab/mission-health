@@ -16,6 +16,7 @@ const files=['dist/backend/worker.mjs','public/standalone-session.js',...['stand
 for(const directory of ['server','worker'])for(const entry of await readdir(join(root,directory),{withFileTypes:true}))if(entry.isFile()&&/\.(?:mjs|js)$/.test(entry.name))files.push(directory+'/'+entry.name);
 for(const entry of await readdir(join(root,'drizzle'),{withFileTypes:true}))if(entry.isFile()&&entry.name.endsWith('.sql'))files.push('drizzle/'+entry.name);
 for(const name of ['analysis-samples','story-tags-core','skin-spots-core','apparent-age-core','appearance-core','face-session-core','actiwatch-core','health-rules-core'])files.push('public/'+name+'.js');
+files.push('public/research-core.js');
 const staging=await mkdtemp(join(tmpdir(),'mission-backend-package-')),checksums={};
 try{
   for(const path of files){await mkdir(dirname(join(staging,path)),{recursive:true});await cp(join(root,path),join(staging,path));checksums[path]=createHash('sha256').update(await readFile(join(staging,path))).digest('hex');}

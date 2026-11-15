@@ -245,6 +245,7 @@ const missionHandler={
       const user=owner(request,env);
       if(request.method!=='GET'&&((request.headers.get('origin')&&request.headers.get('origin')!==url.origin)||request.headers.get('sec-fetch-site')==='cross-site'))fail('forbidden',403);
       if(url.pathname==='/api/readings')return await readingsRoute(request,env,user);
+      const researchMatch=url.pathname.match(/^\/api\/research-analysis(?:\/([a-f0-9-]{36}))?$/i);if(researchMatch)return await researchAnalysisRoute(request,env,user,researchMatch[1]);
       const healthMatch=url.pathname.match(/^\/api\/health-analysis(?:\/([a-f0-9-]{36}))?$/i);if(healthMatch)return await healthAnalysisRoute(request,env,user,healthMatch[1]);
       if(url.pathname==='/api/preflight')return await preflightRoute(request,env,user,ctx);
       if(url.pathname==='/api/media-analysis'){const response=await mediaAnalysisRoute(request,env,user);if(request.method==='POST'&&(response.ok||response.status===503))ctx.waitUntil(syncPending(env,user,'personal'));return response;}

@@ -68,8 +68,8 @@
     anatomy.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.bodyMetric===state.metric)));
     const stats=document.querySelector('.mission-chart-stats');if(stats){const values=seriesFor(crew[state.crew],state.metric,state.period);stats.innerHTML=[['Mean',values.reduce((sum,value)=>sum+value,0)/values.length],['Min.',Math.min(...values)],['Max.',Math.max(...values)]].map(([label,value])=>`<div><span>${label}</span><strong>${format(value,state.metric)}<small> ${unit(state.metric)}</small></strong></div>`).join('');}
     const trendTitle=document.getElementById('trend-heading');trendTitle.removeAttribute('data-i18n');trendTitle.textContent='Comparison with personal baseline';
-    heading.querySelector('h1').textContent = state.workspace === 'research' ? ['library','blood','ecg'].includes(researchState.dataset) ? 'Research' : 'Measured observations' : 'Condition and observations';
-    document.getElementById('mission-heading-description').textContent = state.workspace === 'research' ? 'NASA OSD-575 / OSD-569 / BIDMC / MIT-BIH' : 'Key readings for the selected profile';
+    heading.querySelector('h1').textContent = state.workspace === 'research' ? 'Research' : 'Condition and observations';
+    document.getElementById('mission-heading-description').textContent = state.workspace === 'research' ? 'Personal changes / NASA evidence / saved interpretation' : 'Key readings for the selected profile';
     window.missionBook?.render();
     window.missionConversations?.render(state.view);
     const active = state.workspace === 'research' ? 'sources' : state.view === 'journal' ? 'archive' : state.view === 'health' ? 'observations' : ['chat','favorites','diary'].includes(state.view)?state.view:'overview';

@@ -18,6 +18,7 @@ Mission Health / Bug Busters / NASA Space Apps.
 | --- | --- |
 | NasaGPT Send | `POST /api/chat` |
 | Health Analyze | `POST /api/health-analysis` |
+| Research review with NASA | `POST /api/research-analysis` |
 | Audio/video analysis | `POST /api/media-analysis` |
 | Archive search and answer | `POST /api/astronauts/personal/book-search`, then `/book-answer` |
 | Scheduled tasks | `GET`, `POST /api/tasks`; `PATCH`, `DELETE /api/tasks/{id}` |
@@ -30,3 +31,5 @@ Vercel serves the frontend. The Node.js API and private SQLite/files run on **t2
 The repository is public. Forks and pull requests are open; direct write access requires a GitHub invitation. Merging into `main` deploys the frontend to Vercel. Backend releases are separate.
 
 Details: [API contract](API.md), [local setup](../CONTRIBUTING.md), [deployment](VERCEL_DEPLOYMENT.md), [local Postman requests](mission-health.postman_collection.json).
+
+Research uses verified NASA UTMB sleep/exercise tables, Inspiration4 CBC/CMP and the public Astronaut Journals report. Qdrant retrieves public evidence in a separate namespace from private history; Azure explains personal changes and saves the review in Archive. Cohort values never become personal readings or clinical norms. Sources and checksums: `/data/nasa-research.json`.
